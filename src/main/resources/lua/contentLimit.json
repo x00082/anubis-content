@@ -1,0 +1,15 @@
+{
+  "dirRefreshNumber":{
+    "limit":100,
+    "used":0
+  },
+  "lastModify":1598577465461,
+  "urlPreloadNumber":{
+    "limit":500,
+    "used":0
+  },
+  "urlRefreshNumber":{
+    "limit":1000,
+    "used":0
+  }
+}
