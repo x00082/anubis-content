@@ -22,7 +22,10 @@ public enum ErrorCode {
     DMORIGINJSON("0x001001", "源站参数错误"),
     DMWORKFLOW("0x001002", "请求workflow错误"),
     DMNAME("0x001003", "域名不能为空"),
-    DMTYPE("0x001004", "域名类型不正确");
+    DMTYPE("0x001004", "域名类型不正确"),
+
+    DUPLICATE("0x001005", "添加重复数据"),
+    NULLDATA("0x001006", "数据不存在");
 
     private String code;
     private String description;

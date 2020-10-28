@@ -8,28 +8,20 @@
  */
 package cn.com.pingan.cdn.controller;
 
-import java.util.List;
-
-import javax.servlet.http.HttpServletRequest;
-import javax.validation.Valid;
-
+import cn.com.pingan.cdn.common.ApiReceipt;
+import cn.com.pingan.cdn.common.ContentException;
+import cn.com.pingan.cdn.common.DomainException;
+import cn.com.pingan.cdn.facade.ContentServiceFacade;
+import cn.com.pingan.cdn.gateWay.GateWayHeaderDTO;
+import cn.com.pingan.cdn.validator.content.FreshCommand;
+import com.alibaba.fastjson.JSON;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
-import com.alibaba.fastjson.*;
-
-import cn.com.pingan.cdn.common.*;
-import cn.com.pingan.cdn.facade.ContentServiceFacade;
-import cn.com.pingan.cdn.gateWay.GateWayHeaderDTO;
-import cn.com.pingan.cdn.request.content.ContentVendorDTO;
-import cn.com.pingan.cdn.validator.content.FreshCommand;
+import javax.servlet.http.HttpServletRequest;
+import javax.validation.Valid;
 
 
 

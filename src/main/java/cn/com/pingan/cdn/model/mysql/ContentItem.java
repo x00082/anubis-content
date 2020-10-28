@@ -8,21 +8,12 @@
  */
 package cn.com.pingan.cdn.model.mysql;
 
-import java.util.Date;
-
-import javax.persistence.Column;
-import javax.persistence.Entity;
-import javax.persistence.EnumType;
-import javax.persistence.Enumerated;
-import javax.persistence.GeneratedValue;
-import javax.persistence.GenerationType;
-import javax.persistence.Id;
-import javax.persistence.SequenceGenerator;
-import javax.persistence.Table;
-
 import cn.com.pingan.cdn.common.HisStatus;
 import cn.com.pingan.cdn.common.RefreshType;
 import lombok.Data;
+
+import javax.persistence.*;
+import java.util.Date;
 
 /** 
  * @ClassName: ContentDisplay 
@@ -41,9 +32,9 @@ public class ContentItem {
     //@GeneratedValue(strategy=GenerationType.SEQUENCE,generator="CONTENTHIS_ID_GENERATOR")
     @GeneratedValue(strategy=GenerationType.IDENTITY)
     private Long id;
-    
-    @Column(name="task_id")
-    private String taskId;
+
+    @Column(name="item_id")
+    private String itemId;
     
     @Column(name = "type")
     @Enumerated(EnumType.STRING)
@@ -53,7 +44,7 @@ public class ContentItem {
     @Enumerated(EnumType.STRING)
     private HisStatus status;
 
-    @Column(name="content")
+    @Column(length=4096, name="content")
     private String content;
     
     @Column(name="message")
@@ -64,9 +55,12 @@ public class ContentItem {
     
     @Column(name="update_time")
     private Date updateTime;
-    
-    @Column(name="dynamic_vendor")
-    private String dynamicVendor;
-    
+
+    @Column(name="vendor")
+    private String vendor;
+
+    @Column(name="request_id")
+    private String requestId;
+
 
 }

@@ -1,0 +1,8 @@
+{
+  "mergeTaskId":"init",
+  "mergeUrlCount": 60,
+  "mergeDirCount": 10,
+  "mergePrefetcCount":60,
+  "totalLimit": 240,
+  "rateLimit":80
+}

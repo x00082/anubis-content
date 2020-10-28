@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration debug="false" scan="true" scanPeriod="1 seconds">
+
+    <springProperty scope="content" name="springAppName" source="spring.application.name" />
+    <contextName>logback</contextName>
+    <property name="log.path" value="/anubis/data/logs"/>
+
+    <appender name="console" class="ch.qos.logback.core.ConsoleAppender">
+       <!-- <filter class="ch.qos.logback.classic.filter.ThresholdFilter" >
+            <level>WARN</level>
+        </filter>-->
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [${springAppName},%X{X-B3-TraceId:-},%X{X-B3-SpanId:-}] ${PID:-} [%thread] %-5level %logger- %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <appender name="file" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <!--<file>${log.path}/${springAppName}.log</file>-->
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <!--<fileNamePattern>${log.path}.%d{yyyy-MM-dd}.%i.zip</fileNamePattern>-->
+            <fileNamePattern>${log.path}/%d{yyyyMMdd}/${springAppName}.log</fileNamePattern>
+            <maxHistory>30</maxHistory>
+
+            <!--<timeBasedFileNamingAndTriggeringPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedFNATP">
+            	<maxFileSize>100MB</maxFileSize>
+            </timeBasedFileNamingAndTriggeringPolicy>-->
+        </rollingPolicy>
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [${springAppName},%X{X-B3-TraceId:-},%X{X-B3-SpanId:-}] ${PID:-} [%thread] %-5level %logger- %msg%n
+            </pattern>
+        </encoder>
+    </appender>
+
+    <root level="info">
+        <appender-ref ref="console"/>
+        <appender-ref ref="file"/>
+    </root>
+
+    <!--<logger name="com.xxl.job.executor.service.info" level="WARN" additivity="false">
+        <appender-ref ref="console"/>
+        <appender-ref ref="file"/>
+    </logger>-->
+
+</configuration>

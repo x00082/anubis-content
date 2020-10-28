@@ -8,11 +8,6 @@
  */
 package cn.com.pingan.cdn.config;
 
-import java.util.Map;
-
-import javax.persistence.EntityManager;
-import javax.sql.DataSource;
-
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.orm.jpa.HibernateSettings;
@@ -25,6 +20,10 @@ import org.springframework.orm.jpa.JpaTransactionManager;
 import org.springframework.orm.jpa.LocalContainerEntityManagerFactoryBean;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.EnableTransactionManagement;
+
+import javax.persistence.EntityManager;
+import javax.sql.DataSource;
+import java.util.Map;
 
 /** 
  * @ClassName: mysqlConfig 
@@ -63,7 +62,7 @@ public class mysqlConfig {
 
     private Map<String, Object> getVendorProperties(DataSource dataSource) {
         Map<String, Object> ret = jpaProperties.getHibernateProperties(new HibernateSettings());
-        ret.put("hibernate.dialect", "org.hibernate.dialect.MySQL5Dialect");
+        ret.put("hibernate.dialect", "cn.com.pingan.cdn.config.MySQL5InnoDBDialectUtf8mb4");
         return ret;
     }
 

@@ -8,17 +8,12 @@
  */
 package cn.com.pingan.cdn.model.mysql;
 
-import java.util.Date;
-
-import javax.persistence.Column;
-import javax.persistence.EnumType;
-import javax.persistence.Enumerated;
-import javax.persistence.GeneratedValue;
-import javax.persistence.GenerationType;
-import javax.persistence.Id;
-
-import cn.com.pingan.cdn.common.HisStatus;
 import cn.com.pingan.cdn.common.RefreshType;
+import cn.com.pingan.cdn.common.TaskStatus;
+import lombok.Data;
+
+import javax.persistence.*;
+import java.util.Date;
 
 /** 
  * @ClassName: VendorContentTask 
@@ -27,25 +22,32 @@ import cn.com.pingan.cdn.common.RefreshType;
  * @date 2020年10月19日 上午10:08:51 
  *  
  */
+
+@Data
+@Entity
+@Table(name="vendor_task",schema="test")
 public class VendorContentTask {
     @Id
     @GeneratedValue(strategy=GenerationType.IDENTITY)
     private Long id;
     
-    @Column(name="content_item_id")
-    private String contentItemId;
-    
+    @Column(name="task_id")
+    private String taskId;
+
     @Column(name = "type")
     @Enumerated(EnumType.STRING)
     private RefreshType type;
-    
+
     @Column(name = "status")
     @Enumerated(EnumType.STRING)
-    private HisStatus status;
+    private TaskStatus status;
 
-    @Column(name="content")
+    @Column(length=4096, name="content")
     private String content;
-    
+
+    @Column(name="job_id")
+    private String jobId;
+
     @Column(name="message")
     private String message;
     
@@ -60,4 +62,7 @@ public class VendorContentTask {
     
     @Column(name="version")
     private int version;
+
+    @Column(name="item_id")
+    private String itemId;
 }

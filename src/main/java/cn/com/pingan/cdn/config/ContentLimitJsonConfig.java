@@ -8,16 +8,14 @@
  */
 package cn.com.pingan.cdn.config;
 
-import javax.annotation.PostConstruct;
-
+import com.alibaba.fastjson.JSONObject;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.io.IOUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Component;
 
-import com.alibaba.fastjson.JSONObject;
-
-import lombok.extern.slf4j.Slf4j;
+import javax.annotation.PostConstruct;
 
 /** 
  * @ClassName: ContentLimitJsonConfig 

@@ -8,13 +8,16 @@
  */
 package cn.com.pingan.cdn.service;
 
+import cn.com.pingan.cdn.common.ApiReceipt;
+import cn.com.pingan.cdn.common.ContentException;
+import cn.com.pingan.cdn.common.RefreshType;
+import cn.com.pingan.cdn.gateWay.GateWayHeaderDTO;
+import cn.com.pingan.cdn.model.mysql.ContentHistory;
+
 import java.io.IOException;
 import java.util.List;
 
-import cn.com.pingan.cdn.common.ContentException;
-import cn.com.pingan.cdn.common.RefreshType;
-import cn.com.pingan.cdn.common.ApiReceipt;
-import cn.com.pingan.cdn.gateWay.GateWayHeaderDTO;;
+;
 
 /** 
  * @ClassName: ContentService 
@@ -25,11 +28,15 @@ import cn.com.pingan.cdn.gateWay.GateWayHeaderDTO;;
  */
 public interface ContentService {
     public ApiReceipt saveContent(GateWayHeaderDTO dto, List<String> data, RefreshType type) throws ContentException;
-    public ApiReceipt saveContentM(GateWayHeaderDTO dto, List<String> data, RefreshType type) throws ContentException;
+
+    public void saveContentItem(String requestId) throws ContentException;
+
 
     //ApiReceipt setUserContentNumber(ContentLimitDTO command);
 
     ApiReceipt getUserContentNumber(String spCode) throws IOException;
+
+    public ContentHistory findHisttoryByRequestId(String id)throws ContentException;
     
     public ApiReceipt test() throws ContentException;
 }

@@ -8,15 +8,12 @@
  */
 package cn.com.pingan.cdn.facade;
 
-import java.io.IOException;
-import java.util.List;
-
-import cn.com.pingan.cdn.common.ContentException;
-
-
 import cn.com.pingan.cdn.common.ApiReceipt;
+import cn.com.pingan.cdn.common.ContentException;
 import cn.com.pingan.cdn.gateWay.GateWayHeaderDTO;
 import cn.com.pingan.cdn.validator.content.FreshCommand;
+
+import java.util.List;
 
 /** 
  * @ClassName: ContentServiceFacade 

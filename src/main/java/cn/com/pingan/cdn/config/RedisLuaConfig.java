@@ -22,11 +22,20 @@ import org.springframework.stereotype.Component;
  *  
  */
 @Component
-public class RedisContentCountLuaConfig {
+public class RedisLuaConfig {
     @Bean("contentCountLuaScript")
     public RedisScript<Long> obtainCouponScript() {
         DefaultRedisScript<Long> redisScript = new DefaultRedisScript<>();
         redisScript.setLocation(new ClassPathResource("lua/count.lua"));
+        redisScript.setResultType(Long.class);
+        return redisScript;
+    }
+
+
+    @Bean("vendorQpsLuaScript")
+    public RedisScript<Long> vendorQpsLuaScript() {
+        DefaultRedisScript<Long> redisScript = new DefaultRedisScript<>();
+        redisScript.setLocation(new ClassPathResource("lua/qps.lua"));
         redisScript.setResultType(Long.class);
         return redisScript;
     }

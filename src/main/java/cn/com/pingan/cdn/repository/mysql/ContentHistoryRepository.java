@@ -8,18 +8,13 @@
  */
 package cn.com.pingan.cdn.repository.mysql;
 
-import java.util.Date;
-import java.util.List;
-
-import javax.transaction.Transactional;
-
+import cn.com.pingan.cdn.model.mysql.ContentHistory;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
-
-import cn.com.pingan.cdn.model.mysql.ContentHistory;
+import org.springframework.transaction.annotation.Transactional;
 
 /** 
  * @ClassName: ContentHistoryRepository 
@@ -30,7 +25,16 @@ import cn.com.pingan.cdn.model.mysql.ContentHistory;
  */
 @Repository
 public interface ContentHistoryRepository extends JpaRepository<ContentHistory, Long>, JpaSpecificationExecutor<ContentHistory> {
-    
+
+
+
+    ContentHistory findByRequestId(String requestId);
+
+    @Modifying
+    @Transactional
+    @Query(value = "update content_history h set h.status = ?2, h.update_time=current_timestamp where h.request_id =?1", nativeQuery = true)
+    int updateStatus(String id, String status);
+
     /*
     @Transactional
     @Modifying

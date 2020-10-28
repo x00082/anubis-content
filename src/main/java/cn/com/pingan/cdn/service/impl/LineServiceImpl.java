@@ -18,7 +18,7 @@ import cn.com.pingan.cdn.common.IdDTO;
 import cn.com.pingan.cdn.common.LineResponse;
 import cn.com.pingan.cdn.common.LineResponse.LineDetail;
 import cn.com.pingan.cdn.service.LineService;
-import cn.com.pingan.cdn.service.internal.LineClient;
+import cn.com.pingan.cdn.client.LineClientService;
 import lombok.extern.slf4j.Slf4j;
 
 /** 
@@ -33,7 +33,7 @@ import lombok.extern.slf4j.Slf4j;
 public class LineServiceImpl implements LineService {
 
     @Autowired
-    private LineClient lineClient;
+    private LineClientService lineClientService;
     
     /**
      * @Method: getLineByIds
@@ -47,7 +47,7 @@ public class LineServiceImpl implements LineService {
     @Override
     public List<LineDetail> getLineByIds(List<String> lineIds, boolean detail) throws DomainException {
         try {
-            LineResponse apiResponse = this.lineClient.getLineByIds(new IdDTO(String.join(",", lineIds), detail), "true");
+            LineResponse apiResponse = this.lineClientService.getLineByIds(new IdDTO(String.join(",", lineIds), detail), "true");
             if (!apiResponse.isSuccessful()) {
                 throw new DomainException("0x0002", apiResponse.getMessage());
             }

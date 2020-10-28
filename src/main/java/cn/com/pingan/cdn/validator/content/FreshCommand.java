@@ -8,12 +8,11 @@
  */
 package cn.com.pingan.cdn.validator.content;
 
-import java.util.List;
-
-import javax.validation.constraints.NotEmpty;
-
 import cn.com.pingan.cdn.validator.Command;
 import lombok.Data;
+
+import javax.validation.constraints.NotEmpty;
+import java.util.List;
 
 /** 
  * @ClassName: FreshCommand 

@@ -8,22 +8,20 @@
  */
 package cn.com.pingan.cdn.utils;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.UUID;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.util.StringUtils;
-
+import cn.com.pingan.cdn.common.ErrEnum;
+import cn.com.pingan.cdn.exception.RestfulException;
 import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.type.MapType;
 import com.fasterxml.jackson.databind.type.TypeFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.util.StringUtils;
 
-import cn.com.pingan.cdn.common.ErrEnum;
-import cn.com.pingan.cdn.exception.RestfulException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.UUID;
 
 /** 
  * @ClassName: Utils 

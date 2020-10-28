@@ -8,19 +8,18 @@
  */
 package cn.com.pingan.cdn.facade.internal;
 
-import java.util.List;
-
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-
 import cn.com.pingan.cdn.common.ApiReceipt;
 import cn.com.pingan.cdn.common.ContentException;
+import cn.com.pingan.cdn.common.RefreshType;
 import cn.com.pingan.cdn.facade.ContentServiceFacade;
 import cn.com.pingan.cdn.gateWay.GateWayHeaderDTO;
 import cn.com.pingan.cdn.service.ContentService;
-import cn.com.pingan.cdn.common.RefreshType;
 import cn.com.pingan.cdn.validator.content.FreshCommand;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import java.util.List;
 
 /** 
  * @ClassName: ContentServiceFacadeImpl 
