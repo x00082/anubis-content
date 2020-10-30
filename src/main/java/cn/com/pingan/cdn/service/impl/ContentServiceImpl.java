@@ -12,18 +12,21 @@ import cn.com.pingan.cdn.client.AnubisNotifyService;
 import cn.com.pingan.cdn.common.*;
 import cn.com.pingan.cdn.config.ContentLimitJsonConfig;
 import cn.com.pingan.cdn.config.RedisLuaScriptService;
+import cn.com.pingan.cdn.current.JxGaga;
 import cn.com.pingan.cdn.exception.RestfulException;
 import cn.com.pingan.cdn.gateWay.GateWayHeaderDTO;
 import cn.com.pingan.cdn.model.mysql.ContentHistory;
 import cn.com.pingan.cdn.model.mysql.ContentItem;
+import cn.com.pingan.cdn.model.mysql.DomainVendor;
 import cn.com.pingan.cdn.model.mysql.VendorContentTask;
 import cn.com.pingan.cdn.model.pgsql.Domain;
-import cn.com.pingan.cdn.rabbitmq.constants.Constants;
 import cn.com.pingan.cdn.rabbitmq.config.RabbitListenerConfig;
+import cn.com.pingan.cdn.rabbitmq.constants.Constants;
 import cn.com.pingan.cdn.rabbitmq.message.TaskMsg;
 import cn.com.pingan.cdn.rabbitmq.producer.Producer;
 import cn.com.pingan.cdn.repository.mysql.ContentHistoryRepository;
 import cn.com.pingan.cdn.repository.mysql.ContentItemRepository;
+import cn.com.pingan.cdn.repository.mysql.DomainVendorRepository;
 import cn.com.pingan.cdn.repository.mysql.VendorTaskRepository;
 import cn.com.pingan.cdn.repository.pgsql.DomainRepository;
 import cn.com.pingan.cdn.service.ContentService;
@@ -44,7 +47,9 @@ import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.*;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 /** 
  * @ClassName: ContentServiceImpl 
@@ -65,6 +70,9 @@ public class ContentServiceImpl implements ContentService {
 
     @Autowired
     private ContentItemRepository contentItemRepository;
+
+    @Autowired
+    private DomainVendorRepository domainVendorRepository;
 
     @Autowired
     private VendorTaskRepository vendorTaskRepository;
@@ -90,6 +98,9 @@ public class ContentServiceImpl implements ContentService {
     private int maxPreheat;
     @Value("${day.max.dirRefresh:1000}")
     private int maxDirRefresh;
+
+    @Value("${task.retry.num:3}")
+    private int limitRetry;
     
     
     @Autowired
@@ -175,74 +186,179 @@ public class ContentServiceImpl implements ContentService {
     }
 
     @Override
-    public void saveContentItem(String requestId) throws ContentException{
+    public void saveContentItem(TaskMsg taskMsg) throws ContentException{
+        String requestId = taskMsg.getTaskId();
         ContentHistory contentHistory = this.findHisttoryByRequestId(requestId);
+
+        if(contentHistory == null){
+            log.error("用户任务不存在,丢弃消息");
+            return;
+        }
+
+        if(taskMsg.getRetryNum() > limitRetry){
+            contentHistory.setStatus(HisStatus.FAIL);
+            log.error("超出重试次数,设置任务失败并丢弃消息");
+            return;
+        }
+
+        List<ContentItem> checkItems = contentItemRepository.findByRequestId(requestId);
 
         RefreshType type = contentHistory.getType();
 
-        List<String> urls = JSONArray.parseArray(contentHistory.getContent(), String.class);
-        Map<String, Set<String>> domainVendorsMap = null;
-        try {
-            domainVendorsMap = getDomainVendorsMap(urls);
-        }catch (Exception e){
-            //TODO
-        }
-
         List<ContentItem> contentItemList = new ArrayList<>();
-        List<VendorContentTask> vendorContentTask = new ArrayList<>();
-        URL domainUrl = null;
-        for( String u : urls){//性能待测
-            String itemId = UUID.randomUUID().toString().replaceAll("-", "");
-            ContentItem item = new ContentItem();
-            item.setRequestId(requestId);
-            item.setItemId(itemId);
-            item.setType(type);
-            item.setContent(u);
-            item.setCreateTime(new Date());
-            item.setStatus(HisStatus.WAIT);
 
+        if(checkItems == null || checkItems.size() != contentHistory.getContentNumber()) {
+            log.info("任务:{}入库不全{}，补全数据", requestId, checkItems);
+
+            List<String> urls = JSONArray.parseArray(contentHistory.getContent(), String.class);
+            List<String> lostUrls = new ArrayList<>();
+
+            if(checkItems != null && checkItems.size() != 0){
+                Map<String, ContentItem> existUrlMap = checkItems.stream().collect(Collectors.toMap(i->i.getContent(), i->i));
+                for(String s: urls){
+                    if(!existUrlMap.containsKey(s)){
+                        log.info("添加缺失url:{}",s);
+                        lostUrls.add(s);
+                    }
+                }
+                contentItemList.addAll(checkItems);
+            }else{
+                lostUrls.addAll(urls);
+            }
+
+            Map<String, Set<String>> domainVendorsMap = null;
             try {
-                domainUrl = new URL(u);
+                domainVendorsMap = getDomainVendorsMap(lostUrls);
             } catch (Exception e) {
-                log.error("parse url:{} failed, err:{}", u, e.getMessage());
-                throw RestfulException.builder().code(ErrEnum.ErrInternal.getCode()).message(e.getMessage()).build();
+                //TODO
+                taskMsg.setDelay(30000L);
+                taskMsg.setRetryNum(taskMsg.getRetryNum() + 1);
+                producer.sendTaskMsg(taskMsg);
             }
-            String host = domainUrl.getHost();
 
-            item.setVendor(JSONObject.toJSONString(domainVendorsMap.get(host)));
+            URL domainUrl = null;
+            for (String u : lostUrls) {//
+                String itemId = UUID.randomUUID().toString().replaceAll("-", "");
+                ContentItem item = new ContentItem();
+                item.setRequestId(requestId);
+                item.setItemId(itemId);
+                item.setType(type);
+                item.setContent(u);
+                item.setCreateTime(new Date());
+                item.setStatus(HisStatus.WAIT);
 
-            contentItemList.add(item);
+                try {
+                    domainUrl = new URL(u);
+                } catch (Exception e) {
+                    log.error("parse url:{} failed, err:{}", u, e.getMessage());
+                    throw RestfulException.builder().code(ErrEnum.ErrInternal.getCode()).message(e.getMessage()).build();
+                }
+                String host = domainUrl.getHost();
 
-            contentItemRepository.saveAndFlush(item);
+                item.setVendor(JSONObject.toJSONString(domainVendorsMap.get(host)));
 
-            for(String vendor : domainVendorsMap.get(host)){
-                VendorContentTask vendorTask = new VendorContentTask();
-                String taskId = UUID.randomUUID().toString().replaceAll("-", "");
-                vendorTask.setItemId(itemId);
-                vendorTask.setTaskId(taskId);
-                vendorTask.setVendor(vendor);
-                vendorTask.setType(type);
-                vendorTask.setContent(u);
-                vendorTask.setVersion(0);
-                vendorTask.setCreateTime(new Date());
-                vendorTask.setStatus(TaskStatus.WAIT);
-
-                vendorTaskRepository.saveAndFlush(vendorTask);
-                TaskMsg vendorTaskMsg = new TaskMsg();
-                vendorTaskMsg.setTaskId(taskId);
-                vendorTaskMsg.setVersion(0);
-                vendorTaskMsg.setOperation(TaskOperationEnum.getVendorOperation(vendor));
-                taskService.pushTaskMsg(vendorTaskMsg);
-
+                contentItemList.add(item);
             }
+
+            //校验入库正确
+            checkItems.clear();
+            checkItems = contentItemRepository.saveAll(contentItemList);
+            contentItemRepository.flush();//确保入库
+
+            if (checkItems == null || checkItems.size() != contentItemList.size()) {
+                //放回MQ
+                log.info("任务:{}, 拆分任务校验不正确", requestId);
+                taskMsg.setDelay(30000L);
+                taskMsg.setRetryNum(taskMsg.getRetryNum() + 1);
+                producer.sendDelayMsg(taskMsg);
+            }else{
+                log.info("任务:{}, 拆分任务校验正确", requestId);
+            }
+        }else {
+            log.info("任务:{}, 拆分任务入库已完整", requestId);
         }
+
+        /*
+        List<String> items = checkItems.stream().map(i->i.getItemId()).collect(Collectors.toList());
+
+        List<VendorContentTask> vendorContentTasks = vendorTaskRepository.findByItemIdList(items);
+*/
+        int totalTaskSize = checkItems.stream().collect(Collectors.summingInt(i -> JSONArray.parseArray(i.getVendor(),String.class).size() ));
+        log.info("总的厂商任务数量:[{}]",totalTaskSize);
+
+        List<VendorContentTask> succTasks = new ArrayList<>();
+        JxGaga gg = JxGaga.of(Executors.newCachedThreadPool(),checkItems.size());
+
+        for(ContentItem it : checkItems){
+
+            gg.work(() -> {
+                List<VendorContentTask> tempVendorContentTask = vendorTaskRepository.findByItemId(it.getItemId());
+                if(tempVendorContentTask.size() == JSONArray.parseArray(it.getVendor(), String.class).size() ){
+                    return tempVendorContentTask;
+
+                }else{
+                    List<String> lostVendors = new ArrayList<>();
+
+                    if(tempVendorContentTask.size() > 0){
+                        Map<String, VendorContentTask> vendorContentTaskMap = tempVendorContentTask.stream().collect(Collectors.toMap(i->i.getVendor(), i->i));
+                        for(String s: JSONArray.parseArray(it.getVendor(), String.class)){
+                            if(!vendorContentTaskMap.containsKey(s)){
+                                lostVendors.add(s);
+                            }
+                        }
+                    }else{
+                        lostVendors.addAll(JSONArray.parseArray(it.getVendor(), String.class));
+                    }
+                    List<VendorContentTask> vendorContentTask = new ArrayList<>();
+                    for(String s:lostVendors){
+                        VendorContentTask vendorTask = new VendorContentTask();
+                        String taskId = UUID.randomUUID().toString().replaceAll("-", "");
+                        vendorTask.setItemId(it.getItemId());
+                        vendorTask.setTaskId(taskId);
+                        vendorTask.setVendor(s);
+                        vendorTask.setType(type);
+                        vendorTask.setContent(it.getContent());
+                        vendorTask.setVersion(0);
+                        vendorTask.setCreateTime(new Date());
+                        vendorTask.setStatus(TaskStatus.WAIT);
+                        vendorContentTask.add(vendorTask);
+                    }
+                    tempVendorContentTask.clear();
+                    tempVendorContentTask = vendorTaskRepository.saveAll(vendorContentTask);
+                    if(tempVendorContentTask.size() == lostVendors.size()){
+                        log.info("拆分任务{}的厂商任务入库成功",it.getItemId());
+                        return tempVendorContentTask;
+                    }else{
+                        log.info("拆分任务{}的厂商任务入库失败",it.getItemId());
+                        throw new Exception();
+                    }
+                }
+
+            }, p -> {succTasks.addAll(p);}, q->{log.error("入库失败");
+            } );
+        }
+
+        gg.merge(i -> {
+            log.info("完成数量:[{}], 需要入库的总数为[{}]",i.size(), totalTaskSize);
+                    if(i.size() == totalTaskSize) {
+                        i.forEach(j -> {
+                            log.info("厂商任务入库成功{}", j);
+                            vendorTaskRepository.saveAndFlush(j);
+                            TaskMsg vendorTaskMsg = new TaskMsg();
+                            vendorTaskMsg.setTaskId(j.getTaskId());
+                            vendorTaskMsg.setVersion(0);
+                            vendorTaskMsg.setOperation(TaskOperationEnum.getVendorOperation(j.getVendor()));
+                            taskService.pushTaskMsg(vendorTaskMsg);
+
+                        });
+                    }else{
+                        taskMsg.setDelay(30000L);
+                        taskMsg.setRetryNum(taskMsg.getRetryNum() + 1);
+                        producer.sendDelayMsg(taskMsg);
+                    }
+        }, succTasks, 10, TimeUnit.SECONDS).exit();
     }
 
-    /*
-    @Override
-    ApiReceipt setUserContentNumber(ContentLimitDTO command);
-    */
-    
 
     @Override
     public ApiReceipt getUserContentNumber(String spCode) throws IOException {
@@ -380,9 +496,30 @@ public class ContentServiceImpl implements ContentService {
             log.error("cannot find all domains info from db");
             //throw RestfulException.ErrNoSuchDomain;
         }
+        List<DomainVendor> domianVendors = new ArrayList<>();
+        List<DomainVendor> tempDomianVendors = this.domainVendorRepository.findByDomainList(domains);
+        List<Domain> expireDomainInfos = new ArrayList<>();
+        for(DomainVendor d : tempDomianVendors){
+            if( new Date().getTime() -  d.getUpdateTime().getTime() < 60000L){
+                domianVendors.add(d);//未过期
+            }
+        }
+
+        if(domianVendors.size()>0){
+            Map<String, DomainVendor> mapDV = domianVendors.stream().collect(Collectors.toMap(i->i.getDomain(), i->i));
+            for(Domain d : domainInfos){
+                if(!mapDV.containsKey(d.getDomain())){
+                    expireDomainInfos.add(d);
+                }
+            }
+        }else{
+            expireDomainInfos.addAll(domainInfos);
+        }
+
+
         // 获取域名所在的厂商
         Set<String> lineIds = new HashSet<String>();
-        domainInfos.forEach(d -> {
+        expireDomainInfos.forEach(d -> {
             if (!StringUtils.isEmpty(d.getLineId())) {
                 lineIds.add(d.getLineId());
             } else {//TODO 切覆盖
@@ -414,8 +551,9 @@ public class ContentServiceImpl implements ContentService {
         });
 
         // domain: [vendor]
+        tempDomianVendors.clear();
         Map<String, Set<String>> domainVendorsMap = new HashMap<String, Set<String>>();
-        domainInfos.forEach(d -> {
+        expireDomainInfos.forEach(d -> {
             Set<String> domainVendors = domainVendorsMap.get(d);
             if (domainVendors == null) {
                 domainVendors = new HashSet<String>();
@@ -429,7 +567,23 @@ public class ContentServiceImpl implements ContentService {
                 }
             }
             domainVendorsMap.put(d.getDomain(), domainVendors);
+
+            List<String> vendor = new ArrayList<String>(domainVendors);
+            DomainVendor dv = new DomainVendor();
+            dv.setDomain(d.getDomain());
+            dv.setVendors(JSONObject.toJSONString(vendor));
+            dv.setUpdateTime(new Date());
+            tempDomianVendors.add(dv);
         });
+        if(tempDomianVendors != null && tempDomianVendors.size() > 0){
+            domainVendorRepository.saveAll(tempDomianVendors);
+        }
+
+        for(DomainVendor d :domianVendors){
+            domainVendorsMap.put(d.getDomain(), new HashSet<String>(JSONArray.parseArray(d.getVendors(),String.class)));
+        }
+
+
         log.info("domain-vendors:{}", domainVendorsMap);
 
         return domainVendorsMap;

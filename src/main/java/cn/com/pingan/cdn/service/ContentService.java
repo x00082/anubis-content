@@ -13,6 +13,7 @@ import cn.com.pingan.cdn.common.ContentException;
 import cn.com.pingan.cdn.common.RefreshType;
 import cn.com.pingan.cdn.gateWay.GateWayHeaderDTO;
 import cn.com.pingan.cdn.model.mysql.ContentHistory;
+import cn.com.pingan.cdn.rabbitmq.message.TaskMsg;
 
 import java.io.IOException;
 import java.util.List;
@@ -29,7 +30,7 @@ import java.util.List;
 public interface ContentService {
     public ApiReceipt saveContent(GateWayHeaderDTO dto, List<String> data, RefreshType type) throws ContentException;
 
-    public void saveContentItem(String requestId) throws ContentException;
+    public void saveContentItem(TaskMsg taskMsg) throws ContentException;
 
 
     //ApiReceipt setUserContentNumber(ContentLimitDTO command);

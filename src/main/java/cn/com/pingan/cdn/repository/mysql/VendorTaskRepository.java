@@ -33,6 +33,10 @@ public interface VendorTaskRepository extends JpaRepository<VendorContentTask, L
 
     List<VendorContentTask> findByItemId(String itemId);
 
+    @Modifying
+    @Transactional
+    @Query(value = "select * from vendor_task t  where t.item_id in ?1", nativeQuery = true)
+    List<VendorContentTask> findByItemIdList(List<String> itemIds);
 
     VendorContentTask findByTaskId(String taskId);
 }

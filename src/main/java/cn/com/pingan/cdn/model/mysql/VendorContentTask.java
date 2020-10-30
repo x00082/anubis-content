@@ -25,27 +25,33 @@ import java.util.Date;
 
 @Data
 @Entity
-@Table(name="vendor_task",schema="test")
+@Table(name="vendor_task",schema="test",
+        uniqueConstraints = {
+                @UniqueConstraint(columnNames = {"task_id"})
+        },
+        indexes = {
+                @Index(columnList = "item_id")
+        })
 public class VendorContentTask {
     @Id
     @GeneratedValue(strategy=GenerationType.IDENTITY)
     private Long id;
     
-    @Column(name="task_id")
+    @Column(length=128, name="task_id", nullable = false)
     private String taskId;
 
-    @Column(name = "type")
+    @Column(name = "type", length=32)
     @Enumerated(EnumType.STRING)
     private RefreshType type;
 
-    @Column(name = "status")
+    @Column(name = "status", length=32)
     @Enumerated(EnumType.STRING)
     private TaskStatus status;
 
     @Column(length=4096, name="content")
     private String content;
 
-    @Column(name="job_id")
+    @Column(name="job_id", length=128)
     private String jobId;
 
     @Column(name="message")
@@ -57,12 +63,12 @@ public class VendorContentTask {
     @Column(name="update_time")
     private Date updateTime;
     
-    @Column(name="vendor")
+    @Column(name="vendor", length=128)
     private String vendor;
     
     @Column(name="version")
     private int version;
 
-    @Column(name="item_id")
+    @Column(length=128, name="item_id")
     private String itemId;
 }

@@ -56,8 +56,7 @@ public class ContentConsumer {
             TaskMsg taskMsg = JSONObject.toJavaObject(msgObj, TaskMsg.class);
             log.info("转换对象{}", taskMsg);
 
-            String reqId = taskMsg.getTaskId();
-            contentService.saveContentItem(reqId);
+            contentService.saveContentItem(taskMsg);
 
         }catch (Exception e){
             log.info("拆分任务或生产厂商任务失败", e);

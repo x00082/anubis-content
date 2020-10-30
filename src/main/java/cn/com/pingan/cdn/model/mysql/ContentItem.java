@@ -24,23 +24,27 @@ import java.util.Date;
  */
 @Data
 @Entity
-@Table(name="content_item",schema="test")
+@Table(name="content_item",schema="test",
+        uniqueConstraints = {
+                @UniqueConstraint(columnNames = {"item_id"})
+        },
+        indexes = {
+                @Index(columnList = "request_id")
+        })
 public class ContentItem {
     
     @Id
-    //@SequenceGenerator(name="CONTENTHIS_ID_GENERATOR",sequenceName="contenthis_id_seq",allocationSize=1,schema="base")
-    //@GeneratedValue(strategy=GenerationType.SEQUENCE,generator="CONTENTHIS_ID_GENERATOR")
     @GeneratedValue(strategy=GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name="item_id")
+    @Column(length=128, name="item_id", nullable = false)
     private String itemId;
     
-    @Column(name = "type")
+    @Column(name = "type", length=32)
     @Enumerated(EnumType.STRING)
     private RefreshType type;
     
-    @Column(name = "status")
+    @Column(name = "status", length=32)
     @Enumerated(EnumType.STRING)
     private HisStatus status;
 
@@ -59,7 +63,7 @@ public class ContentItem {
     @Column(name="vendor")
     private String vendor;
 
-    @Column(name="request_id")
+    @Column(length=128, name="request_id")
     private String requestId;
 
 

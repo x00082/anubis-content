@@ -20,6 +20,7 @@ import com.alibaba.fastjson.JSONObject;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.stereotype.Service;
 
@@ -39,13 +40,17 @@ import java.util.NoSuchElementException;
 @Slf4j
 public class TaskServiceImpl implements TaskService {
 
+    @Value("${task.round.delay:60000L}")
+    private Long roundMs;
 
+    @Value("${task.round.limit:60000L}")
+    private Integer roundLimit;
 
-    private Long roundMs = 60000L;
-    private Integer roundLimit = 10;
+    @Value("${task.timeout.delay:3000L}")
+    private Long timeOutMs;
 
-    private Long timeOutMs = 3000L;
-    private Integer timeOutLimit = 3;
+    @Value("${task.timeout.limit:3}")
+    private Integer timeOutLimit;
 
 
     private ObjectMapper objectMapper = new ObjectMapper();
@@ -298,7 +303,7 @@ public class TaskServiceImpl implements TaskService {
                             }else{
                                 msg.setDelay(roundMs);
                             }
-                            log.info("刷新预热任务仍未完成，任务编号[{}], 等待{}ms后查询", json.getString("jobId"), roundMs);
+                            log.info("刷新预热任务未完成，任务编号[{}], 等待{}ms后查询", json.getString("jobId"), roundMs);
                             msg.setRetryNum(0);
                             flag = true;
                         } else {

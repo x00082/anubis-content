@@ -7,7 +7,12 @@ import javax.persistence.*;
 
 @Data
 @Entity
-@Table(name="vendor_info",schema="test")
+@Table(name="vendor_info",schema="test", uniqueConstraints = {
+        @UniqueConstraint(columnNames = {"vendor"})
+        },
+        indexes = {
+                @Index(columnList = "status")
+        })
 public class VendorInfo {
 
     @Id
@@ -39,7 +44,7 @@ public class VendorInfo {
     @Column(name = "merge_prefetc_count")
     private int mergePrefetcCount;
 
-    @Column(name = "status")
+    @Column(name = "status", length=16)
     private String status;//up,down
 
     public void setVendorInfo(VendorInfoDTO infoDTO){

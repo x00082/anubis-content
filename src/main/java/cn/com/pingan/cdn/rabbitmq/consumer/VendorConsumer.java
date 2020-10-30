@@ -34,7 +34,7 @@ public class VendorConsumer {
     private String[] vendorQueues = Constants.VENDOR_QUEUE;
 
     @Bean
-    public String[] vendorQueues(){
+    public String[] vendorQueues() {
         return vendorQueues;
     }
 
@@ -50,62 +50,303 @@ public class VendorConsumer {
     @Autowired
     private AnubisNotifyService notifyService;
 
+
+    void handlerMessage(TaskMsg taskMsg) throws Exception{
+        VendorInfo vendorInfo = taskService.findVendorInfo(TaskOperationEnum.getVendorString(taskMsg.getOperation()));
+        String vendorStatus = vendorInfo.getStatus();
+        if ("down".equals(vendorStatus)) {
+            taskMsg.setDelay(1 * 60 * 1000L);
+            taskService.pushTaskMsg(taskMsg);//放回队列
+            rabbitListenerConfig.stop(taskMsg.getOperation().name());//关闭监听
+            //发送通知
+        } else {
+
+            if (taskMsg.getIsLimit()) {//查询时不需要限制
+                //QPS限制
+                int qps = vendorInfo.getTotalQps();
+                String redisKey = taskMsg.getOperation().toString();
+                List<String> keys = new ArrayList<>();
+                keys.add(redisKey);
+                List<String> args = new ArrayList<>();
+                args.add(String.valueOf(qps));
+                // 0-成功，-1执行异常，-100超限
+                int result = luaScriptService.executeQpsScript(keys, args);
+                if (-100 == result) {
+                    log.warn("redis:{} Limit:{}", keys, qps);
+                    taskMsg.setDelay(500L);
+                    taskService.pushTaskMsg(taskMsg);
+                } else if (-1 == result) {
+                    log.warn("redis:{} Limit:{} 执行异常", keys, qps);
+                    taskMsg.setDelay(3000L);
+                    taskService.pushTaskMsg(taskMsg);//3秒后重试
+                } else {
+                    taskService.handlerTask(taskMsg);
+                }
+            } else {
+                taskService.handlerTask(taskMsg);
+            }
+        }
+    }
+/*
     @RabbitListener(queues = {"#{vendorQueues}"})
-    public void receive(Channel channel, Message message){
+    public void receive(Channel channel, Message message) {//TODO 拆分多个监听
         try {
 
-            String msg=new String(message.getBody());
-            JSONObject msgObj=JSONObject.parseObject(msg);
+            String msg = new String(message.getBody());
+            JSONObject msgObj = JSONObject.parseObject(msg);
 
             log.info("robbit mq receive a message{}", msg.toString());
 
             TaskMsg taskMsg = JSONObject.toJavaObject(msgObj, TaskMsg.class);
             log.info("转换对象{}", taskMsg);
 
-            VendorInfo vendorInfo = taskService.findVendorInfo(TaskOperationEnum.getVendorString(taskMsg.getOperation()));
-            String vendorStatus = vendorInfo.getStatus();
-            if("down".equals(vendorStatus)){
-                taskMsg.setDelay(1 * 60 * 1000L);
-                taskService.pushTaskMsg(taskMsg);//放回队列
-                rabbitListenerConfig.stop(taskMsg.getOperation().name());//关闭监听
-                //发送通知
-            }else {
+            handlerMessage(taskMsg);
 
-                if (taskMsg.getIsLimit()) {//查询时不需要限制
-                    //QPS限制
-                    int qps = vendorInfo.getTotalQps();
-                    String redisKey = taskMsg.getOperation().toString();
-                    List<String> keys = new ArrayList<>();
-                    keys.add(redisKey);
-                    List<String> args = new ArrayList<>();
-                    args.add(String.valueOf(qps));
-                    // 0-成功，-1执行异常，-100超限
-                    int result = luaScriptService.executeQpsScript(keys, args);
-                    if (-100 == result) {
-                        log.warn("redis:{} Limit:{}", keys, qps);
-                        taskMsg.setDelay(500L);
-                        taskService.pushTaskMsg(taskMsg);
-                    } else if (-1 == result) {
-                        log.warn("redis:{} Limit:{} 执行异常", keys, qps);
-                        taskMsg.setDelay(3000L);
-                        taskService.pushTaskMsg(taskMsg);//3秒后重试
-                    } else {
-                        taskService.handlerTask(taskMsg);
-                    }
-                } else {
-                    taskService.handlerTask(taskMsg);
-                }
-            }
-
-        }catch (Exception e){
+        } catch (Exception e) {
             log.info("消息处理异常", e);
-        }finally {
+        } finally {
 
             try {
-                channel.basicAck(message.getMessageProperties().getDeliveryTag(),false);
+                channel.basicAck(message.getMessageProperties().getDeliveryTag(), false);
             } catch (IOException e) {
                 log.error("VendorConsumer Ack Fail ");
             }
         }
     }
+*/
+
+    @RabbitListener(queues = Constants.CONTENT_VENDOR_ALIYUN)
+    public void receiveALIYUN(Channel channel, Message message) {
+        try {
+
+            String msg = new String(message.getBody());
+            JSONObject msgObj = JSONObject.parseObject(msg);
+
+            log.info("ALIYUN robbit mq receive a message{}", msg.toString());
+
+            TaskMsg taskMsg = JSONObject.toJavaObject(msgObj, TaskMsg.class);
+            log.info("转换对象{}", taskMsg);
+
+            handlerMessage(taskMsg);
+
+        } catch (Exception e) {
+            log.error("消息处理异常", e);
+        } finally {
+
+            try {
+                channel.basicAck(message.getMessageProperties().getDeliveryTag(), false);
+            } catch (IOException e) {
+                log.error("VendorConsumer Ack Fail ");
+            }
+        }
+    }
+
+    @RabbitListener(queues = Constants.CONTENT_VENDOR_BAISHAN)
+    public void receiveBAISHAN(Channel channel, Message message) {
+        try {
+
+            String msg = new String(message.getBody());
+            JSONObject msgObj = JSONObject.parseObject(msg);
+
+            log.info("BAISHAN robbit mq receive a message{}", msg.toString());
+
+            TaskMsg taskMsg = JSONObject.toJavaObject(msgObj, TaskMsg.class);
+            log.info("转换对象{}", taskMsg);
+
+            handlerMessage(taskMsg);
+
+        } catch (Exception e) {
+            log.error("receiveBAISHAN消息处理异常", e);
+        } finally {
+
+            try {
+                channel.basicAck(message.getMessageProperties().getDeliveryTag(), false);
+            } catch (IOException e) {
+                log.error("VendorConsumer Ack Fail ");
+            }
+        }
+    }
+
+    @RabbitListener(queues = Constants.CONTENT_VENDOR_CHINACHE)
+    public void receiveCHINACHE(Channel channel, Message message) {
+        try {
+
+            String msg = new String(message.getBody());
+            JSONObject msgObj = JSONObject.parseObject(msg);
+
+            log.info("CHINACHE robbit mq receive a message{}", msg.toString());
+
+            TaskMsg taskMsg = JSONObject.toJavaObject(msgObj, TaskMsg.class);
+            log.info("转换对象{}", taskMsg);
+
+            handlerMessage(taskMsg);
+
+        } catch (Exception e) {
+            log.error("receiveCHINACHE 消息处理异常", e);
+        } finally {
+
+            try {
+                channel.basicAck(message.getMessageProperties().getDeliveryTag(), false);
+            } catch (IOException e) {
+                log.error("VendorConsumer Ack Fail ");
+            }
+        }
+    }
+
+    @RabbitListener(queues = Constants.CONTENT_VENDOR_JDCLOUD)
+    public void receiveJDCLOUD(Channel channel, Message message) {
+        try {
+
+            String msg = new String(message.getBody());
+            JSONObject msgObj = JSONObject.parseObject(msg);
+
+            log.info("JDCLOUD robbit mq receive a message{}", msg.toString());
+
+            TaskMsg taskMsg = JSONObject.toJavaObject(msgObj, TaskMsg.class);
+            log.info("转换对象{}", taskMsg);
+
+            handlerMessage(taskMsg);
+
+        } catch (Exception e) {
+            log.error("receiveJDCLOUD 消息处理异常", e);
+        } finally {
+
+            try {
+                channel.basicAck(message.getMessageProperties().getDeliveryTag(), false);
+            } catch (IOException e) {
+                log.error("VendorConsumer Ack Fail ");
+            }
+        }
+    }
+
+    @RabbitListener(queues = Constants.CONTENT_VENDOR_KSYUN)
+    public void receiveKSYUN(Channel channel, Message message) {
+        try {
+
+            String msg = new String(message.getBody());
+            JSONObject msgObj = JSONObject.parseObject(msg);
+
+            log.info("KSYUN robbit mq receive a message{}", msg.toString());
+
+            TaskMsg taskMsg = JSONObject.toJavaObject(msgObj, TaskMsg.class);
+            log.info("转换对象{}", taskMsg);
+
+            handlerMessage(taskMsg);
+
+        } catch (Exception e) {
+            log.error("receiveKSYUN 消息处理异常", e);
+        } finally {
+
+            try {
+                channel.basicAck(message.getMessageProperties().getDeliveryTag(), false);
+            } catch (IOException e) {
+                log.error("VendorConsumer Ack Fail ");
+            }
+        }
+    }
+
+    @RabbitListener(queues = Constants.CONTENT_VENDOR_NET)
+    public void receiveNET(Channel channel, Message message) {
+        try {
+
+            String msg = new String(message.getBody());
+            JSONObject msgObj = JSONObject.parseObject(msg);
+
+            log.info("NET robbit mq receive a message{}", msg.toString());
+
+            TaskMsg taskMsg = JSONObject.toJavaObject(msgObj, TaskMsg.class);
+            log.info("转换对象{}", taskMsg);
+
+            handlerMessage(taskMsg);
+
+        } catch (Exception e) {
+            log.error("receiveNET 消息处理异常", e);
+        } finally {
+
+            try {
+                channel.basicAck(message.getMessageProperties().getDeliveryTag(), false);
+            } catch (IOException e) {
+                log.error("VendorConsumer Ack Fail ");
+            }
+        }
+    }
+
+    @RabbitListener(queues = Constants.CONTENT_VENDOR_QINIU)
+    public void receiveQINIU(Channel channel, Message message) {
+        try {
+
+            String msg = new String(message.getBody());
+            JSONObject msgObj = JSONObject.parseObject(msg);
+
+            log.info("QINIU robbit mq receive a message{}", msg.toString());
+
+            TaskMsg taskMsg = JSONObject.toJavaObject(msgObj, TaskMsg.class);
+            log.info("转换对象{}", taskMsg);
+
+            handlerMessage(taskMsg);
+
+        } catch (Exception e) {
+            log.error("receiveQINIU 消息处理异常", e);
+        } finally {
+
+            try {
+                channel.basicAck(message.getMessageProperties().getDeliveryTag(), false);
+            } catch (IOException e) {
+                log.error("VendorConsumer Ack Fail ");
+            }
+        }
+    }
+
+    @RabbitListener(queues = Constants.CONTENT_VENDOR_TENCENT)
+    public void receiveTENCENT(Channel channel, Message message) {
+        try {
+
+            String msg = new String(message.getBody());
+            JSONObject msgObj = JSONObject.parseObject(msg);
+
+            log.info("ALiYun robbit mq receive a message{}", msg.toString());
+
+            TaskMsg taskMsg = JSONObject.toJavaObject(msgObj, TaskMsg.class);
+            log.info("转换对象{}", taskMsg);
+
+            handlerMessage(taskMsg);
+
+        } catch (Exception e) {
+            log.error("receiveTENCENT 消息处理异常", e);
+        } finally {
+
+            try {
+                channel.basicAck(message.getMessageProperties().getDeliveryTag(), false);
+            } catch (IOException e) {
+                log.error("VendorConsumer Ack Fail ");
+            }
+        }
+    }
+
+    @RabbitListener(queues = Constants.CONTENT_VENDOR_VENUS)
+    public void receiveVENUS(Channel channel, Message message) {
+        try {
+
+            String msg = new String(message.getBody());
+            JSONObject msgObj = JSONObject.parseObject(msg);
+
+            log.info("VENUS robbit mq receive a message{}", msg.toString());
+
+            TaskMsg taskMsg = JSONObject.toJavaObject(msgObj, TaskMsg.class);
+            log.info("转换对象{}", taskMsg);
+
+            handlerMessage(taskMsg);
+
+        } catch (Exception e) {
+            log.error("receiveVENUS 消息处理异常", e);
+        } finally {
+
+            try {
+                channel.basicAck(message.getMessageProperties().getDeliveryTag(), false);
+            } catch (IOException e) {
+                log.error("VendorConsumer Ack Fail ");
+            }
+        }
+    }
+
 }
