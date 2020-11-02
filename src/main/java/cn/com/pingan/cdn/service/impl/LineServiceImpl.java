@@ -13,7 +13,7 @@ import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import cn.com.pingan.cdn.common.DomainException;
+import cn.com.pingan.cdn.exception.DomainException;
 import cn.com.pingan.cdn.common.IdDTO;
 import cn.com.pingan.cdn.common.LineResponse;
 import cn.com.pingan.cdn.common.LineResponse.LineDetail;

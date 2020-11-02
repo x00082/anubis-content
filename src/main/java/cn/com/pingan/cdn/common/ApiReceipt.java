@@ -12,6 +12,7 @@ import brave.Tracer;
 import cn.com.pingan.cdn.config.ApplicationContextProvider;
 import cn.com.pingan.cdn.common.ReceiptAssistant.ReceiptEnum;
 
+import cn.com.pingan.cdn.exception.ErrorCode;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.Setter;

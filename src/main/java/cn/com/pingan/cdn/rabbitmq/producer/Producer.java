@@ -1,7 +1,7 @@
 package cn.com.pingan.cdn.rabbitmq.producer;
 
 
-import cn.com.pingan.cdn.common.ErrEnum;
+import cn.com.pingan.cdn.exception.ErrEnum;
 import cn.com.pingan.cdn.exception.RestfulException;
 import cn.com.pingan.cdn.rabbitmq.constants.Constants;
 import cn.com.pingan.cdn.rabbitmq.message.TaskMsg;

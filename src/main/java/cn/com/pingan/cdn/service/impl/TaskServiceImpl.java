@@ -2,6 +2,7 @@ package cn.com.pingan.cdn.service.impl;
 
 import cn.com.pingan.cdn.client.*;
 import cn.com.pingan.cdn.common.*;
+import cn.com.pingan.cdn.config.RedisLuaScriptService;
 import cn.com.pingan.cdn.exception.RestfulException;
 import cn.com.pingan.cdn.model.mysql.ContentHistory;
 import cn.com.pingan.cdn.model.mysql.ContentItem;
@@ -40,17 +41,19 @@ import java.util.NoSuchElementException;
 @Slf4j
 public class TaskServiceImpl implements TaskService {
 
-    @Value("${task.round.delay:60000L}")
+    @Value("${task.round.delay:60000}")
     private Long roundMs;
 
-    @Value("${task.round.limit:60000L}")
+    @Value("${task.round.limit:10}")
     private Integer roundLimit;
 
-    @Value("${task.timeout.delay:3000L}")
+    @Value("${task.timeout.delay:3000}")
     private Long timeOutMs;
 
     @Value("${task.timeout.limit:3}")
     private Integer timeOutLimit;
+
+    private String roundRobinLimitPrefix = "robin_";
 
 
     private ObjectMapper objectMapper = new ObjectMapper();
@@ -100,6 +103,9 @@ public class TaskServiceImpl implements TaskService {
 
     @Autowired
     private Producer producer;
+
+    @Autowired
+    RedisLuaScriptService luaScriptService;
 
     @Override
     public void pushTaskMsg(TaskMsg msg) throws RestfulException{
@@ -171,8 +177,27 @@ public class TaskServiceImpl implements TaskService {
     @Override
     public Boolean handlerNewRequest(VendorContentTask task, TaskMsg msg) throws RestfulException {
         log.info("enter handlerNewRequest:{}",task);
-        JSONObject response = null;
         Boolean flag = true;
+
+        VendorInfo vendorInfo = this.findVendorInfo(TaskOperationEnum.getVendorString(msg.getOperation()));
+        if (msg.getIsLimit()) {//
+            //请求QPS限制
+            int qps = vendorInfo!=null?vendorInfo.getTotalQps():50;
+            String redisKey = msg.getOperation().toString();
+            // 0-成功，-1执行异常，-100超限
+            int result = handlerTaskLimit(msg, redisKey,qps);
+            if (-100 == result) {
+                log.warn("redis:{} Limit:{}", redisKey, qps);
+                msg.setDelay(1000L);
+                return flag;
+            } else if (-1 == result) {
+                log.warn("redis:{} Limit:{} 执行异常", redisKey, qps);
+                msg.setDelay(timeOutMs);
+                return flag;//3秒后重试
+            }
+        }
+
+        JSONObject response = null;
         RefreshPreloadData data = new RefreshPreloadData();
         List<String> urls = new ArrayList<>();
         urls.add(task.getContent());
@@ -180,7 +205,7 @@ public class TaskServiceImpl implements TaskService {
 
         VendorClientService vendorClient = getVendorClientVO(VendorEnum.getByCode(task.getVendor()));
         try{
-            switch (task.getType().getCode()){
+            switch (task.getType().name()){
                 case "url":
                     response = vendorClient.refreshUrl(data);
                     break;
@@ -194,7 +219,8 @@ public class TaskServiceImpl implements TaskService {
                     throw new Exception();
             }
             if(response == null){
-                throw new Exception();
+                log.error("response is null");
+                throw new Exception(task.getTaskId() + ": response is null");
             }
 
             log.info("response:{}", response);
@@ -223,7 +249,8 @@ public class TaskServiceImpl implements TaskService {
                 vendorTaskRepository.saveAndFlush(task);
 
             }else {
-                throw new Exception();
+                log.error("response:{} err ", response);
+                throw new Exception(task.getTaskId() + ": response err");
             }
 
         }catch (Exception e){
@@ -241,8 +268,28 @@ public class TaskServiceImpl implements TaskService {
     @Override
     public Boolean handlerRoundRobin(VendorContentTask task, TaskMsg msg) throws RestfulException {
         log.info("enter handlerRoundRobin:{}",task);
-        JSONObject response = null;
         Boolean flag = true;
+
+        //VendorInfo vendorInfo = this.findVendorInfo(TaskOperationEnum.getVendorString(msg.getOperation()));
+        if (msg.getIsLimit()) {//
+            //请求QPS限制
+            int limit = 10;
+            String redisKey = roundRobinLimitPrefix + msg.getOperation().toString();
+            // 0-成功，-1执行异常，-100超限
+            int result = handlerTaskLimit(msg, redisKey, limit);
+            if (-100 == result) {
+                log.warn("redis:{} Limit:{}", redisKey, limit);
+                msg.setDelay(1000L);
+                return flag;
+            } else if (-1 == result) {
+                log.warn("redis:{} Limit:{} 执行异常", redisKey, limit);
+                msg.setDelay(timeOutMs);
+                return flag;//3秒后重试
+            }
+        }
+
+        JSONObject response = null;
+
         RefreshPreloadTaskStatusDTO dto = new RefreshPreloadTaskStatusDTO();
         String type;
         if(task.getType().equals(RefreshType.url) || task.getType().equals(RefreshType.dir)){
@@ -267,6 +314,10 @@ public class TaskServiceImpl implements TaskService {
         VendorClientService vendorClient = getVendorClientVO(VendorEnum.getByCode(task.getVendor()));
         try {
             response = vendorClient.queryRefreshPreloadTask(dto);
+            if(response == null || !response.containsKey("data")){
+                log.error("response is null or no data");
+                throw new Exception(task.getTaskId() + ": response no data");
+            }
             log.info("response:{}", response);
 
             JSONArray jsonArray = response.getJSONArray("data");
@@ -321,7 +372,7 @@ public class TaskServiceImpl implements TaskService {
                 }
             }else{
                 log.info("返回无效数据{}", response);
-                throw new Exception();
+                throw new Exception(task.getTaskId());
             }
 
         }catch (Exception e){
@@ -435,6 +486,18 @@ public class TaskServiceImpl implements TaskService {
         }
         return null;
     }
+
+    public int handlerTaskLimit(TaskMsg msg, String key, int limit){
+        VendorInfo vendorInfo = this.findVendorInfo(TaskOperationEnum.getVendorString(msg.getOperation()));
+        //请求QPS限制
+        List<String> keys = new ArrayList<>();
+        keys.add(key);
+        List<String> args = new ArrayList<>();
+        args.add(String.valueOf(limit));
+        // 0-成功，-1执行异常，-100超限
+        return luaScriptService.executeQpsScript(keys, args);
+    }
+
 
     public void handleTaskRepositityException(Exception e) throws RestfulException {
         if (e instanceof EmptyResultDataAccessException || e instanceof NoSuchElementException) {

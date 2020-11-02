@@ -56,35 +56,11 @@ public class VendorConsumer {
         String vendorStatus = vendorInfo.getStatus();
         if ("down".equals(vendorStatus)) {
             taskMsg.setDelay(1 * 60 * 1000L);
-            taskService.pushTaskMsg(taskMsg);//放回队列
             rabbitListenerConfig.stop(taskMsg.getOperation().name());//关闭监听
+            taskService.pushTaskMsg(taskMsg);//放回队列
             //发送通知
         } else {
-
-            if (taskMsg.getIsLimit()) {//查询时不需要限制
-                //QPS限制
-                int qps = vendorInfo.getTotalQps();
-                String redisKey = taskMsg.getOperation().toString();
-                List<String> keys = new ArrayList<>();
-                keys.add(redisKey);
-                List<String> args = new ArrayList<>();
-                args.add(String.valueOf(qps));
-                // 0-成功，-1执行异常，-100超限
-                int result = luaScriptService.executeQpsScript(keys, args);
-                if (-100 == result) {
-                    log.warn("redis:{} Limit:{}", keys, qps);
-                    taskMsg.setDelay(500L);
-                    taskService.pushTaskMsg(taskMsg);
-                } else if (-1 == result) {
-                    log.warn("redis:{} Limit:{} 执行异常", keys, qps);
-                    taskMsg.setDelay(3000L);
-                    taskService.pushTaskMsg(taskMsg);//3秒后重试
-                } else {
-                    taskService.handlerTask(taskMsg);
-                }
-            } else {
-                taskService.handlerTask(taskMsg);
-            }
+            taskService.handlerTask(taskMsg);
         }
     }
 /*

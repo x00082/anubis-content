@@ -1,7 +1,7 @@
 package cn.com.pingan.cdn.service.impl;
 
 import cn.com.pingan.cdn.common.ApiReceipt;
-import cn.com.pingan.cdn.common.ErrorCode;
+import cn.com.pingan.cdn.exception.ErrorCode;
 import cn.com.pingan.cdn.model.mysql.VendorInfo;
 import cn.com.pingan.cdn.repository.mysql.VendorInfoRepository;
 import cn.com.pingan.cdn.request.VendorInfoDTO;
@@ -24,7 +24,7 @@ public class ConfigServiceImpl implements ConfigService {
     VendorInfoRepository vendorInfoRepository;
 
     @Override
-    public ApiReceipt addVendorInfo(VendorInfoDTO infoDTO) throws Exception {
+    public ApiReceipt addVendorInfo(VendorInfoDTO infoDTO) {
 
         VendorInfo info = vendorInfoRepository.findByVendor(infoDTO.getVendor());
         if(info == null){
@@ -40,7 +40,7 @@ public class ConfigServiceImpl implements ConfigService {
     }
 
     @Override
-    public ApiReceipt modifyVendorInfo(VendorInfoDTO infoDTO) throws Exception {
+    public ApiReceipt modifyVendorInfo(VendorInfoDTO infoDTO) {
 
         VendorInfo info = vendorInfoRepository.findByVendor(infoDTO.getVendor());
         if(info == null){
@@ -56,7 +56,7 @@ public class ConfigServiceImpl implements ConfigService {
     }
 
     @Override
-    public ApiReceipt delVendorInfo(String vendor) throws Exception {
+    public ApiReceipt delVendorInfo(String vendor) {
         VendorInfo info = vendorInfoRepository.findByVendor(vendor);
         if(info == null){
             log.info("{}厂商信息不存在", vendor);
@@ -67,7 +67,7 @@ public class ConfigServiceImpl implements ConfigService {
     }
 
     @Override
-    public ApiReceipt queryVendorInfo(String vendor) throws Exception{
+    public ApiReceipt queryVendorInfo(String vendor){
         VendorInfo info = vendorInfoRepository.findByVendor(vendor);
         if(info == null){
             log.info("{}厂商信息不存在", vendor);
@@ -77,15 +77,15 @@ public class ConfigServiceImpl implements ConfigService {
     }
 
     @Override
-    public Boolean setVendorStatus(VendorInfoDTO infoDTO) throws Exception{
+    public ApiReceipt setVendorStatus(VendorInfoDTO infoDTO){
         VendorInfo info = vendorInfoRepository.findByVendor(infoDTO.getVendor());
         if(info == null){
             log.info("{}厂商信息不存在", infoDTO.getVendor());
-            return false;
+            return ApiReceipt.error();
         }
 
         info.setStatus(infoDTO.getStatus());
         vendorInfoRepository.saveAndFlush(info);
-        return true;
+        return ApiReceipt.ok();
     }
 }

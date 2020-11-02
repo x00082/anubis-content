@@ -9,6 +9,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Date;
 import java.util.List;
 
 /**
@@ -37,6 +38,12 @@ public interface VendorTaskRepository extends JpaRepository<VendorContentTask, L
     @Transactional
     @Query(value = "select * from vendor_task t  where t.item_id in ?1", nativeQuery = true)
     List<VendorContentTask> findByItemIdList(List<String> itemIds);
+
+
+    @Modifying
+    @Transactional
+    @Query(value = "delete from vendor_task where create_time <?1", nativeQuery = true)
+    void clear(Date time);
 
     VendorContentTask findByTaskId(String taskId);
 }

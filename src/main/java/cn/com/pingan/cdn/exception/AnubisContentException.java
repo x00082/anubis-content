@@ -1,6 +1,5 @@
 package cn.com.pingan.cdn.exception;
 
-import cn.com.pingan.cdn.common.AnubisContentExceptionEnum;
 import lombok.Data;
 
 /**

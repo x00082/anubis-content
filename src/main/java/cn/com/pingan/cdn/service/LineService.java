@@ -10,7 +10,7 @@ package cn.com.pingan.cdn.service;
 
 import java.util.List;
 
-import cn.com.pingan.cdn.common.DomainException;
+import cn.com.pingan.cdn.exception.DomainException;
 import cn.com.pingan.cdn.common.LineResponse;
 
 /** 

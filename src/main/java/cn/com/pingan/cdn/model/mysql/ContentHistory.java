@@ -24,7 +24,7 @@ import java.util.Date;
  */
 @Data
 @Entity
-@Table(name="content_history",schema="test",
+@Table(name="content_history",
         uniqueConstraints = {
                 @UniqueConstraint(columnNames = {"request_id"})
         })
@@ -37,30 +37,30 @@ public class ContentHistory {
     @Column(length=128, name="request_id", nullable = false)
     private String requestId;
     
-    @Column(name = "type", length=32)
+    @Column(name = "type", length=32, nullable = false)
     @Enumerated(EnumType.STRING)
     private RefreshType type;
     
-    @Column(name = "status", length=32)
+    @Column(name = "status", length=32, nullable = false)
     @Enumerated(EnumType.STRING)
     private HisStatus status;
     
-    @Column(name="user_id", length=128)
+    @Column(name="user_id", length=128, nullable = false)
     private String userId;
     
-    @Column(length=4096, name="content")
+    @Column(length=4096, name="content", nullable = false)
     private String content;
     
-    @Column(name="create_time")
+    @Column(name="create_time", nullable = false)
     private Date createTime;
     
     @Column(name="update_time")
     private Date updateTime;
     
-    @Column(name="content_number")
+    @Column(name="content_number", nullable = false)
     private Integer contentNumber;
     
-    @Column(name="is_admin", length=16)
+    @Column(name="is_admin", length=16, nullable = false)
     private String isAdmin;
 
 }

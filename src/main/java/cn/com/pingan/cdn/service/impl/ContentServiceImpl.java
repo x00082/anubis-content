@@ -12,27 +12,20 @@ import cn.com.pingan.cdn.client.AnubisNotifyService;
 import cn.com.pingan.cdn.common.*;
 import cn.com.pingan.cdn.config.ContentLimitJsonConfig;
 import cn.com.pingan.cdn.config.RedisLuaScriptService;
-import cn.com.pingan.cdn.current.JxGaga;
+import cn.com.pingan.cdn.exception.ContentException;
+import cn.com.pingan.cdn.exception.ErrEnum;
 import cn.com.pingan.cdn.exception.RestfulException;
 import cn.com.pingan.cdn.gateWay.GateWayHeaderDTO;
-import cn.com.pingan.cdn.model.mysql.ContentHistory;
-import cn.com.pingan.cdn.model.mysql.ContentItem;
-import cn.com.pingan.cdn.model.mysql.DomainVendor;
-import cn.com.pingan.cdn.model.mysql.VendorContentTask;
+import cn.com.pingan.cdn.model.mysql.*;
 import cn.com.pingan.cdn.model.pgsql.Domain;
 import cn.com.pingan.cdn.rabbitmq.config.RabbitListenerConfig;
 import cn.com.pingan.cdn.rabbitmq.constants.Constants;
 import cn.com.pingan.cdn.rabbitmq.message.TaskMsg;
 import cn.com.pingan.cdn.rabbitmq.producer.Producer;
-import cn.com.pingan.cdn.repository.mysql.ContentHistoryRepository;
-import cn.com.pingan.cdn.repository.mysql.ContentItemRepository;
-import cn.com.pingan.cdn.repository.mysql.DomainVendorRepository;
-import cn.com.pingan.cdn.repository.mysql.VendorTaskRepository;
+import cn.com.pingan.cdn.repository.mysql.*;
 import cn.com.pingan.cdn.repository.pgsql.DomainRepository;
-import cn.com.pingan.cdn.service.ContentService;
-import cn.com.pingan.cdn.service.LineService;
-import cn.com.pingan.cdn.service.NotifyAlarmService;
-import cn.com.pingan.cdn.service.TaskService;
+import cn.com.pingan.cdn.request.openapi.ContentDefaultNumDTO;
+import cn.com.pingan.cdn.service.*;
 import cn.com.pingan.cdn.utils.Utils;
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONArray;
@@ -47,7 +40,6 @@ import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.*;
-import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
@@ -64,6 +56,9 @@ public class ContentServiceImpl implements ContentService {
     
     @Autowired
     private ContentHistoryRepository contentHistoryRepository;
+
+    @Autowired
+    private UserLimitRepository userLimitRepository;
     
     @Autowired
     private DomainRepository domainRepository;
@@ -99,8 +94,13 @@ public class ContentServiceImpl implements ContentService {
     @Value("${day.max.dirRefresh:1000}")
     private int maxDirRefresh;
 
+    static final long timeout = 365;
+
     @Value("${task.retry.num:3}")
     private int limitRetry;
+
+    @Value("${task.domain.vendor.expire:60000}")
+    private long domianVendorExpire;
     
     
     @Autowired
@@ -114,6 +114,9 @@ public class ContentServiceImpl implements ContentService {
     NotifyAlarmService notifyAlarmService;
     @Autowired
     RabbitListenerConfig rabbitListenerConfig;
+
+    @Autowired
+    private RedisService redisService;
     
 
     @Override
@@ -144,7 +147,6 @@ public class ContentServiceImpl implements ContentService {
             }else {
                 throw new ContentException("0x004014");
             }
-
         }
 
         data.clear();
@@ -197,6 +199,8 @@ public class ContentServiceImpl implements ContentService {
 
         if(taskMsg.getRetryNum() > limitRetry){
             contentHistory.setStatus(HisStatus.FAIL);
+            contentHistory.setUpdateTime(new Date());
+            contentHistoryRepository.save(contentHistory);
             log.error("超出重试次数,设置任务失败并丢弃消息");
             return;
         }
@@ -230,7 +234,7 @@ public class ContentServiceImpl implements ContentService {
             try {
                 domainVendorsMap = getDomainVendorsMap(lostUrls);
             } catch (Exception e) {
-                //TODO
+                log.error("获取厂商失败");
                 taskMsg.setDelay(30000L);
                 taskMsg.setRetryNum(taskMsg.getRetryNum() + 1);
                 producer.sendTaskMsg(taskMsg);
@@ -278,92 +282,123 @@ public class ContentServiceImpl implements ContentService {
             log.info("任务:{}, 拆分任务入库已完整", requestId);
         }
 
-        /*
-        List<String> items = checkItems.stream().map(i->i.getItemId()).collect(Collectors.toList());
-
-        List<VendorContentTask> vendorContentTasks = vendorTaskRepository.findByItemIdList(items);
-*/
         int totalTaskSize = checkItems.stream().collect(Collectors.summingInt(i -> JSONArray.parseArray(i.getVendor(),String.class).size() ));
-        log.info("总的厂商任务数量:[{}]",totalTaskSize);
+        log.info("需要生成厂商任务数量:[{}]",totalTaskSize);
 
-        List<VendorContentTask> succTasks = new ArrayList<>();
-        JxGaga gg = JxGaga.of(Executors.newCachedThreadPool(),checkItems.size());
+        List<String> itemIdList = new ArrayList<>();
+
+        List<VendorContentTask> lostVendorContentTask = new ArrayList<>();
 
         for(ContentItem it : checkItems){
 
-            gg.work(() -> {
-                List<VendorContentTask> tempVendorContentTask = vendorTaskRepository.findByItemId(it.getItemId());
-                if(tempVendorContentTask.size() == JSONArray.parseArray(it.getVendor(), String.class).size() ){
-                    return tempVendorContentTask;
+            itemIdList.add(it.getItemId());
+            int vendorNum = JSONArray.parseArray(it.getVendor(), String.class).size();
+            List<String> lostVendors = new ArrayList<>();
 
+            if(vendorNum == 0){
+                log.error("任务厂商列表为空");
+                //TODO
+            }else{
+                List<VendorContentTask> existVendorContentTask = vendorTaskRepository.findByItemId(it.getItemId());
+
+                if(existVendorContentTask.size() == JSONArray.parseArray(it.getVendor(), String.class).size() ){
+                    continue;
+
+                }else if(existVendorContentTask.size() ==0){
+                    lostVendors.addAll(JSONArray.parseArray(it.getVendor(), String.class));
                 }else{
-                    List<String> lostVendors = new ArrayList<>();
-
-                    if(tempVendorContentTask.size() > 0){
-                        Map<String, VendorContentTask> vendorContentTaskMap = tempVendorContentTask.stream().collect(Collectors.toMap(i->i.getVendor(), i->i));
-                        for(String s: JSONArray.parseArray(it.getVendor(), String.class)){
-                            if(!vendorContentTaskMap.containsKey(s)){
-                                lostVendors.add(s);
-                            }
+                    Map<String, VendorContentTask> vendorContentTaskMap = existVendorContentTask.stream().collect(Collectors.toMap(i->i.getVendor(), i->i));
+                    for(String s: JSONArray.parseArray(it.getVendor(), String.class)){
+                        if(!vendorContentTaskMap.containsKey(s)){
+                            lostVendors.add(s);
                         }
-                    }else{
-                        lostVendors.addAll(JSONArray.parseArray(it.getVendor(), String.class));
-                    }
-                    List<VendorContentTask> vendorContentTask = new ArrayList<>();
-                    for(String s:lostVendors){
-                        VendorContentTask vendorTask = new VendorContentTask();
-                        String taskId = UUID.randomUUID().toString().replaceAll("-", "");
-                        vendorTask.setItemId(it.getItemId());
-                        vendorTask.setTaskId(taskId);
-                        vendorTask.setVendor(s);
-                        vendorTask.setType(type);
-                        vendorTask.setContent(it.getContent());
-                        vendorTask.setVersion(0);
-                        vendorTask.setCreateTime(new Date());
-                        vendorTask.setStatus(TaskStatus.WAIT);
-                        vendorContentTask.add(vendorTask);
-                    }
-                    tempVendorContentTask.clear();
-                    tempVendorContentTask = vendorTaskRepository.saveAll(vendorContentTask);
-                    if(tempVendorContentTask.size() == lostVendors.size()){
-                        log.info("拆分任务{}的厂商任务入库成功",it.getItemId());
-                        return tempVendorContentTask;
-                    }else{
-                        log.info("拆分任务{}的厂商任务入库失败",it.getItemId());
-                        throw new Exception();
                     }
                 }
-
-            }, p -> {succTasks.addAll(p);}, q->{log.error("入库失败");
-            } );
+                log.info("生成任务厂商{}", lostVendors);
+                for(String s:lostVendors){
+                    VendorContentTask vendorTask = new VendorContentTask();
+                    String taskId = UUID.randomUUID().toString().replaceAll("-", "");
+                    vendorTask.setItemId(it.getItemId());
+                    vendorTask.setTaskId(taskId);
+                    vendorTask.setVendor(s);
+                    vendorTask.setType(type);
+                    vendorTask.setContent(it.getContent());
+                    vendorTask.setVersion(0);
+                    vendorTask.setCreateTime(new Date());
+                    vendorTask.setStatus(TaskStatus.WAIT);
+                    lostVendorContentTask.add(vendorTask);
+                }
+            }
         }
+        vendorTaskRepository.saveAll(lostVendorContentTask);
+        vendorTaskRepository.flush();
 
-        gg.merge(i -> {
-            log.info("完成数量:[{}], 需要入库的总数为[{}]",i.size(), totalTaskSize);
-                    if(i.size() == totalTaskSize) {
-                        i.forEach(j -> {
-                            log.info("厂商任务入库成功{}", j);
-                            vendorTaskRepository.saveAndFlush(j);
-                            TaskMsg vendorTaskMsg = new TaskMsg();
-                            vendorTaskMsg.setTaskId(j.getTaskId());
-                            vendorTaskMsg.setVersion(0);
-                            vendorTaskMsg.setOperation(TaskOperationEnum.getVendorOperation(j.getVendor()));
-                            taskService.pushTaskMsg(vendorTaskMsg);
+        List<VendorContentTask> allVendorContentTask = vendorTaskRepository.findByItemIdList(itemIdList);
+        int existSize = allVendorContentTask.size();
+        if(existSize != totalTaskSize){
+            log.error("厂商任务已入库数量{}, 需要{}", existSize, totalTaskSize);
+            taskMsg.setDelay(30000L);
+            taskMsg.setRetryNum(taskMsg.getRetryNum() + 1);
+            producer.sendDelayMsg(taskMsg);
+        }else{
+            log.info("厂商任务已入库数量{},并发送消息", existSize);
 
-                        });
-                    }else{
-                        taskMsg.setDelay(30000L);
-                        taskMsg.setRetryNum(taskMsg.getRetryNum() + 1);
-                        producer.sendDelayMsg(taskMsg);
-                    }
-        }, succTasks, 10, TimeUnit.SECONDS).exit();
+            for(VendorContentTask it:allVendorContentTask) {
+                TaskMsg vendorTaskMsg = new TaskMsg();
+                vendorTaskMsg.setTaskId(it.getTaskId());
+                vendorTaskMsg.setVersion(0);
+                vendorTaskMsg.setOperation(TaskOperationEnum.getVendorOperation(it.getVendor()));
+                taskService.pushTaskMsg(vendorTaskMsg);
+            }
+        }
+    }
+
+    @Override
+    public ApiReceipt setUserContentNumber(ContentLimitDTO command) {
+        StringBuilder redisKey = new StringBuilder("contentNumber_").append(command.getSpCode());
+        //默认设置为本次修改时间
+        command.setLastModify(new Date().getTime());
+
+        String redisValue = JSON.toJSONString(command);
+
+        redisService.set(redisKey.toString(), redisValue, timeout, TimeUnit.DAYS);
+
+        return ApiReceipt.ok();
     }
 
 
     @Override
     public ApiReceipt getUserContentNumber(String spCode) throws IOException {
-        // TODO 自动生成的方法存根
-        return null;
+        UserLimit userLimit = userLimitRepository.findByUserId(spCode);
+        StringBuilder redisKey = new StringBuilder("contentNumber_").append(spCode);
+
+        JSONObject contentLimit = contentLimitJsonConfig.getDefaultContentLimit();
+        long lastModify = System.currentTimeMillis();
+        if(contentLimit == null){
+            contentLimit = new JSONObject();
+            contentLimit.put("urlRefreshNumber",new Item(0, userLimit != null?userLimit.getDefaultUrlLimit():maxRefresh));
+            contentLimit.put("dirRefreshNumber",new Item(0, userLimit != null?userLimit.getDefaultDirLimit():maxDirRefresh));
+            contentLimit.put("urlPreloadNumber",new Item(0, userLimit != null?userLimit.getDefaultPreloadLimit():maxPreheat));
+
+        }
+        contentLimit.put("lastModify",lastModify);
+
+        List<String> keys = new ArrayList<>();
+        keys.add(redisKey.toString());
+
+        List<String> args  = new ArrayList<>();
+        args.add(String.valueOf(System.currentTimeMillis()));
+        args.add(contentLimit.toJSONString());
+        args.add(String.valueOf(todayTimeStamp()));
+        // null 失败
+        String result = luaScriptService.executeUserLimitScript(keys,args);
+        if(null == result){
+            //anubisNotifyService.emailNotifyApiException(new AnubisNotifyExceptionRequest("anubis-content",type.name(),new StringBuilder("spCode:").append(spCode).toString(),new ApiReceipt().getRequestId(),"超过每日数量上限"));
+            //throw new ContentException("0x004012");
+            return ApiReceipt.error();
+        }
+
+        return ApiReceipt.ok(JSONObject.parse(result));
     }
 
 
@@ -424,13 +459,15 @@ public class ContentServiceImpl implements ContentService {
     private void checkUserLimit(boolean adminFlag,RefreshType type,String spCode,int size) throws ContentException {
         if(adminFlag) return;
         //
+
+        UserLimit userLimit = userLimitRepository.findByUserId(spCode);
         JSONObject contentLimit = contentLimitJsonConfig.getDefaultContentLimit();
         long lastModify = System.currentTimeMillis();
         if(contentLimit == null){
             contentLimit = new JSONObject();
-            contentLimit.put("urlRefreshNumber",new Item(0, maxRefresh));
-            contentLimit.put("dirRefreshNumber",new Item(0, maxDirRefresh));
-            contentLimit.put("urlPreloadNumber",new Item(0, maxPreheat));
+            contentLimit.put("urlRefreshNumber",new Item(0, userLimit != null?userLimit.getDefaultUrlLimit():maxRefresh));
+            contentLimit.put("dirRefreshNumber",new Item(0, userLimit != null?userLimit.getDefaultDirLimit():maxDirRefresh));
+            contentLimit.put("urlPreloadNumber",new Item(0, userLimit != null?userLimit.getDefaultPreloadLimit():maxPreheat));
 
         }
         contentLimit.put("lastModify",lastModify);
@@ -467,6 +504,20 @@ public class ContentServiceImpl implements ContentService {
        return calendar.getTime().getTime();
     }
 
+    private boolean isToday(Long lastModify) {
+        Calendar calendar = Calendar.getInstance();
+        calendar.setTime(new Date());
+        calendar.set(Calendar.HOUR_OF_DAY, 0);
+        calendar.set(Calendar.MINUTE, 0);
+        calendar.set(Calendar.SECOND, 0);
+
+        if (lastModify != null && lastModify > calendar.getTime().getTime()) {
+            //
+            return true;
+        }
+        return false;
+    }
+
 
     public Map<String, Set<String>> getDomainVendorsMap(List<String> contents) throws Exception {
         Map<String, List<String>> domainUrlsMap = new HashMap<String, List<String>>();
@@ -500,7 +551,7 @@ public class ContentServiceImpl implements ContentService {
         List<DomainVendor> tempDomianVendors = this.domainVendorRepository.findByDomainList(domains);
         List<Domain> expireDomainInfos = new ArrayList<>();
         for(DomainVendor d : tempDomianVendors){
-            if( new Date().getTime() -  d.getUpdateTime().getTime() < 60000L){
+            if( new Date().getTime() -  d.getUpdateTime().getTime() < domianVendorExpire){
                 domianVendors.add(d);//未过期
             }
         }
@@ -516,7 +567,6 @@ public class ContentServiceImpl implements ContentService {
             expireDomainInfos.addAll(domainInfos);
         }
 
-
         // 获取域名所在的厂商
         Set<String> lineIds = new HashSet<String>();
         expireDomainInfos.forEach(d -> {
@@ -530,10 +580,15 @@ public class ContentServiceImpl implements ContentService {
 
 
 
-        List<LineResponse.LineDetail> lineInfos = this.lineService.getLineByIds(new ArrayList<String>(lineIds), true);
-        if (lineInfos.size() != lineIds.size()) {
-            log.error("cannot find all lines info lineIds:{}", lineIds);
-            //throw RestfulException.ErrNoSuchDomain;
+        List<LineResponse.LineDetail> lineInfos;
+        if(lineIds.size() > 0) {
+            lineInfos = this.lineService.getLineByIds(new ArrayList<String>(lineIds), true);
+            if (lineInfos.size() != lineIds.size()) {
+                log.error("cannot find all lines info lineIds:{}", lineIds);
+                //throw RestfulException.ErrNoSuchDomain;
+            }
+        }else{
+            lineInfos = new ArrayList<>();
         }
         Map<String, List<String>> lineIdVendorMap = new HashMap<String, List<String>>();
         lineInfos.forEach(l -> {
@@ -678,5 +733,30 @@ public class ContentServiceImpl implements ContentService {
         }
         
         return null;
+    }
+
+    @Override
+    public ApiReceipt setUserDefaultContentNumber(ContentDefaultNumDTO command) {
+        UserLimit userLimit = userLimitRepository.findByUserId(command.getSpCode());
+        if(userLimit == null){
+            userLimit = new UserLimit();
+        }
+        userLimit.setDefaultUrlLimit(command.getUrlRefreshNumber());
+        userLimit.setDefaultDirLimit(command.getDirRefreshNumber());
+        userLimit.setDefaultPreloadLimit(command.getUrlPreloadNumber());
+        userLimit.setUpdateTime(new Date());
+        userLimitRepository.save(userLimit);
+        return ApiReceipt.ok();
+    }
+
+    @Override
+    public ApiReceipt getUserDefaultContentNumber(String spCode) throws IOException {
+        UserLimit userLimit = userLimitRepository.findByUserId(spCode);
+        if(userLimit == null){
+            return ApiReceipt.ok();
+        }else{
+            return ApiReceipt.ok(userLimit.response());
+        }
+
     }
 }

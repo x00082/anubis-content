@@ -8,7 +8,7 @@
  */
 package cn.com.pingan.cdn.utils;
 
-import cn.com.pingan.cdn.common.ErrEnum;
+import cn.com.pingan.cdn.exception.ErrEnum;
 import cn.com.pingan.cdn.exception.RestfulException;
 import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.ObjectMapper;

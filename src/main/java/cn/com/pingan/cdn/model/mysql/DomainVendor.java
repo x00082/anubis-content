@@ -16,7 +16,7 @@ import java.util.Date;
  */
 @Data
 @Entity
-@Table(name="domain_vendor",schema="test")
+@Table(name="domain_vendor")
 public class DomainVendor {
 
     @Id

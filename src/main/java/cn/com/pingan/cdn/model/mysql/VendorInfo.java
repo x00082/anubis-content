@@ -7,7 +7,7 @@ import javax.persistence.*;
 
 @Data
 @Entity
-@Table(name="vendor_info",schema="test", uniqueConstraints = {
+@Table(name="vendor_info", uniqueConstraints = {
         @UniqueConstraint(columnNames = {"vendor"})
         },
         indexes = {
@@ -19,21 +19,14 @@ public class VendorInfo {
     @GeneratedValue(strategy= GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name="vendor")
+    @Column(name="vendor", nullable = false)
     private String vendor;
 
-    @Column(name = "refresh_url_qps")
-    private int refreshQps;
-
-    @Column(name = "refresh_dir_qps")
-    private int refreshDirQps;
-
-    @Column(name = "prefetc_qps")
-    private int prefetcQps;
-
-    @Column(name = "total_qps")
+    @Column(name = "total_qps", nullable = false)
     private int totalQps;
 
+    @Column(name = "total_size")
+    private int totalSize;
 
     @Column(name = "merge_url_count")
     private int mergeUrlCount;
@@ -44,27 +37,24 @@ public class VendorInfo {
     @Column(name = "merge_prefetc_count")
     private int mergePrefetcCount;
 
-    @Column(name = "status", length=16)
+    @Column(name = "status", length=16, nullable = false)
     private String status;//up,down
 
     public void setVendorInfo(VendorInfoDTO infoDTO){
-        this.refreshQps = infoDTO.getRefreshQps();
-        this.refreshDirQps = infoDTO.getRefreshDirQps();
-        this.prefetcQps = infoDTO.getPrefetcQps();
+
         this.totalQps = infoDTO.getTotalQps();
+        this.totalSize = infoDTO.getTotalSize();
         this.mergeUrlCount = infoDTO.getMergeUrlCount();
         this.mergeDirCount = infoDTO.getMergeDirCount();
-        this.mergePrefetcCount = infoDTO.getPrefetcQps();
+        this.mergePrefetcCount = infoDTO.getMergePrefetcCount();
         this.status = infoDTO.getStatus();
     }
 
     public VendorInfoDTO getVendorInfo(){
         VendorInfoDTO infoDTO = new VendorInfoDTO();
         infoDTO.setVendor(vendor);
-        infoDTO.setRefreshQps(refreshQps);
-        infoDTO.setRefreshDirQps(refreshDirQps);
-        infoDTO.setPrefetcQps(prefetcQps);
         infoDTO.setTotalQps(totalQps);
+        infoDTO.setTotalSize(totalSize);
         infoDTO.setMergeUrlCount(mergeUrlCount);
         infoDTO.setMergeDirCount(mergeDirCount);
         infoDTO.setMergePrefetcCount(mergePrefetcCount);

@@ -6,7 +6,7 @@
  * @author lujun  
  * @date 2020年10月15日 下午2:22:19 
  */
-package cn.com.pingan.cdn.common;
+package cn.com.pingan.cdn.exception;
 
 import lombok.Getter;
 

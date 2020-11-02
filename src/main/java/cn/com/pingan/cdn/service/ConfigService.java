@@ -11,13 +11,13 @@ import cn.com.pingan.cdn.request.VendorInfoDTO;
  */
 public interface ConfigService {
 
-    public ApiReceipt addVendorInfo(VendorInfoDTO infoDTO) throws Exception;
+    public ApiReceipt addVendorInfo(VendorInfoDTO infoDTO) ;
 
-    public ApiReceipt modifyVendorInfo(VendorInfoDTO infoDTO) throws Exception;
+    public ApiReceipt modifyVendorInfo(VendorInfoDTO infoDTO);
 
-    public ApiReceipt delVendorInfo(String vendor) throws Exception;
+    public ApiReceipt delVendorInfo(String vendor);
 
-    public ApiReceipt queryVendorInfo(String vendor) throws Exception;
+    public ApiReceipt queryVendorInfo(String vendor);
 
-    public Boolean setVendorStatus(VendorInfoDTO infoDTO) throws Exception;
+    public ApiReceipt setVendorStatus(VendorInfoDTO infoDTO);
 }

@@ -9,12 +9,14 @@
 package cn.com.pingan.cdn.controller;
 
 import cn.com.pingan.cdn.common.ApiReceipt;
-import cn.com.pingan.cdn.common.ContentException;
-import cn.com.pingan.cdn.common.DomainException;
+import cn.com.pingan.cdn.exception.ContentException;
+import cn.com.pingan.cdn.exception.DomainException;
 import cn.com.pingan.cdn.facade.ContentServiceFacade;
 import cn.com.pingan.cdn.gateWay.GateWayHeaderDTO;
 import cn.com.pingan.cdn.validator.content.FreshCommand;
+import cn.com.pingan.cdn.validator.content.QueryHisCommand;
 import com.alibaba.fastjson.JSON;
+import com.alibaba.fastjson.JSONObject;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -136,6 +138,17 @@ public class ContentController {
             log.info("content/fresh/url end result:{}", JSON.toJSONString(result));
             return result;
         }
+
+        @PostMapping("/test/queryHis")
+        public ApiReceipt testQueryHis(@Valid @RequestBody QueryHisCommand command) throws ContentException, DomainException {
+            GateWayHeaderDTO dto = new GateWayHeaderDTO();
+            dto.setIsAdmin("true");
+            dto.setSpcode("1563872277077");
+            dto.setUid("e72c4493b8da6b489e7f8d8a641b1481196e026c42815942380dfec61cdce93c");
+            ApiReceipt result =ApiReceipt.ok().data(this.facade.queryHis(dto,command));
+            log.info("content/fresh/url end result:{}", JSONObject.toJSONString(result));
+            return result;
+        }
         
         
         /***
@@ -143,13 +156,13 @@ public class ContentController {
         * @Param:
         * @return:
         */
-        /*//TODOs
+        //TODOs
         @PostMapping("/queryHis")
-        public ApiReceipt queryHis(@Valid @RequestBody QueryHisCommand command) throws ContentException {
+        public ApiReceipt queryHis(@Valid @RequestBody QueryHisCommand command) throws ContentException, DomainException {
 
             log.info("content/queryHis start command:{}", JSON.toJSONString(command));
             // TODO
-            GateWayHeaderDTO dto=permissionService.getGateWayInfo(request);
+            GateWayHeaderDTO dto = this.getGateWayInfo(request);
             if(StringUtils.isEmpty(dto.getUsername()) || StringUtils.isEmpty(dto.getUid())) {
                 throw new ContentException("0x004007");
             }
@@ -160,11 +173,11 @@ public class ContentController {
                 }
             }
 
-            //ApiReceipt result =ApiReceipt.ok().data(this.facade.queryHis(dto,command));
+            ApiReceipt result =ApiReceipt.ok().data(this.facade.queryHis(dto,command));
             log.info("content/queryHis end result:{}", JSON.toJSONString(result));
             return result;
         }
-        */
+
         
         private GateWayHeaderDTO getGateWayInfo(HttpServletRequest request) {
 //          Enumeration<String> names=request.getHeaderNames();

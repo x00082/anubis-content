@@ -6,7 +6,7 @@
  * @author lujun  
  * @date 2020年9月30日 下午2:24:44 
  */
-package cn.com.pingan.cdn.common;
+package cn.com.pingan.cdn.exception;
 
 /** 
  * @ClassName: ErrorCode 

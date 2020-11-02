@@ -16,6 +16,8 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Date;
+
 /** 
  * @ClassName: ContentHistoryRepository 
  * @Description: TODO() 
@@ -34,6 +36,12 @@ public interface ContentHistoryRepository extends JpaRepository<ContentHistory, 
     @Transactional
     @Query(value = "update content_history h set h.status = ?2, h.update_time=current_timestamp where h.request_id =?1", nativeQuery = true)
     int updateStatus(String id, String status);
+
+
+    @Modifying
+    @Transactional
+    @Query(value = "delete from content_history  where create_time <?1", nativeQuery = true)
+    void clear(Date time);
 
     /*
     @Transactional

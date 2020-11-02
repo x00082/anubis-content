@@ -11,7 +11,11 @@ package cn.com.pingan.cdn.repository.mysql;
 import cn.com.pingan.cdn.model.mysql.ContentItem;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Date;
 import java.util.List;
 
 /** 
@@ -27,4 +31,9 @@ public interface ContentItemRepository extends JpaRepository<ContentItem, Long>,
     ContentItem findByItemId(String itemId);
 
     List<ContentItem> findByRequestId(String requestId);
+
+    @Modifying
+    @Transactional
+    @Query(value = "delete from content_item  where create_time <?1", nativeQuery = true)
+    void clear(Date time);
 }

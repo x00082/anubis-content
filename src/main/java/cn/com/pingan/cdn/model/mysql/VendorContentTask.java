@@ -25,7 +25,7 @@ import java.util.Date;
 
 @Data
 @Entity
-@Table(name="vendor_task",schema="test",
+@Table(name="vendor_task",
         uniqueConstraints = {
                 @UniqueConstraint(columnNames = {"task_id"})
         },
@@ -40,15 +40,15 @@ public class VendorContentTask {
     @Column(length=128, name="task_id", nullable = false)
     private String taskId;
 
-    @Column(name = "type", length=32)
+    @Column(name = "type", length=32, nullable = false)
     @Enumerated(EnumType.STRING)
     private RefreshType type;
 
-    @Column(name = "status", length=32)
+    @Column(name = "status", length=32, nullable = false)
     @Enumerated(EnumType.STRING)
     private TaskStatus status;
 
-    @Column(length=4096, name="content")
+    @Column(length=4096, name="content", nullable = false)
     private String content;
 
     @Column(name="job_id", length=128)
@@ -57,18 +57,18 @@ public class VendorContentTask {
     @Column(name="message")
     private String message;
     
-    @Column(name="create_time")
+    @Column(name="create_time", nullable = false)
     private Date createTime;
     
     @Column(name="update_time")
     private Date updateTime;
     
-    @Column(name="vendor", length=128)
+    @Column(name="vendor", length=128, nullable = false)
     private String vendor;
     
     @Column(name="version")
     private int version;
 
-    @Column(length=128, name="item_id")
+    @Column(length=128, name="item_id", nullable = false)
     private String itemId;
 }

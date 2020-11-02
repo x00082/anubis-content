@@ -12,13 +12,9 @@ import lombok.Data;
 public class VendorInfoDTO {
     private String vendor;
 
-    private int refreshQps;
-
-    private int refreshDirQps;
-
-    private int prefetcQps;
-
     private int totalQps;
+
+    private int totalSize;
 
     private int mergeUrlCount;
 

@@ -1,4 +1,4 @@
-package cn.com.pingan.cdn.common;
+package cn.com.pingan.cdn.exception;
 
 /**
  * @Classname AnubisCdnExceptionEnum

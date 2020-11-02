@@ -41,6 +41,9 @@ public class RedisLuaScriptService {
     @Resource(name = "vendorQpsLuaScript")
     private RedisScript<Long> qpsLuaScript;
 
+    @Resource(name = "getUserLimitLuaScript")
+    private RedisScript<String> getUserLimitLuaScript;
+
     /**
      * 启动时加载
      */
@@ -85,6 +88,23 @@ public class RedisLuaScriptService {
         } catch (Exception e) {
             log.error("execute script error", e);
             return -1;
+        }
+    }
+
+
+    /**
+     * 执行脚本
+     * @param keys
+     * @param args
+     * @return
+     */
+    public String executeUserLimitScript(List<String> keys, List<String> args) {
+        try {
+            String scriptValue = redisTemplate.execute(getUserLimitLuaScript,keys,args.toArray());
+            return scriptValue.toString();
+        } catch (Exception e) {
+            log.error("execute script error", e);
+            return null;
         }
     }
 }

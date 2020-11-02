@@ -9,10 +9,16 @@
 package cn.com.pingan.cdn.facade;
 
 import cn.com.pingan.cdn.common.ApiReceipt;
-import cn.com.pingan.cdn.common.ContentException;
+import cn.com.pingan.cdn.common.ContentLimitDTO;
+import cn.com.pingan.cdn.exception.ContentException;
 import cn.com.pingan.cdn.gateWay.GateWayHeaderDTO;
+import cn.com.pingan.cdn.request.QueryHisDTO;
+import cn.com.pingan.cdn.request.VendorInfoDTO;
+import cn.com.pingan.cdn.request.openapi.ContentDefaultNumDTO;
 import cn.com.pingan.cdn.validator.content.FreshCommand;
+import cn.com.pingan.cdn.validator.content.QueryHisCommand;
 
+import java.io.IOException;
 import java.util.List;
 
 /** 
@@ -29,7 +35,7 @@ public interface ContentServiceFacade {
 
     public ApiReceipt prefetch(GateWayHeaderDTO dto, FreshCommand command)throws ContentException;
 
-    //public QueryHisDTO queryHis(GateWayHeaderDTO dto, QueryHisCommand command);
+    public QueryHisDTO queryHis(GateWayHeaderDTO dto, QueryHisCommand command);
 
 
     ApiReceipt openApiRefreshDir(GateWayHeaderDTO dto, List<String> data) throws ContentException;
@@ -38,6 +44,22 @@ public interface ContentServiceFacade {
     ApiReceipt openApiRefreshUrl(GateWayHeaderDTO dto, List<String> data) throws ContentException;
 
     ApiReceipt openApiPreload(GateWayHeaderDTO dto, List<String> data) throws ContentException;
+
+    ApiReceipt setUserContentNumber(ContentLimitDTO command);
+
+    ApiReceipt getUserContentNumber(String spCode) throws IOException;
+
+    public ApiReceipt setUserLimitNumber(ContentDefaultNumDTO command);
+
+    public ApiReceipt getUserLimitNumber(String spCode) throws IOException;
+
+    public ApiReceipt addVendorInfo(VendorInfoDTO command);
+
+    public ApiReceipt setVendorInfo(VendorInfoDTO command);
+
+    public ApiReceipt getVendorInfo(String vendor);
+
+    public ApiReceipt setVendorStatus(VendorInfoDTO command);
     
     ApiReceipt test() throws ContentException;
 }

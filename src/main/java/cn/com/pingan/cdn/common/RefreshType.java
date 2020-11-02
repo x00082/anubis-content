@@ -19,29 +19,15 @@ public enum RefreshType {
     /**
      * url刷新
      */
-    url("url"),
+    url,
     /**
      * 目录刷新
      */
-    dir("dir"),
+    dir,
     /**
      * 预热
      */
-    preheat("preheat");
-    
-    private String code;
-
-    RefreshType(String code) {
-        this.code = code;
-    }
-
-    public String getCode() {
-        return code;
-    }
-
-    public void setCode(String code) {
-        this.code = code;
-    }
+    preheat;
     
     
     public static RefreshType of(String value) {

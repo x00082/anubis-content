@@ -24,7 +24,7 @@ import java.util.Date;
  */
 @Data
 @Entity
-@Table(name="content_item",schema="test",
+@Table(name="content_item",
         uniqueConstraints = {
                 @UniqueConstraint(columnNames = {"item_id"})
         },
@@ -40,30 +40,30 @@ public class ContentItem {
     @Column(length=128, name="item_id", nullable = false)
     private String itemId;
     
-    @Column(name = "type", length=32)
+    @Column(name = "type", length=32, nullable = false)
     @Enumerated(EnumType.STRING)
     private RefreshType type;
     
-    @Column(name = "status", length=32)
+    @Column(name = "status", length=32, nullable = false)
     @Enumerated(EnumType.STRING)
     private HisStatus status;
 
-    @Column(length=4096, name="content")
+    @Column(length=4096, name="content", nullable = false)
     private String content;
     
     @Column(name="message")
     private String message;
     
-    @Column(name="create_time")
+    @Column(name="create_time", nullable = false)
     private Date createTime;
     
     @Column(name="update_time")
     private Date updateTime;
 
-    @Column(name="vendor")
+    @Column(name="vendor", nullable = false)
     private String vendor;
 
-    @Column(length=128, name="request_id")
+    @Column(length=128, name="request_id", nullable = false)
     private String requestId;
 
 

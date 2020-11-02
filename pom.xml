@@ -163,6 +163,12 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-amqp</artifactId>
         </dependency>
+
+        <dependency>
+            <groupId>cn.com.pingan.cdn</groupId>
+            <artifactId>mixcdn-account-api</artifactId>
+            <version>1.0</version>
+        </dependency>
 		
 	</dependencies>
 	

@@ -39,4 +39,12 @@ public class RedisLuaConfig {
         redisScript.setResultType(Long.class);
         return redisScript;
     }
+
+    @Bean("getUserLimitLuaScript")
+    public RedisScript<String> getUserLimitLuaScript() {
+        DefaultRedisScript<String> redisScript = new DefaultRedisScript<>();
+        redisScript.setLocation(new ClassPathResource("lua/getContentNum.lua"));
+        redisScript.setResultType(String.class);
+        return redisScript;
+    }
 }
