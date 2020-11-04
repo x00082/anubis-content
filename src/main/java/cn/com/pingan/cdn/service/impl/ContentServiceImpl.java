@@ -14,6 +14,7 @@ import cn.com.pingan.cdn.config.ContentLimitJsonConfig;
 import cn.com.pingan.cdn.config.RedisLuaScriptService;
 import cn.com.pingan.cdn.exception.ContentException;
 import cn.com.pingan.cdn.exception.ErrEnum;
+import cn.com.pingan.cdn.exception.ErrorCode;
 import cn.com.pingan.cdn.exception.RestfulException;
 import cn.com.pingan.cdn.gateWay.GateWayHeaderDTO;
 import cn.com.pingan.cdn.model.mysql.*;
@@ -70,6 +71,9 @@ public class ContentServiceImpl implements ContentService {
     private DomainVendorRepository domainVendorRepository;
 
     @Autowired
+    private LineToVendorRepository lineToVendorRepository;
+
+    @Autowired
     private VendorTaskRepository vendorTaskRepository;
 
     @Autowired
@@ -120,71 +124,111 @@ public class ContentServiceImpl implements ContentService {
     
 
     @Override
-    public ApiReceipt saveContent(GateWayHeaderDTO dto, List<String> data, RefreshType type) throws ContentException {
+    public ApiReceipt saveContent(GateWayHeaderDTO dto, List<String> data, RefreshType type){
         if (null == data || data.size() == 0) {
-            throw new ContentException("0x004008", "内容为空,请正确填写!");
+            return ApiReceipt.error("0x004008", "内容为空,请正确填写!");
         }
 
-        //校验data 的数据格式 去重
-        List <String> tmpData = new ArrayList<>();
-        HashSet h = new HashSet();
+        try{
+            //校验data 的数据格式 去重
+            List <String> tmpData = new ArrayList<>();
+            HashSet h = new HashSet();
 
-        for (String url :data) {
-            if(h.add(url.toLowerCase())){
-                tmpData.add(url);
+            for (String url :data) {
+                if(h.add(url.toLowerCase())){
+                    tmpData.add(url);
+                }
+                if(url.toLowerCase().startsWith("http://") ||url.toLowerCase().startsWith("https://")){
+
+                    if (RefreshType.url == type && url.toLowerCase().endsWith("/")) {
+                        return ApiReceipt.error(ErrorCode.ENDURL);
+                    }
+                    if (RefreshType.preheat == type && url.toLowerCase().endsWith("/")) {
+                        return ApiReceipt.error(ErrorCode.ENDPRELOAD);
+                    }
+                    if (RefreshType.dir == type && !url.toLowerCase().endsWith("/")) {
+                        return ApiReceipt.error(ErrorCode.ENDDIR);
+                    }
+                }else {
+                    return ApiReceipt.error(ErrorCode.STARTURL);
+                }
             }
-            if(url.toLowerCase().startsWith("http://") ||url.toLowerCase().startsWith("https://")){
 
-                if (RefreshType.url == type && url.toLowerCase().endsWith("/")) {
-                    throw new ContentException("0x004015");
-                }
-                if (RefreshType.preheat == type && url.toLowerCase().endsWith("/")) {
-                    throw new ContentException("0x004016");
-                }
-                if (RefreshType.dir == type && !url.toLowerCase().endsWith("/")) {
-                    throw new ContentException("0x004017");
-                }
-            }else {
-                throw new ContentException("0x004014");
+            data.clear();
+            data.addAll(tmpData);
+
+            boolean adminFlag = "true".equals(dto.getIsAdmin());
+
+            //检查域名状态
+            checkDomainStatus(data, adminFlag, dto);
+
+            //计数
+            checkUserLimit(adminFlag, type, dto.getSpcode(), data.size());
+
+            //原始请求入库
+            String taskId = UUID.randomUUID().toString().replaceAll("-", "");
+            ContentHistory contentHistory = new ContentHistory();
+
+            contentHistory.setType(type);
+            contentHistory.setRequestId(taskId);
+            contentHistory.setUserId(dto.getUid());
+            contentHistory.setContent(JSON.toJSONString(data));
+            contentHistory.setCreateTime(new Date());
+            contentHistory.setStatus(HisStatus.WAIT);
+            contentHistory.setContentNumber(data.size());
+            contentHistory.setIsAdmin(dto.getIsAdmin());
+
+            contentHistoryRepository.saveAndFlush(contentHistory);
+            log.info("contentHistory id:{}", contentHistory.getId());
+
+
+            TaskMsg historyTaskMsg = new TaskMsg();
+            historyTaskMsg.setTaskId(taskId);
+            historyTaskMsg.setVersion(0);
+            historyTaskMsg.setOperation(TaskOperationEnum.content_item);
+            producer.sendTaskMsg(historyTaskMsg);
+
+            log.info("sendTaskMsg:{} to MQ", historyTaskMsg);
+            return ApiReceipt.ok().data(taskId);
+        }catch (Exception e){
+            if(e instanceof ContentException){
+                String code = ((ContentException) e).getCode();
+                return ApiReceipt.error(code, e.getMessage());
+            }else{
+                return ApiReceipt.error(ErrorCode.INTERERR);
             }
         }
+        
+    }
 
-        data.clear();
-        data.addAll(tmpData);
-        
-        boolean adminFlag = "true".equals(dto.getIsAdmin());
-        //检查域名状态
-        checkDomainStatus(data, adminFlag, dto);
-        
-        //计数
-        checkUserLimit(adminFlag,type,dto.getSpcode(),data.size());
-        
-        //原始请求入库
-        String taskId = UUID.randomUUID().toString().replaceAll("-", "");
-        ContentHistory contentHistory = new ContentHistory();
-        
-        contentHistory.setType(type);
-        contentHistory.setRequestId(taskId);
-        contentHistory.setUserId(dto.getUid());
-        contentHistory.setContent(JSON.toJSONString(data));
-        contentHistory.setCreateTime(new Date());
-        contentHistory.setStatus(HisStatus.WAIT);
-        contentHistory.setContentNumber(data.size());
-        contentHistory.setIsAdmin(dto.getIsAdmin());
-        
-        contentHistoryRepository.saveAndFlush(contentHistory);
-        log.info("contentHistory id:{}", contentHistory.getId());
+    @Override
+    public ApiReceipt redoContentTask(String requestId, boolean flag) throws ContentException {
 
+        ContentHistory contentHistory = this.findHisttoryByRequestId(requestId);
+        if(contentHistory == null){
+            log.error("用户任务[{}]不存在",requestId);
+            return  ApiReceipt.error("0x004008", String.format("[%s]原始任务记录不存在，禁止操作", requestId));
+        }
+        if(contentHistory.getStatus().equals(HisStatus.FAIL)){//任务已失败或未开始
+            contentHistory.setStatus(HisStatus.WAIT);
+            log.info("[{}]请求任务已失败，设置为wait", requestId);
 
+        }else if(contentHistory.getStatus().equals(HisStatus.WAIT)){
+            log.info("[{}]请求任务为wait,不需要重试", requestId);
+        }else{
+            log.info("[{}]请求任务已成功，不再重试", requestId);
+            return  ApiReceipt.ok();
+
+        }
         TaskMsg historyTaskMsg = new TaskMsg();
-        historyTaskMsg.setTaskId(taskId);
+        historyTaskMsg.setTaskId(requestId);
         historyTaskMsg.setVersion(0);
         historyTaskMsg.setOperation(TaskOperationEnum.content_item);
         producer.sendTaskMsg(historyTaskMsg);
 
-        log.info("sendTaskMsg:{} to MQ",historyTaskMsg);
-        return ApiReceipt.ok().data(taskId);
-        
+
+        return  ApiReceipt.ok();
+
     }
 
     @Override
@@ -200,15 +244,15 @@ public class ContentServiceImpl implements ContentService {
         if(taskMsg.getRetryNum() > limitRetry){
             contentHistory.setStatus(HisStatus.FAIL);
             contentHistory.setUpdateTime(new Date());
+            contentHistory.setMessage("拆分任务及其子任务失败超限");
             contentHistoryRepository.save(contentHistory);
             log.error("超出重试次数,设置任务失败并丢弃消息");
             return;
         }
 
+
         List<ContentItem> checkItems = contentItemRepository.findByRequestId(requestId);
-
         RefreshType type = contentHistory.getType();
-
         List<ContentItem> contentItemList = new ArrayList<>();
 
         if(checkItems == null || checkItems.size() != contentHistory.getContentNumber()) {
@@ -232,12 +276,20 @@ public class ContentServiceImpl implements ContentService {
 
             Map<String, Set<String>> domainVendorsMap = null;
             try {
-                domainVendorsMap = getDomainVendorsMap(lostUrls);
-            } catch (Exception e) {
+                domainVendorsMap = getDomainVendorsMapNew(lostUrls);
+                if(domainVendorsMap == null){
+                    log.error("获取厂商失败");
+                    taskMsg.setDelay(30000L);
+                    taskMsg.setRetryNum(taskMsg.getRetryNum() + 1);
+                    producer.sendTaskMsg(taskMsg);
+                    return;
+                }
+            } catch (Exception e) {//TODO 缓存线路
                 log.error("获取厂商失败");
                 taskMsg.setDelay(30000L);
                 taskMsg.setRetryNum(taskMsg.getRetryNum() + 1);
                 producer.sendTaskMsg(taskMsg);
+                return;
             }
 
             URL domainUrl = null;
@@ -255,7 +307,12 @@ public class ContentServiceImpl implements ContentService {
                     domainUrl = new URL(u);
                 } catch (Exception e) {
                     log.error("parse url:{} failed, err:{}", u, e.getMessage());
-                    throw RestfulException.builder().code(ErrEnum.ErrInternal.getCode()).message(e.getMessage()).build();
+                    contentHistory.setStatus(HisStatus.FAIL);
+                    contentHistory.setUpdateTime(new Date());
+                    contentHistory.setMessage("内容url解析失败");
+                    contentHistoryRepository.save(contentHistory);
+                    log.error("内容url解析失败,设置任务失败并丢弃消息");
+                    return;
                 }
                 String host = domainUrl.getHost();
 
@@ -275,6 +332,7 @@ public class ContentServiceImpl implements ContentService {
                 taskMsg.setDelay(30000L);
                 taskMsg.setRetryNum(taskMsg.getRetryNum() + 1);
                 producer.sendDelayMsg(taskMsg);
+                return;
             }else{
                 log.info("任务:{}, 拆分任务校验正确", requestId);
             }
@@ -330,8 +388,10 @@ public class ContentServiceImpl implements ContentService {
                 }
             }
         }
-        vendorTaskRepository.saveAll(lostVendorContentTask);
-        vendorTaskRepository.flush();
+        if(lostVendorContentTask.size()>0) {
+            vendorTaskRepository.saveAll(lostVendorContentTask);
+            vendorTaskRepository.flush();
+        }
 
         List<VendorContentTask> allVendorContentTask = vendorTaskRepository.findByItemIdList(itemIdList);
         int existSize = allVendorContentTask.size();
@@ -421,7 +481,7 @@ public class ContentServiceImpl implements ContentService {
                 host = (new URL(url)).getHost();
             } catch (MalformedURLException e) {
                 log.error("无效的URL [{}]",url);
-                throw new ContentException("0x004008", "域名无效，禁止操作");
+                throw new ContentException("0x004008", String.format("无效的URL:[%s]，禁止操作", url));
             }
             domainParam.add(host);
         }
@@ -451,7 +511,7 @@ public class ContentServiceImpl implements ContentService {
 
         for (String host : domainParam) {
             if (!domainMap.containsKey(host)) {
-                throw new ContentException("0x004008", "域名无效，禁止操作");
+                throw new ContentException("0x004008", String.format("域名:[%s]不可用，禁止操作", host));
             }
         }
     }
@@ -680,6 +740,121 @@ public class ContentServiceImpl implements ContentService {
         });
         */
     }
+
+
+    public Map<String, Set<String>> getDomainVendorsMapNew(List<String> contents) throws Exception{
+        Map<String, List<String>> domainUrlsMap = new HashMap<String, List<String>>();
+        URL domainUrl = null;
+        Boolean flag = true;
+
+        for (String url : contents) {
+            try {
+                domainUrl = new URL(url);
+            } catch (Exception e) {
+                log.error("parse url:{} failed, err:{}", url, e.getMessage());
+                throw RestfulException.builder().code(ErrEnum.ErrInternal.getCode()).message(e.getMessage()).build();
+            }
+            String host = domainUrl.getHost();
+            List<String> domainUrls = domainUrlsMap.get(host);
+            if (domainUrls == null) {
+                domainUrls = new ArrayList<String>();
+            }
+            domainUrls.add(url);
+            domainUrlsMap.put(host, domainUrls);
+        }
+
+        // 获取域名信息
+        List<String> domains = new ArrayList<String>(domainUrlsMap.keySet());
+        log.info("domains:{}", Utils.objectToString(domains));
+        List<Domain> domainInfos = this.domainRepository.findAllByDomainInAndStatusNot(domains, "DELETE");
+        if (domainInfos.size() != domains.size()) {
+            log.error("cannot find all domains info from db");
+            flag = false;
+        }
+        // 获取域名所在的厂商
+        Set<String> lineIds = new HashSet<String>();
+        domainInfos.forEach(d -> {
+            if (!StringUtils.isEmpty(d.getLineId())) {
+                lineIds.add(d.getLineId());
+            } else {
+                //List<String> expectedVendor = getExpectedBaseLine(d.getExpectedVendor());
+                //lineIds.addAll(expectedVendor);
+                lineIds.addAll(d.getExpectedBaseLine());
+            }
+        });
+
+        List<LineVendor> vendors = this.lineToVendorRepository.findByLineIdList(new ArrayList<String>(lineIds));
+        Map<String, LineVendor> lineIdLineVendorMap = vendors.stream().collect(Collectors.toMap(i->i.getLineId(), i->i));
+        Map<String, List<String>> lineIdVendorMap = new HashMap<String, List<String>>();
+        for(LineVendor lv :vendors){
+            lineIdVendorMap.put(lv.getLineId(), JSONArray.parseArray(lv.getVendors(), String.class));
+        }
+        if(vendors.size() != lineIds.size()){
+            List<String> lostLineVendor = new ArrayList<>();
+            for(String s : lineIds){
+                if(!lineIdLineVendorMap.containsKey(s)){
+                    lostLineVendor.add(s);
+                }
+            }
+            if(lostLineVendor.size()>0) {
+                List<LineResponse.LineDetail> lineInfos = this.lineService.getLineByIds(new ArrayList<String>(lostLineVendor), true);
+                if(lineInfos.size() != lostLineVendor.size()){
+                    log.error("获取Line数量不全");
+                    flag = false;
+                }
+                for(LineResponse.LineDetail l: lineInfos){
+                    List<String> lineVendors = new ArrayList<String>();
+
+                    if (l.getType().equals(LineResponse.LineType.base.name())) {
+                        lineVendors.add(l.getVendor());
+                    } else {
+                        if (l.getBaseLines() != null) {
+                            for (String baselineId : l.getBaseLines().keySet()) {
+                                lineVendors.add(l.getBaseLines().get(baselineId).getVendor());
+                            }
+                        }
+                    }
+                    if(lineVendors.size()>0) {//不为空时才入库
+                        lineIdVendorMap.put(l.getId(), lineVendors);
+                        LineVendor LineVendorAdd = new LineVendor();
+                        LineVendorAdd.setLineId(l.getId());
+                        LineVendorAdd.setVendors(JSONObject.toJSONString(lineVendors));
+                        lineToVendorRepository.save(LineVendorAdd);
+                    }else{
+                        log.error("厂商数量为空");
+                        flag = false;
+                    }
+                };
+            }
+        }
+
+        if(!flag){
+            log.error("获取厂商不全");
+            return null;
+        }
+
+        // domain: [vendor]
+        Map<String, Set<String>> domainVendorsMap = new HashMap<String, Set<String>>();
+        domainInfos.forEach(d -> {
+            Set<String> domainVendors = domainVendorsMap.get(d);
+            if (domainVendors == null) {
+                domainVendors = new HashSet<String>();
+            }
+            if (!StringUtils.isEmpty(d.getLineId())) {
+                domainVendors.addAll(lineIdVendorMap.get(d.getLineId()));
+            } else {
+                for (String l : d.getExpectedBaseLine()) {
+                    domainVendors.addAll(lineIdVendorMap.get(l));
+                }
+            }
+            domainVendorsMap.put(d.getDomain(), domainVendors);
+        });
+        log.info("domain-vendors:{}", Utils.objectToString(domainVendorsMap));
+
+        return domainVendorsMap;
+    }
+
+
 
 
     public List<String> getExpectedBaseLine(String expectedVendor) {

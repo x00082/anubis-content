@@ -15,7 +15,7 @@ public interface TaskService {
 
     public void pushTaskMsg(TaskMsg msg) throws RestfulException;
 
-    public void addTaskVersion(TaskMsg msg) throws RestfulException;
+    public int addTaskVersion(TaskMsg msg) throws RestfulException;
 
     public int handlerTask(TaskMsg msg) throws RestfulException;
 

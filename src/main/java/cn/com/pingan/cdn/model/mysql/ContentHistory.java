@@ -44,6 +44,9 @@ public class ContentHistory {
     @Column(name = "status", length=32, nullable = false)
     @Enumerated(EnumType.STRING)
     private HisStatus status;
+
+    @Column(name="message")
+    private String message;
     
     @Column(name="user_id", length=128, nullable = false)
     private String userId;

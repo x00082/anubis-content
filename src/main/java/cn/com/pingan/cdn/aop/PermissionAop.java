@@ -17,21 +17,36 @@ import java.util.Enumeration;
 import java.util.Map;
 
 /**
- * @program: anubis-base
+ * @program: anubis-content
  *
  * @description: 越权校验
  *
- * @author: wangchao535
+ * @author: Luj
  *
- * @create: 2019-08-29 16:05
+ * @create: 2020-11-03 16:05
  **/
-/*
+
+import cn.com.pingan.cdn.exception.SslCertException;
+import com.alibaba.fastjson.JSON;
+import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
+import org.aspectj.lang.JoinPoint;
+import org.aspectj.lang.annotation.*;
+import org.springframework.stereotype.Component;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
+
+import javax.servlet.http.HttpServletRequest;
+import java.util.Arrays;
+import java.util.Enumeration;
+
 @Aspect
 @Slf4j
 @Component
 public class PermissionAop {
     @Pointcut("execution(* cn.com.pingan.cdn.controller .*.*(..))")
     private void anyMethod(){ }
+
 
     @Before("anyMethod()")
     public void deBefore(JoinPoint joinPoint) throws Throwable {
@@ -46,6 +61,7 @@ public class PermissionAop {
         log.info("CLASS_METHOD : " + joinPoint.getSignature().getDeclaringTypeName() + "." + joinPoint.getSignature().getName());
         log.info("ARGS : " + Arrays.toString(joinPoint.getArgs()));
 
+
         Enumeration<String> names=request.getHeaderNames();
         while (names.hasMoreElements()){
             String name=(String)names.nextElement();
@@ -53,7 +69,7 @@ public class PermissionAop {
         }
 //        GateWayHeaderDTO dto = new GateWayHeaderDTO();
         //校验账户信息
-        if(request.getHeader("uid") == null &&StringUtils.isEmpty(request.getHeader("uid"))){
+        if(request.getHeader("uid") == null && StringUtils.isEmpty(request.getHeader("uid"))){
             throw new SslCertException("0x0001");
         }
 //        if(request.getHeader("isAdmin")==null &&StringUtils.isEmpty(request.getHeader("isAdmin"))){
@@ -68,13 +84,18 @@ public class PermissionAop {
         if(request.getHeader("spcode")==null &&StringUtils.isEmpty(request.getHeader("spcode"))){
             throw new SslCertException("0x0001");
         }
+
     }
+
+    /*
     private Map getRequestFirstMap(Object[]argus){
         if(argus!=null &&argus.length>0 && argus[0] instanceof Map){
             return (Map)argus[0];
         }
         return null;
     }
+    */
+
 
     @AfterReturning(returning = "ret", pointcut = "anyMethod()")
     public void doAfterReturning(Object ret) throws Throwable {
@@ -92,13 +113,13 @@ public class PermissionAop {
         }catch (Exception e){
             log.error("异常",e);
         }
-
     }
     String getPrintPrefix(JoinPoint joinPoint){
         String className=joinPoint.getTarget().getClass().getSimpleName();
         String methodName=joinPoint.getSignature().getName();
         return className+".componentName."+methodName;
     }
+
 
 //    //后置最终通知,final增强，不管是抛出异常或者正常退出都会执行
 //    @After("anyMethod()")
@@ -122,4 +143,4 @@ public class PermissionAop {
 
 
 }
-*/
+

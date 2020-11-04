@@ -52,6 +52,7 @@ public class VendorConsumer {
 
 
     void handlerMessage(TaskMsg taskMsg) throws Exception{
+        /*
         VendorInfo vendorInfo = taskService.findVendorInfo(TaskOperationEnum.getVendorString(taskMsg.getOperation()));
         String vendorStatus = vendorInfo.getStatus();
         if ("down".equals(vendorStatus)) {
@@ -62,6 +63,8 @@ public class VendorConsumer {
         } else {
             taskService.handlerTask(taskMsg);
         }
+        */
+        taskService.handlerTask(taskMsg);
     }
 /*
     @RabbitListener(queues = {"#{vendorQueues}"})

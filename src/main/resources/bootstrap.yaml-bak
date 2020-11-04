@@ -31,8 +31,19 @@ spring:
 eureka:
   client:
     service-url:
-      defaultZone: http://10.1.8.45:8888/eureka
+      defaultZone: http://10.8.81.2:8888/eureka,http://10.8.81.4:8888/eureka,http://10.8.81.5:8888/eureka
 
+---
+spring:
+  profiles:
+    bjstg
+  cloud:
+    config:
+      profile: bjstg
+eureka:
+  client:
+    service-url:
+      defaultZone: http://10.1.8.45:8888/eureka
 ---
 spring:
   profiles:

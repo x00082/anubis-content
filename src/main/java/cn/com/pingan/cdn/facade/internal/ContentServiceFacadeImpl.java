@@ -214,6 +214,8 @@ public class ContentServiceFacadeImpl implements ContentServiceFacade {
             for (ContentHistory contentHistory : pager) {
                 his = new OpenApiUserContentHisDTO();
                 BeanUtils.copyProperties(contentHistory, his);
+                his.setTaskId(contentHistory.getRequestId());
+                his.setOptTime(contentHistory.getCreateTime());
                 String dataStatus = contentHistory.getStatus() != null ? contentHistory.getStatus().toString() : "";
                 if ("SUCCESS".equals(dataStatus)) {
                     his.setStatus("成功");

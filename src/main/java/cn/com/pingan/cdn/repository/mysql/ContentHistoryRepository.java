@@ -40,6 +40,12 @@ public interface ContentHistoryRepository extends JpaRepository<ContentHistory, 
 
     @Modifying
     @Transactional
+    @Query(value = "update content_history h set h.status = ?2, h.update_time=current_timestamp, h.message = ?3 where h.request_id =?1", nativeQuery = true)
+    int updateStatusAndMessage(String id, String status, String message);
+
+
+    @Modifying
+    @Transactional
     @Query(value = "delete from content_history  where create_time <?1", nativeQuery = true)
     void clear(Date time);
 

@@ -5,6 +5,7 @@ import cn.com.pingan.cdn.common.ApiReceipt;
 import cn.com.pingan.cdn.common.ContentLimitDTO;
 import cn.com.pingan.cdn.exception.ContentException;
 import cn.com.pingan.cdn.exception.DomainException;
+import cn.com.pingan.cdn.exception.ErrorCode;
 import cn.com.pingan.cdn.facade.ContentServiceFacade;
 import cn.com.pingan.cdn.gateWay.GateWayHeaderDTO;
 import cn.com.pingan.cdn.request.VendorInfoDTO;
@@ -42,12 +43,12 @@ public class OpenApiContentController {
     public ApiReceipt refreshUrl(@RequestBody OpenApiFreshCommand command) throws ContentException, DomainException {
         log.info("content/fresh/url start command:{}", JSON.toJSONString(command));
         GateWayHeaderDTO dto= this.getGateWayInfo(request);
-        requestHeaderCheck(dto);
+        if (!requestHeaderCheck(dto)) return  ApiReceipt.error(ErrorCode.NOHEADER);
 
         //越权校验
         if(!"true".equals(dto.getIsAdmin())) {
             if (StringUtils.isEmpty(dto.getSpcode()) ) {
-                throw new DomainException("0x0001");
+                return  ApiReceipt.error(ErrorCode.FORBIDOPT);
             }
         }
 
@@ -61,12 +62,12 @@ public class OpenApiContentController {
     public ApiReceipt refreshDir(@RequestBody OpenApiFreshCommand command) throws ContentException, DomainException {
         log.info("content/fresh/dir start command:{}", JSON.toJSONString(command));
         GateWayHeaderDTO dto= this.getGateWayInfo(request);
-        requestHeaderCheck(dto);
+        if (!requestHeaderCheck(dto)) return  ApiReceipt.error(ErrorCode.NOHEADER);
 
         //越权校验
         if(!"true".equals(dto.getIsAdmin())) {
             if (StringUtils.isEmpty(dto.getSpcode())) {
-                throw new DomainException("0x0001");
+                return  ApiReceipt.error(ErrorCode.FORBIDOPT);
             }
         }
 
@@ -80,12 +81,12 @@ public class OpenApiContentController {
         log.info("content/preheat start command:{}", JSON.toJSONString(command));
 
         GateWayHeaderDTO dto=this.getGateWayInfo(request);
-        requestHeaderCheck(dto);
+        if (!requestHeaderCheck(dto)) return  ApiReceipt.error(ErrorCode.NOHEADER);
 
         //越权校验
         if(!"true".equals(dto.getIsAdmin())) {
             if (StringUtils.isEmpty(dto.getSpcode())) {
-                throw new DomainException("0x0001");
+                return  ApiReceipt.error(ErrorCode.FORBIDOPT);
             }
         }
 
@@ -105,11 +106,11 @@ public class OpenApiContentController {
     public ApiReceipt setUserContentNumber(@RequestBody ContentLimitDTO command) throws ContentException {
         log.info("user/content/number start command:{}", JSON.toJSONString(command));
         GateWayHeaderDTO dto= this.getGateWayInfo(request);
-        requestHeaderCheck(dto);
+        if (!requestHeaderCheck(dto)) return  ApiReceipt.error(ErrorCode.NOHEADER);
 
         //越权校验
         if(!"true".equalsIgnoreCase(dto.getIsAdmin())){
-          throw new  ContentException("0x004010");
+            return  ApiReceipt.error(ErrorCode.FORBIDOPT);
         }
         ApiReceipt result=this.facade.setUserContentNumber(command);
         log.info("user/content/number end result:{}", JSON.toJSONString(result));
@@ -127,10 +128,10 @@ public class OpenApiContentController {
     public ApiReceipt getUserContentNumber(@RequestParam(required = false) String spCode) throws ContentException, IOException {
         log.info("查询user/content/number start command:{}", spCode);
         GateWayHeaderDTO dto= this.getGateWayInfo(request);
-        requestHeaderCheck(dto);
+        if (!requestHeaderCheck(dto)) return  ApiReceipt.error(ErrorCode.NOHEADER);
         //越权校验
         if("true".equalsIgnoreCase(dto.getIsAdmin())){
-           if(StringUtils.isBlank(spCode)) throw new ContentException("0x0000");
+           if(StringUtils.isBlank(spCode)) return  ApiReceipt.error(ErrorCode.FORBIDOPT);
         }else {
             spCode = dto.getSpcode();
         }
@@ -149,11 +150,11 @@ public class OpenApiContentController {
     public ApiReceipt setUserLimitNumber(@RequestBody ContentDefaultNumDTO command) throws ContentException {
         log.info("user/content/limit start command:{}", JSON.toJSONString(command));
         GateWayHeaderDTO dto= this.getGateWayInfo(request);
-        requestHeaderCheck(dto);
+        if (!requestHeaderCheck(dto)) return  ApiReceipt.error(ErrorCode.NOHEADER);
 
         //越权校验
         if(!"true".equalsIgnoreCase(dto.getIsAdmin())){
-            throw new  ContentException("0x004010");
+            return  ApiReceipt.error(ErrorCode.FORBIDOPT);
         }
         ApiReceipt result=this.facade.setUserLimitNumber(command);
         log.info("user/content/limit end result:{}", JSON.toJSONString(result));
@@ -171,10 +172,10 @@ public class OpenApiContentController {
     public ApiReceipt getUserLimitNumber(@RequestParam(required = false) String spCode) throws ContentException, IOException {
         log.info("查询user/content/limit start command:{}", spCode);
         GateWayHeaderDTO dto= this.getGateWayInfo(request);
-        requestHeaderCheck(dto);
+        if (!requestHeaderCheck(dto)) return  ApiReceipt.error(ErrorCode.NOHEADER);
         //越权校验
         if(!"true".equalsIgnoreCase(dto.getIsAdmin())){
-            throw new  ContentException("0x004010");
+            return  ApiReceipt.error(ErrorCode.FORBIDOPT);
         }
         ApiReceipt result=this.facade.getUserLimitNumber(spCode);
         log.info("查询user/content/limit end result:{}", JSON.toJSONString(result));
@@ -193,11 +194,11 @@ public class OpenApiContentController {
     public ApiReceipt addVendorInfo(@RequestBody VendorInfoDTO command) throws ContentException {
         log.info("vendor/content/info/add start command:{}", JSON.toJSONString(command));
         GateWayHeaderDTO dto= this.getGateWayInfo(request);
-        requestHeaderCheck(dto);
+        if (!requestHeaderCheck(dto)) return  ApiReceipt.error(ErrorCode.NOHEADER);
 
         //越权校验
         if(!"true".equalsIgnoreCase(dto.getIsAdmin())){
-            throw new  ContentException("0x004010");
+            return  ApiReceipt.error(ErrorCode.FORBIDOPT);
         }
         ApiReceipt result=this.facade.addVendorInfo(command);
         log.info("vendor/content/info/add end result:{}", JSON.toJSONString(result));
@@ -215,10 +216,10 @@ public class OpenApiContentController {
     public ApiReceipt getVendorInfo(@RequestParam String vendor) throws ContentException, IOException {
         log.info("查询vendor/content/info start command:{}", vendor);
         GateWayHeaderDTO dto= this.getGateWayInfo(request);
-        requestHeaderCheck(dto);
+        if (!requestHeaderCheck(dto)) return  ApiReceipt.error(ErrorCode.NOHEADER);
         //越权校验
         if(!"true".equalsIgnoreCase(dto.getIsAdmin())){
-            throw new  ContentException("0x004010");
+            return  ApiReceipt.error(ErrorCode.FORBIDOPT);
         }
         ApiReceipt result=this.facade.getVendorInfo(vendor);
         log.info("查询vendor/content/info end result:{}", JSON.toJSONString(result));
@@ -244,10 +245,10 @@ public class OpenApiContentController {
     public ApiReceipt setVendorInfo(@RequestBody VendorInfoDTO command) throws ContentException, IOException {
         log.info("vendor/content/info/set start command:{}", command);
         GateWayHeaderDTO dto= this.getGateWayInfo(request);
-        requestHeaderCheck(dto);
+        if (!requestHeaderCheck(dto)) return  ApiReceipt.error(ErrorCode.NOHEADER);
         //越权校验
         if(!"true".equalsIgnoreCase(dto.getIsAdmin())){
-            throw new  ContentException("0x004010");
+            return  ApiReceipt.error(ErrorCode.FORBIDOPT);
         }
         ApiReceipt result=this.facade.setVendorInfo(command);
         log.info("vendor/content/info/set end result:{}", JSON.toJSONString(result));
@@ -265,10 +266,10 @@ public class OpenApiContentController {
     public ApiReceipt setVendorInfoStatus(@RequestBody VendorInfoDTO command) throws ContentException, IOException {
         log.info("vendor/content/info/set start command:{}", command);
         GateWayHeaderDTO dto= this.getGateWayInfo(request);
-        requestHeaderCheck(dto);
+        if (!requestHeaderCheck(dto)) return  ApiReceipt.error(ErrorCode.NOHEADER);
         //越权校验
         if(!"true".equalsIgnoreCase(dto.getIsAdmin())){
-            throw new  ContentException("0x004010");
+            return  ApiReceipt.error(ErrorCode.FORBIDOPT);
         }
         ApiReceipt result=this.facade.setVendorStatus(command);
         log.info("vendor/content/info/status end result:{}", JSON.toJSONString(result));
@@ -276,10 +277,11 @@ public class OpenApiContentController {
     }
 
 
-    public void requestHeaderCheck(GateWayHeaderDTO dto) throws ContentException {
+    public Boolean requestHeaderCheck(GateWayHeaderDTO dto) throws ContentException {
         if(StringUtils.isEmpty(dto.getUsername()) || StringUtils.isEmpty(dto.getUid())||StringUtils.isEmpty(dto.getSpcode())) {
-            throw new ContentException("0x004007");
+            return false;
         }
+        return true;
     }
 
     private GateWayHeaderDTO getGateWayInfo(HttpServletRequest request) {

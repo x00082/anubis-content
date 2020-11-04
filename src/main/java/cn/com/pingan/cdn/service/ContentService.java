@@ -32,6 +32,8 @@ import java.util.List;
 public interface ContentService {
     public ApiReceipt saveContent(GateWayHeaderDTO dto, List<String> data, RefreshType type) throws ContentException;
 
+    public ApiReceipt redoContentTask(String requestId, boolean flag) throws ContentException;
+
     public void saveContentItem(TaskMsg taskMsg) throws ContentException;
 
 

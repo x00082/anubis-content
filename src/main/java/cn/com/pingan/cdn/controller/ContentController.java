@@ -11,6 +11,7 @@ package cn.com.pingan.cdn.controller;
 import cn.com.pingan.cdn.common.ApiReceipt;
 import cn.com.pingan.cdn.exception.ContentException;
 import cn.com.pingan.cdn.exception.DomainException;
+import cn.com.pingan.cdn.exception.ErrorCode;
 import cn.com.pingan.cdn.facade.ContentServiceFacade;
 import cn.com.pingan.cdn.gateWay.GateWayHeaderDTO;
 import cn.com.pingan.cdn.validator.content.FreshCommand;
@@ -38,6 +39,12 @@ import javax.validation.Valid;
 @RequestMapping("/content")
 public class ContentController {
 
+        public static int SINGLE_URL_REFRESH_LIMIT = 60; //单次url刷新上限
+
+        public static int SINGLE_DIR_REFRESH_LIMIT = 10;  //单次目录刷新上限
+
+        public static int SINGLE_URL_PRELOAD_LIMIT = 60;  //单次url预热上限
+
         private static final Logger log = org.slf4j.LoggerFactory.getLogger(ContentController.class);
         
         private @Autowired ContentServiceFacade facade;
@@ -51,23 +58,33 @@ public class ContentController {
          * @throws ContentException 
          */
         @PutMapping("/refresh/dir")
-        public ApiReceipt freshDir(@Valid @RequestBody FreshCommand command) throws ContentException, DomainException{
+        public ApiReceipt freshDir(@Valid @RequestBody FreshCommand command) throws ContentException, DomainException {
             log.info("content/fresh/dir start command:{}", JSON.toJSONString(command));
             GateWayHeaderDTO dto = this.getGateWayInfo(request);
-            if(StringUtils.isEmpty(dto.getUsername()) || StringUtils.isEmpty(dto.getUid())||StringUtils.isEmpty(dto.getSpcode())|| null==command.getData() || command.getData() .size()==0) {
-                throw new ContentException("0x004007");
+            if (StringUtils.isEmpty(dto.getUsername()) || StringUtils.isEmpty(dto.getUid()) || StringUtils.isEmpty(dto.getSpcode())) {
+                return ApiReceipt.error(ErrorCode.NOHEADER);
             }
-            
+
+            if (null == command.getData() || command.getData().size() == 0) {
+
+                return ApiReceipt.error(ErrorCode.PARAMILLEGAL);
+            }
+
+            if (command.getData().size() > SINGLE_DIR_REFRESH_LIMIT) {
+                return ApiReceipt.error(ErrorCode.OUTLIMITSINGLE);
+            }
+
             //越权校验
-            if(!"true".equals(dto.getIsAdmin())) {
+            if (!"true".equals(dto.getIsAdmin())) {
                 if (StringUtils.isEmpty(command.getSpCode()) || !dto.getSpcode().equals(command.getSpCode())) {
-                    throw new DomainException("0x0001");
+                    return ApiReceipt.error(ErrorCode.FORBIDOPT);
                 }
             }
 
-            ApiReceipt result=this.facade.refreshDir(dto,command);
+            ApiReceipt result = this.facade.refreshDir(dto, command);
             log.info("content/fresh/dir end result:{}", JSON.toJSONString(result));
             return result;
+
         }
 
         /***
@@ -79,13 +96,23 @@ public class ContentController {
         public ApiReceipt freshUrl(@Valid @RequestBody FreshCommand command) throws ContentException, DomainException {
             log.info("content/fresh/url start command:{}", JSON.toJSONString(command));
             GateWayHeaderDTO dto = this.getGateWayInfo(request);
-            if(StringUtils.isEmpty(dto.getUsername()) || StringUtils.isEmpty(dto.getUid())||StringUtils.isEmpty(dto.getSpcode())|| null==command.getData() || command.getData() .size()==0) {
-                throw new ContentException("0x004007");
+            if (StringUtils.isEmpty(dto.getUsername()) || StringUtils.isEmpty(dto.getUid()) || StringUtils.isEmpty(dto.getSpcode())) {
+                return ApiReceipt.error(ErrorCode.NOHEADER);
             }
+
+            if (null == command.getData() || command.getData().size() == 0) {
+
+                return ApiReceipt.error(ErrorCode.PARAMILLEGAL);
+            }
+
+            if (command.getData().size() > SINGLE_URL_REFRESH_LIMIT) {
+                return ApiReceipt.error(ErrorCode.OUTLIMITSINGLE);
+            }
+
             //越权校验
-            if(!"true".equals(dto.getIsAdmin())) {
+            if (!"true".equals(dto.getIsAdmin())) {
                 if (StringUtils.isEmpty(command.getSpCode()) || !dto.getSpcode().equals(command.getSpCode())) {
-                    throw new DomainException("0x0001");
+                    return ApiReceipt.error(ErrorCode.FORBIDOPT);
                 }
             }
 
@@ -105,13 +132,23 @@ public class ContentController {
             log.info("content/preheat start command:{}", JSON.toJSONString(command));
             // TODO
             GateWayHeaderDTO dto = this.getGateWayInfo(request);
-            if(StringUtils.isEmpty(dto.getUsername()) || StringUtils.isEmpty(dto.getUid())||StringUtils.isEmpty(dto.getSpcode())|| null==command.getData() || command.getData() .size()==0) {
-                throw new ContentException("0x004007");
+            if (StringUtils.isEmpty(dto.getUsername()) || StringUtils.isEmpty(dto.getUid()) || StringUtils.isEmpty(dto.getSpcode())) {
+                return ApiReceipt.error(ErrorCode.NOHEADER);
             }
+
+            if (null == command.getData() || command.getData().size() == 0) {
+
+                return ApiReceipt.error(ErrorCode.PARAMILLEGAL);
+            }
+
+            if (command.getData().size() > SINGLE_URL_PRELOAD_LIMIT) {
+                return ApiReceipt.error(ErrorCode.OUTLIMITSINGLE);
+            }
+
             //越权校验
-            if(!"true".equals(dto.getIsAdmin())) {
+            if (!"true".equals(dto.getIsAdmin())) {
                 if (StringUtils.isEmpty(command.getSpCode()) || !dto.getSpcode().equals(command.getSpCode())) {
-                    throw new DomainException("0x0001");
+                    return ApiReceipt.error(ErrorCode.FORBIDOPT);
                 }
             }
 
@@ -123,9 +160,10 @@ public class ContentController {
         @GetMapping("/test")
         public ApiReceipt testurl(String s) throws ContentException, DomainException {
             ApiReceipt result = new ApiReceipt();
+            return  ApiReceipt.error(ErrorCode.PARAMILLEGAL);
             
-            this.facade.test();
-            return result;
+            //this.facade.test();
+            //return result;
         }
         
         @PostMapping("/test/refreshurl")
@@ -164,12 +202,12 @@ public class ContentController {
             // TODO
             GateWayHeaderDTO dto = this.getGateWayInfo(request);
             if(StringUtils.isEmpty(dto.getUsername()) || StringUtils.isEmpty(dto.getUid())) {
-                throw new ContentException("0x004007");
+                return  ApiReceipt.error(ErrorCode.NOHEADER);
             }
             //越权校验
             if(!"true".equals(dto.getIsAdmin())) {
                 if (StringUtils.isEmpty(command.getSpCode()) || !dto.getSpcode().equals(command.getSpCode())) {
-                    throw new DomainException("0x0001");
+                    return  ApiReceipt.error(ErrorCode.FORBIDOPT);
                 }
             }
 
