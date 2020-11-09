@@ -197,10 +197,10 @@ public class TaskServiceImpl implements TaskService {
         log.info("enter handlerNewRequest:{}",task);
         Boolean flag = true;//原本控制是否需要循环，目前都为true
 
-        VendorInfo vendorInfo = vendorInfoRepository.findByVendor(TaskOperationEnum.getVendorString(msg.getOperation()));
+        VendorInfo vendorInfo = vendorInfoRepository.findByVendor(task.getVendor());
         String vendorStatus;
         if(vendorInfo == null){
-            log.warn("[{}] vendorInfo db is null", TaskOperationEnum.getVendorString(msg.getOperation()));
+            log.warn("[{}] vendorInfo db is null", task.getVendor());
             vendorStatus = defaultVendorStatus;
         }else{
             vendorStatus = vendorInfo.getStatus();
@@ -219,7 +219,7 @@ public class TaskServiceImpl implements TaskService {
             int result = handlerTaskLimit(msg, redisKey,qps);
             if (-100 == result) {
                 log.warn("redis:{} Limit:{}", redisKey, qps);
-                msg.setDelay(1000L);
+                //msg.setDelay(1000L);
                 return flag;
             } else if (-1 == result) {
                 log.warn("redis:{} Limit:{} 执行异常", redisKey, qps);
@@ -259,6 +259,7 @@ public class TaskServiceImpl implements TaskService {
             if(response.containsKey("status") && response.containsKey("message")){
                 task.setMessage(response.getString("message"));
                 if(response.getString("status").equals(Constants.STATUS_WAIT)) {
+                    task.setStatus(TaskStatus.WAIT);
                     if(response.getString("message").equals(Constants.QPS_LIMIT)){
                         log.error("vendor:{}  QPS LIMIT", response.getString("vendor"));
                         msg.setDelay(timeOutMs);
@@ -268,6 +269,7 @@ public class TaskServiceImpl implements TaskService {
                         task.setStatus(TaskStatus.PROCESSING);
                         msg.setDelay(30000L);//30秒后查询
                         msg.setRetryNum(0);//状态改变，清空计数
+                        msg.setOperation(TaskOperationEnum.of(msg.getOperation().name()+"_robin"));
                     }
                 }else if(response.getString("status").equals(Constants.STATUS_FAIL)){
                     msg.setRetryNum(msg.getRetryNum() + 1);
@@ -277,7 +279,7 @@ public class TaskServiceImpl implements TaskService {
                         msg.setDelay(timeOutMs);
                     }
                 }
-                vendorTaskRepository.saveAndFlush(task);
+                vendorTaskRepository.save(task);
 
             }else {
                 log.error("response:{} err ", response);
@@ -301,10 +303,10 @@ public class TaskServiceImpl implements TaskService {
         log.info("enter handlerRoundRobin:{}",task);
         Boolean flag = true;
 
-        VendorInfo vendorInfo = vendorInfoRepository.findByVendor(TaskOperationEnum.getVendorString(msg.getOperation()));
+        VendorInfo vendorInfo = vendorInfoRepository.findByVendor(task.getVendor());
         String vendorStatus;
         if(vendorInfo == null){
-            log.warn("[{}] vendorInfo db is null", TaskOperationEnum.getVendorString(msg.getOperation()));
+            log.warn("[{}] vendorInfo db is null", task.getVendor());
             vendorStatus = defaultVendorStatus;
         }else{
             vendorStatus = vendorInfo.getStatus();
@@ -318,12 +320,12 @@ public class TaskServiceImpl implements TaskService {
         if (msg.getIsLimit()) {//
             //请求QPS限制
             int limit = robinQps;
-            String redisKey = roundRobinLimitPrefix + msg.getOperation().toString();
+            String redisKey = msg.getOperation().toString();
             // 0-成功，-1执行异常，-100超限
             int result = handlerTaskLimit(msg, redisKey, limit);
             if (-100 == result) {
                 log.warn("redis:{} Limit:{}", redisKey, limit);
-                msg.setDelay(1000L);
+                //msg.setDelay(1000L);
                 return flag;
             } else if (-1 == result) {
                 log.warn("redis:{} Limit:{} 执行异常", redisKey, limit);
@@ -373,7 +375,7 @@ public class TaskServiceImpl implements TaskService {
                             task.setUpdateTime(new Date());
 
                             flag = true;
-                            vendorTaskRepository.saveAndFlush(task);
+                            vendorTaskRepository.save(task);
                             msg.setRetryNum(0);
                             log.info("刷新预热任务完成，任务编号[{}]", json.getString("jobId"));
                         } else if (Constants.STATUS_FAIL.equals(json.getString("status"))) {
@@ -381,14 +383,14 @@ public class TaskServiceImpl implements TaskService {
                             task.setMessage(StringUtils.isNoneBlank(json.getString("message"))?json.getString("message"):"厂商执行失败");
                             task.setUpdateTime(new Date());
                             flag = true;
-                            vendorTaskRepository.saveAndFlush(task);
+                            vendorTaskRepository.save(task);
                             msg.setRetryNum(0);
                             log.info("刷新预热任务失败，任务编号[{}]", json.getString("jobId"));
                         } else if (Constants.STATUS_WAIT.equals(json.getString("status"))) {
                             if(!task.getStatus().equals(TaskStatus.ROUND_ROBIN)) {
                                 task.setStatus(TaskStatus.ROUND_ROBIN);
                                 task.setUpdateTime(new Date());
-                                vendorTaskRepository.saveAndFlush(task);
+                                vendorTaskRepository.save(task);
                             }
                             msg.setRoundRobinNum(msg.getRoundRobinNum() + 1);
                             if(msg.getRoundRobinNum() > roundLimit){
@@ -434,6 +436,7 @@ public class TaskServiceImpl implements TaskService {
     public Boolean handlerSuccess(VendorContentTask task, TaskMsg msg) throws RestfulException{
         log.info("handlerSuccess:{}",task);
 
+        /*
         boolean allSuccess = true;
         ContentItem item = contentItemRepository.findByItemId(task.getItemId());
         if(item.getStatus().equals(HisStatus.WAIT)){
@@ -496,6 +499,7 @@ public class TaskServiceImpl implements TaskService {
                 }
             }
         }
+        */
         return false;
     }
 

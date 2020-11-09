@@ -95,13 +95,13 @@ public class VendorConsumer {
 */
 
     @RabbitListener(queues = Constants.CONTENT_VENDOR_ALIYUN)
-    public void receiveALIYUN(Channel channel, Message message) {
+    public void receiveALiYun(Channel channel, Message message) {
         try {
 
             String msg = new String(message.getBody());
             JSONObject msgObj = JSONObject.parseObject(msg);
 
-            log.info("ALIYUN robbit mq receive a message{}", msg.toString());
+            log.info("ALiYun rabbit mq receive a message{}", msg.toString());
 
             TaskMsg taskMsg = JSONObject.toJavaObject(msgObj, TaskMsg.class);
             log.info("转换对象{}", taskMsg);
@@ -109,25 +109,25 @@ public class VendorConsumer {
             handlerMessage(taskMsg);
 
         } catch (Exception e) {
-            log.error("消息处理异常", e);
+            log.error("receiveALiYun消息处理异常", e);
         } finally {
 
             try {
                 channel.basicAck(message.getMessageProperties().getDeliveryTag(), false);
             } catch (IOException e) {
-                log.error("VendorConsumer Ack Fail ");
+                log.error("receiveALiYun Ack Fail ");
             }
         }
     }
 
-    @RabbitListener(queues = Constants.CONTENT_VENDOR_BAISHAN)
-    public void receiveBAISHAN(Channel channel, Message message) {
+    @RabbitListener(queues = Constants.CONTENT_VENDOR_ALIYUN_ROBIN)
+    public void receiveALiYunRobin(Channel channel, Message message) {
         try {
 
             String msg = new String(message.getBody());
             JSONObject msgObj = JSONObject.parseObject(msg);
 
-            log.info("BAISHAN robbit mq receive a message{}", msg.toString());
+            log.info("ALiYunRobin rabbit mq receive a message{}", msg.toString());
 
             TaskMsg taskMsg = JSONObject.toJavaObject(msgObj, TaskMsg.class);
             log.info("转换对象{}", taskMsg);
@@ -135,25 +135,78 @@ public class VendorConsumer {
             handlerMessage(taskMsg);
 
         } catch (Exception e) {
-            log.error("receiveBAISHAN消息处理异常", e);
+            log.error("receiveALiYunRobin消息处理异常", e);
         } finally {
 
             try {
                 channel.basicAck(message.getMessageProperties().getDeliveryTag(), false);
             } catch (IOException e) {
-                log.error("VendorConsumer Ack Fail ");
+                log.error("receiveALiYunRobin Ack Fail ");
+            }
+        }
+    }
+
+
+    @RabbitListener(queues = Constants.CONTENT_VENDOR_BAISHAN)
+    public void receiveBaiShan(Channel channel, Message message) {
+        try {
+
+            String msg = new String(message.getBody());
+            JSONObject msgObj = JSONObject.parseObject(msg);
+
+            log.info("BaiShan rabbit mq receive a message{}", msg.toString());
+
+            TaskMsg taskMsg = JSONObject.toJavaObject(msgObj, TaskMsg.class);
+            log.info("转换对象{}", taskMsg);
+
+            handlerMessage(taskMsg);
+
+        } catch (Exception e) {
+            log.error("receiveBaiShan消息处理异常", e);
+        } finally {
+
+            try {
+                channel.basicAck(message.getMessageProperties().getDeliveryTag(), false);
+            } catch (IOException e) {
+                log.error("receiveBaiShan Ack Fail ");
+            }
+        }
+    }
+
+    @RabbitListener(queues = Constants.CONTENT_VENDOR_BAISHAN_ROBIN)
+    public void receiveBaiShanRobin(Channel channel, Message message) {
+        try {
+
+            String msg = new String(message.getBody());
+            JSONObject msgObj = JSONObject.parseObject(msg);
+
+            log.info("BaiShanRobin rabbit mq receive a message{}", msg.toString());
+
+            TaskMsg taskMsg = JSONObject.toJavaObject(msgObj, TaskMsg.class);
+            log.info("转换对象{}", taskMsg);
+
+            handlerMessage(taskMsg);
+
+        } catch (Exception e) {
+            log.error("receiveBaiShanRobin消息处理异常", e);
+        } finally {
+
+            try {
+                channel.basicAck(message.getMessageProperties().getDeliveryTag(), false);
+            } catch (IOException e) {
+                log.error("receiveBaiShanRobin Ack Fail ");
             }
         }
     }
 
     @RabbitListener(queues = Constants.CONTENT_VENDOR_CHINACHE)
-    public void receiveCHINACHE(Channel channel, Message message) {
+    public void receiveChinaChe(Channel channel, Message message) {
         try {
 
             String msg = new String(message.getBody());
             JSONObject msgObj = JSONObject.parseObject(msg);
 
-            log.info("CHINACHE robbit mq receive a message{}", msg.toString());
+            log.info("ChinaChe rabbit mq receive a message{}", msg.toString());
 
             TaskMsg taskMsg = JSONObject.toJavaObject(msgObj, TaskMsg.class);
             log.info("转换对象{}", taskMsg);
@@ -161,25 +214,51 @@ public class VendorConsumer {
             handlerMessage(taskMsg);
 
         } catch (Exception e) {
-            log.error("receiveCHINACHE 消息处理异常", e);
+            log.error("receiveChinaChe消息处理异常", e);
         } finally {
 
             try {
                 channel.basicAck(message.getMessageProperties().getDeliveryTag(), false);
             } catch (IOException e) {
-                log.error("VendorConsumer Ack Fail ");
+                log.error("receiveChinaChe Ack Fail ");
+            }
+        }
+    }
+
+    @RabbitListener(queues = Constants.CONTENT_VENDOR_CHINACHE_ROBIN)
+    public void receiveChinaCheRobin(Channel channel, Message message) {
+        try {
+
+            String msg = new String(message.getBody());
+            JSONObject msgObj = JSONObject.parseObject(msg);
+
+            log.info("ChinaCheRobin rabbit mq receive a message{}", msg.toString());
+
+            TaskMsg taskMsg = JSONObject.toJavaObject(msgObj, TaskMsg.class);
+            log.info("转换对象{}", taskMsg);
+
+            handlerMessage(taskMsg);
+
+        } catch (Exception e) {
+            log.error("receiveChinaCheRobin消息处理异常", e);
+        } finally {
+
+            try {
+                channel.basicAck(message.getMessageProperties().getDeliveryTag(), false);
+            } catch (IOException e) {
+                log.error("receiveChinaCheRobin Ack Fail ");
             }
         }
     }
 
     @RabbitListener(queues = Constants.CONTENT_VENDOR_JDCLOUD)
-    public void receiveJDCLOUD(Channel channel, Message message) {
+    public void receiveJDCloud(Channel channel, Message message) {
         try {
 
             String msg = new String(message.getBody());
             JSONObject msgObj = JSONObject.parseObject(msg);
 
-            log.info("JDCLOUD robbit mq receive a message{}", msg.toString());
+            log.info("JDCloud rabbit mq receive a message{}", msg.toString());
 
             TaskMsg taskMsg = JSONObject.toJavaObject(msgObj, TaskMsg.class);
             log.info("转换对象{}", taskMsg);
@@ -187,25 +266,51 @@ public class VendorConsumer {
             handlerMessage(taskMsg);
 
         } catch (Exception e) {
-            log.error("receiveJDCLOUD 消息处理异常", e);
+            log.error("receiveJDCloud消息处理异常", e);
         } finally {
 
             try {
                 channel.basicAck(message.getMessageProperties().getDeliveryTag(), false);
             } catch (IOException e) {
-                log.error("VendorConsumer Ack Fail ");
+                log.error("receiveJDCloud Ack Fail ");
+            }
+        }
+    }
+
+    @RabbitListener(queues = Constants.CONTENT_VENDOR_JDCLOUD_ROBIN)
+    public void receiveJDCloudRobin(Channel channel, Message message) {
+        try {
+
+            String msg = new String(message.getBody());
+            JSONObject msgObj = JSONObject.parseObject(msg);
+
+            log.info("JDCloudRobin rabbit mq receive a message{}", msg.toString());
+
+            TaskMsg taskMsg = JSONObject.toJavaObject(msgObj, TaskMsg.class);
+            log.info("转换对象{}", taskMsg);
+
+            handlerMessage(taskMsg);
+
+        } catch (Exception e) {
+            log.error("receiveJDCloudRobin消息处理异常", e);
+        } finally {
+
+            try {
+                channel.basicAck(message.getMessageProperties().getDeliveryTag(), false);
+            } catch (IOException e) {
+                log.error("receiveJDCloudRobin Ack Fail ");
             }
         }
     }
 
     @RabbitListener(queues = Constants.CONTENT_VENDOR_KSYUN)
-    public void receiveKSYUN(Channel channel, Message message) {
+    public void receiveKSYun(Channel channel, Message message) {
         try {
 
             String msg = new String(message.getBody());
             JSONObject msgObj = JSONObject.parseObject(msg);
 
-            log.info("KSYUN robbit mq receive a message{}", msg.toString());
+            log.info("KSYun rabbit mq receive a message{}", msg.toString());
 
             TaskMsg taskMsg = JSONObject.toJavaObject(msgObj, TaskMsg.class);
             log.info("转换对象{}", taskMsg);
@@ -213,25 +318,51 @@ public class VendorConsumer {
             handlerMessage(taskMsg);
 
         } catch (Exception e) {
-            log.error("receiveKSYUN 消息处理异常", e);
+            log.error("receiveKSYun消息处理异常", e);
         } finally {
 
             try {
                 channel.basicAck(message.getMessageProperties().getDeliveryTag(), false);
             } catch (IOException e) {
-                log.error("VendorConsumer Ack Fail ");
+                log.error("receiveKSYun Ack Fail ");
+            }
+        }
+    }
+
+    @RabbitListener(queues = Constants.CONTENT_VENDOR_KSYUN_ROBIN)
+    public void receiveKSYunRobin(Channel channel, Message message) {
+        try {
+
+            String msg = new String(message.getBody());
+            JSONObject msgObj = JSONObject.parseObject(msg);
+
+            log.info("KSYunRobin rabbit mq receive a message{}", msg.toString());
+
+            TaskMsg taskMsg = JSONObject.toJavaObject(msgObj, TaskMsg.class);
+            log.info("转换对象{}", taskMsg);
+
+            handlerMessage(taskMsg);
+
+        } catch (Exception e) {
+            log.error("receiveKSYunRobin消息处理异常", e);
+        } finally {
+
+            try {
+                channel.basicAck(message.getMessageProperties().getDeliveryTag(), false);
+            } catch (IOException e) {
+                log.error("receiveKSYunRobin Ack Fail ");
             }
         }
     }
 
     @RabbitListener(queues = Constants.CONTENT_VENDOR_NET)
-    public void receiveNET(Channel channel, Message message) {
+    public void receiveNet(Channel channel, Message message) {
         try {
 
             String msg = new String(message.getBody());
             JSONObject msgObj = JSONObject.parseObject(msg);
 
-            log.info("NET robbit mq receive a message{}", msg.toString());
+            log.info("Net rabbit mq receive a message{}", msg.toString());
 
             TaskMsg taskMsg = JSONObject.toJavaObject(msgObj, TaskMsg.class);
             log.info("转换对象{}", taskMsg);
@@ -239,25 +370,51 @@ public class VendorConsumer {
             handlerMessage(taskMsg);
 
         } catch (Exception e) {
-            log.error("receiveNET 消息处理异常", e);
+            log.error("receiveNet消息处理异常", e);
         } finally {
 
             try {
                 channel.basicAck(message.getMessageProperties().getDeliveryTag(), false);
             } catch (IOException e) {
-                log.error("VendorConsumer Ack Fail ");
+                log.error("receiveNet Ack Fail ");
+            }
+        }
+    }
+
+    @RabbitListener(queues = Constants.CONTENT_VENDOR_NET_ROBIN)
+    public void receiveNetRobin(Channel channel, Message message) {
+        try {
+
+            String msg = new String(message.getBody());
+            JSONObject msgObj = JSONObject.parseObject(msg);
+
+            log.info("NetRobin rabbit mq receive a message{}", msg.toString());
+
+            TaskMsg taskMsg = JSONObject.toJavaObject(msgObj, TaskMsg.class);
+            log.info("转换对象{}", taskMsg);
+
+            handlerMessage(taskMsg);
+
+        } catch (Exception e) {
+            log.error("receiveNetRobin消息处理异常", e);
+        } finally {
+
+            try {
+                channel.basicAck(message.getMessageProperties().getDeliveryTag(), false);
+            } catch (IOException e) {
+                log.error("receiveNetRobin Ack Fail ");
             }
         }
     }
 
     @RabbitListener(queues = Constants.CONTENT_VENDOR_QINIU)
-    public void receiveQINIU(Channel channel, Message message) {
+    public void receiveQiNiu(Channel channel, Message message) {
         try {
 
             String msg = new String(message.getBody());
             JSONObject msgObj = JSONObject.parseObject(msg);
 
-            log.info("QINIU robbit mq receive a message{}", msg.toString());
+            log.info("QiNiu rabbit mq receive a message{}", msg.toString());
 
             TaskMsg taskMsg = JSONObject.toJavaObject(msgObj, TaskMsg.class);
             log.info("转换对象{}", taskMsg);
@@ -265,25 +422,51 @@ public class VendorConsumer {
             handlerMessage(taskMsg);
 
         } catch (Exception e) {
-            log.error("receiveQINIU 消息处理异常", e);
+            log.error("receiveQiNiu 消息处理异常", e);
         } finally {
 
             try {
                 channel.basicAck(message.getMessageProperties().getDeliveryTag(), false);
             } catch (IOException e) {
-                log.error("VendorConsumer Ack Fail ");
+                log.error("receiveQiNiu Ack Fail ");
+            }
+        }
+    }
+
+    @RabbitListener(queues = Constants.CONTENT_VENDOR_QINIU_ROBIN)
+    public void receiveQiNiuRobin(Channel channel, Message message) {
+        try {
+
+            String msg = new String(message.getBody());
+            JSONObject msgObj = JSONObject.parseObject(msg);
+
+            log.info("QiNiuRobin rabbit mq receive a message{}", msg.toString());
+
+            TaskMsg taskMsg = JSONObject.toJavaObject(msgObj, TaskMsg.class);
+            log.info("转换对象{}", taskMsg);
+
+            handlerMessage(taskMsg);
+
+        } catch (Exception e) {
+            log.error("receiveQiNiuRobin消息处理异常", e);
+        } finally {
+
+            try {
+                channel.basicAck(message.getMessageProperties().getDeliveryTag(), false);
+            } catch (IOException e) {
+                log.error("receiveQiNiuRobin Ack Fail ");
             }
         }
     }
 
     @RabbitListener(queues = Constants.CONTENT_VENDOR_TENCENT)
-    public void receiveTENCENT(Channel channel, Message message) {
+    public void receiveTenCent(Channel channel, Message message) {
         try {
 
             String msg = new String(message.getBody());
             JSONObject msgObj = JSONObject.parseObject(msg);
 
-            log.info("ALiYun robbit mq receive a message{}", msg.toString());
+            log.info("TenCent rabbit mq receive a message{}", msg.toString());
 
             TaskMsg taskMsg = JSONObject.toJavaObject(msgObj, TaskMsg.class);
             log.info("转换对象{}", taskMsg);
@@ -291,25 +474,78 @@ public class VendorConsumer {
             handlerMessage(taskMsg);
 
         } catch (Exception e) {
-            log.error("receiveTENCENT 消息处理异常", e);
+            log.error("receiveTenCent消息处理异常", e);
         } finally {
 
             try {
                 channel.basicAck(message.getMessageProperties().getDeliveryTag(), false);
             } catch (IOException e) {
-                log.error("VendorConsumer Ack Fail ");
+                log.error("receiveTenCent Ack Fail ");
+            }
+        }
+    }
+
+    @RabbitListener(queues = Constants.CONTENT_VENDOR_TENCENT_ROBIN)
+    public void receiveTenCentRobin(Channel channel, Message message) {
+        try {
+
+            String msg = new String(message.getBody());
+            JSONObject msgObj = JSONObject.parseObject(msg);
+
+            log.info("TenCentRobin rabbit mq receive a message{}", msg.toString());
+
+            TaskMsg taskMsg = JSONObject.toJavaObject(msgObj, TaskMsg.class);
+            log.info("转换对象{}", taskMsg);
+
+            handlerMessage(taskMsg);
+
+        } catch (Exception e) {
+            log.error("receiveTenCentRobin消息处理异常", e);
+        } finally {
+
+            try {
+                channel.basicAck(message.getMessageProperties().getDeliveryTag(), false);
+            } catch (IOException e) {
+                log.error("receiveTenCentRobin Ack Fail ");
+            }
+        }
+    }
+
+    /******************************************自建请求******************************************/
+    @RabbitListener(queues = Constants.CONTENT_VENDOR_VENUS)
+    public void receiveVenus1(Channel channel, Message message) {
+        try {
+
+            String msg = new String(message.getBody());
+            JSONObject msgObj = JSONObject.parseObject(msg);
+
+            log.info("Venus rabbit mq receive a message{}", msg.toString());
+
+            TaskMsg taskMsg = JSONObject.toJavaObject(msgObj, TaskMsg.class);
+            log.info("转换对象{}", taskMsg);
+
+            handlerMessage(taskMsg);
+
+        } catch (Exception e) {
+            log.error("receiveVenus消息处理异常", e);
+        } finally {
+
+            try {
+                channel.basicAck(message.getMessageProperties().getDeliveryTag(), false);
+            } catch (IOException e) {
+                log.error("receiveVenus Ack Fail ");
             }
         }
     }
 
     @RabbitListener(queues = Constants.CONTENT_VENDOR_VENUS)
-    public void receiveVENUS(Channel channel, Message message) {
+    public void receiveVenus2(Channel channel, Message message) {
         try {
 
             String msg = new String(message.getBody());
             JSONObject msgObj = JSONObject.parseObject(msg);
 
-            log.info("VENUS robbit mq receive a message{}", msg.toString());
+            log.info("Venus rabbit mq receive a message{}", msg.toString());
 
             TaskMsg taskMsg = JSONObject.toJavaObject(msgObj, TaskMsg.class);
             log.info("转换对象{}", taskMsg);
@@ -317,15 +553,485 @@ public class VendorConsumer {
             handlerMessage(taskMsg);
 
         } catch (Exception e) {
-            log.error("receiveVENUS 消息处理异常", e);
+            log.error("receiveVenus消息处理异常", e);
         } finally {
 
             try {
                 channel.basicAck(message.getMessageProperties().getDeliveryTag(), false);
             } catch (IOException e) {
-                log.error("VendorConsumer Ack Fail ");
+                log.error("receiveVenus Ack Fail ");
             }
         }
     }
+
+    @RabbitListener(queues = Constants.CONTENT_VENDOR_VENUS)
+    public void receiveVenus3(Channel channel, Message message) {
+        try {
+
+            String msg = new String(message.getBody());
+            JSONObject msgObj = JSONObject.parseObject(msg);
+
+            log.info("Venus rabbit mq receive a message{}", msg.toString());
+
+            TaskMsg taskMsg = JSONObject.toJavaObject(msgObj, TaskMsg.class);
+            log.info("转换对象{}", taskMsg);
+
+            handlerMessage(taskMsg);
+
+        } catch (Exception e) {
+            log.error("receiveVenus消息处理异常", e);
+        } finally {
+
+            try {
+                channel.basicAck(message.getMessageProperties().getDeliveryTag(), false);
+            } catch (IOException e) {
+                log.error("receiveVenus Ack Fail ");
+            }
+        }
+    }
+
+    @RabbitListener(queues = Constants.CONTENT_VENDOR_VENUS)
+    public void receiveVenus4(Channel channel, Message message) {
+        try {
+
+            String msg = new String(message.getBody());
+            JSONObject msgObj = JSONObject.parseObject(msg);
+
+            log.info("Venus rabbit mq receive a message{}", msg.toString());
+
+            TaskMsg taskMsg = JSONObject.toJavaObject(msgObj, TaskMsg.class);
+            log.info("转换对象{}", taskMsg);
+
+            handlerMessage(taskMsg);
+
+        } catch (Exception e) {
+            log.error("receiveVenus消息处理异常", e);
+        } finally {
+
+            try {
+                channel.basicAck(message.getMessageProperties().getDeliveryTag(), false);
+            } catch (IOException e) {
+                log.error("receiveVenus Ack Fail ");
+            }
+        }
+    }
+
+    @RabbitListener(queues = Constants.CONTENT_VENDOR_VENUS)
+    public void receiveVenus5(Channel channel, Message message) {
+        try {
+
+            String msg = new String(message.getBody());
+            JSONObject msgObj = JSONObject.parseObject(msg);
+
+            log.info("Venus rabbit mq receive a message{}", msg.toString());
+
+            TaskMsg taskMsg = JSONObject.toJavaObject(msgObj, TaskMsg.class);
+            log.info("转换对象{}", taskMsg);
+
+            handlerMessage(taskMsg);
+
+        } catch (Exception e) {
+            log.error("receiveVenus消息处理异常", e);
+        } finally {
+
+            try {
+                channel.basicAck(message.getMessageProperties().getDeliveryTag(), false);
+            } catch (IOException e) {
+                log.error("receiveVenus Ack Fail ");
+            }
+        }
+    }
+
+    @RabbitListener(queues = Constants.CONTENT_VENDOR_VENUS)
+    public void receiveVenus6(Channel channel, Message message) {
+        try {
+
+            String msg = new String(message.getBody());
+            JSONObject msgObj = JSONObject.parseObject(msg);
+
+            log.info("Venus rabbit mq receive a message{}", msg.toString());
+
+            TaskMsg taskMsg = JSONObject.toJavaObject(msgObj, TaskMsg.class);
+            log.info("转换对象{}", taskMsg);
+
+            handlerMessage(taskMsg);
+
+        } catch (Exception e) {
+            log.error("receiveVenus消息处理异常", e);
+        } finally {
+
+            try {
+                channel.basicAck(message.getMessageProperties().getDeliveryTag(), false);
+            } catch (IOException e) {
+                log.error("receiveVenus Ack Fail ");
+            }
+        }
+    }
+
+    @RabbitListener(queues = Constants.CONTENT_VENDOR_VENUS)
+    public void receiveVenus7(Channel channel, Message message) {
+        try {
+
+            String msg = new String(message.getBody());
+            JSONObject msgObj = JSONObject.parseObject(msg);
+
+            log.info("Venus rabbit mq receive a message{}", msg.toString());
+
+            TaskMsg taskMsg = JSONObject.toJavaObject(msgObj, TaskMsg.class);
+            log.info("转换对象{}", taskMsg);
+
+            handlerMessage(taskMsg);
+
+        } catch (Exception e) {
+            log.error("receiveVenus消息处理异常", e);
+        } finally {
+
+            try {
+                channel.basicAck(message.getMessageProperties().getDeliveryTag(), false);
+            } catch (IOException e) {
+                log.error("receiveVenus Ack Fail ");
+            }
+        }
+    }
+
+    @RabbitListener(queues = Constants.CONTENT_VENDOR_VENUS)
+    public void receiveVenus8(Channel channel, Message message) {
+        try {
+
+            String msg = new String(message.getBody());
+            JSONObject msgObj = JSONObject.parseObject(msg);
+
+            log.info("Venus rabbit mq receive a message{}", msg.toString());
+
+            TaskMsg taskMsg = JSONObject.toJavaObject(msgObj, TaskMsg.class);
+            log.info("转换对象{}", taskMsg);
+
+            handlerMessage(taskMsg);
+
+        } catch (Exception e) {
+            log.error("receiveVenus消息处理异常", e);
+        } finally {
+
+            try {
+                channel.basicAck(message.getMessageProperties().getDeliveryTag(), false);
+            } catch (IOException e) {
+                log.error("receiveVenus Ack Fail ");
+            }
+        }
+    }
+
+    @RabbitListener(queues = Constants.CONTENT_VENDOR_VENUS)
+    public void receiveVenus9(Channel channel, Message message) {
+        try {
+
+            String msg = new String(message.getBody());
+            JSONObject msgObj = JSONObject.parseObject(msg);
+
+            log.info("Venus rabbit mq receive a message{}", msg.toString());
+
+            TaskMsg taskMsg = JSONObject.toJavaObject(msgObj, TaskMsg.class);
+            log.info("转换对象{}", taskMsg);
+
+            handlerMessage(taskMsg);
+
+        } catch (Exception e) {
+            log.error("receiveVenus消息处理异常", e);
+        } finally {
+
+            try {
+                channel.basicAck(message.getMessageProperties().getDeliveryTag(), false);
+            } catch (IOException e) {
+                log.error("receiveVenus Ack Fail ");
+            }
+        }
+    }
+
+    @RabbitListener(queues = Constants.CONTENT_VENDOR_VENUS)
+    public void receiveVenus10(Channel channel, Message message) {
+        try {
+
+            String msg = new String(message.getBody());
+            JSONObject msgObj = JSONObject.parseObject(msg);
+
+            log.info("Venus rabbit mq receive a message{}", msg.toString());
+
+            TaskMsg taskMsg = JSONObject.toJavaObject(msgObj, TaskMsg.class);
+            log.info("转换对象{}", taskMsg);
+
+            handlerMessage(taskMsg);
+
+        } catch (Exception e) {
+            log.error("receiveVenus消息处理异常", e);
+        } finally {
+
+            try {
+                channel.basicAck(message.getMessageProperties().getDeliveryTag(), false);
+            } catch (IOException e) {
+                log.error("receiveVenus Ack Fail ");
+            }
+        }
+    }
+
+    /******************************************自建轮询******************************************/
+    @RabbitListener(queues = Constants.CONTENT_VENDOR_VENUS_ROBIN)
+    public void receiveVenusRobin1(Channel channel, Message message) {
+        try {
+
+            String msg = new String(message.getBody());
+            JSONObject msgObj = JSONObject.parseObject(msg);
+
+            log.info("VenusRobin rabbit mq receive a message{}", msg.toString());
+
+            TaskMsg taskMsg = JSONObject.toJavaObject(msgObj, TaskMsg.class);
+            log.info("转换对象{}", taskMsg);
+
+            handlerMessage(taskMsg);
+
+        } catch (Exception e) {
+            log.error("receiveVenusRobin消息处理异常", e);
+        } finally {
+
+            try {
+                channel.basicAck(message.getMessageProperties().getDeliveryTag(), false);
+            } catch (IOException e) {
+                log.error("receiveVenusRobin Ack Fail ");
+            }
+        }
+    }
+
+    @RabbitListener(queues = Constants.CONTENT_VENDOR_VENUS_ROBIN)
+    public void receiveVenusRobin2(Channel channel, Message message) {
+        try {
+
+            String msg = new String(message.getBody());
+            JSONObject msgObj = JSONObject.parseObject(msg);
+
+            log.info("VenusRobin rabbit mq receive a message{}", msg.toString());
+
+            TaskMsg taskMsg = JSONObject.toJavaObject(msgObj, TaskMsg.class);
+            log.info("转换对象{}", taskMsg);
+
+            handlerMessage(taskMsg);
+
+        } catch (Exception e) {
+            log.error("receiveVenusRobin消息处理异常", e);
+        } finally {
+
+            try {
+                channel.basicAck(message.getMessageProperties().getDeliveryTag(), false);
+            } catch (IOException e) {
+                log.error("receiveVenusRobin Ack Fail ");
+            }
+        }
+    }
+
+    /*
+    @RabbitListener(queues = Constants.CONTENT_VENDOR_VENUS_ROBIN)
+    public void receiveVenusRobin3(Channel channel, Message message) {
+        try {
+
+            String msg = new String(message.getBody());
+            JSONObject msgObj = JSONObject.parseObject(msg);
+
+            log.info("VenusRobin rabbit mq receive a message{}", msg.toString());
+
+            TaskMsg taskMsg = JSONObject.toJavaObject(msgObj, TaskMsg.class);
+            log.info("转换对象{}", taskMsg);
+
+            handlerMessage(taskMsg);
+
+        } catch (Exception e) {
+            log.error("receiveVenusRobin消息处理异常", e);
+        } finally {
+
+            try {
+                channel.basicAck(message.getMessageProperties().getDeliveryTag(), false);
+            } catch (IOException e) {
+                log.error("receiveVenusRobin Ack Fail ");
+            }
+        }
+    }
+    @RabbitListener(queues = Constants.CONTENT_VENDOR_VENUS_ROBIN)
+    public void receiveVenusRobin4(Channel channel, Message message) {
+        try {
+
+            String msg = new String(message.getBody());
+            JSONObject msgObj = JSONObject.parseObject(msg);
+
+            log.info("VenusRobin rabbit mq receive a message{}", msg.toString());
+
+            TaskMsg taskMsg = JSONObject.toJavaObject(msgObj, TaskMsg.class);
+            log.info("转换对象{}", taskMsg);
+
+            handlerMessage(taskMsg);
+
+        } catch (Exception e) {
+            log.error("receiveVenusRobin消息处理异常", e);
+        } finally {
+
+            try {
+                channel.basicAck(message.getMessageProperties().getDeliveryTag(), false);
+            } catch (IOException e) {
+                log.error("receiveVenusRobin Ack Fail ");
+            }
+        }
+    }
+
+    @RabbitListener(queues = Constants.CONTENT_VENDOR_VENUS_ROBIN)
+    public void receiveVenusRobin5(Channel channel, Message message) {
+        try {
+
+            String msg = new String(message.getBody());
+            JSONObject msgObj = JSONObject.parseObject(msg);
+
+            log.info("VenusRobin rabbit mq receive a message{}", msg.toString());
+
+            TaskMsg taskMsg = JSONObject.toJavaObject(msgObj, TaskMsg.class);
+            log.info("转换对象{}", taskMsg);
+
+            handlerMessage(taskMsg);
+
+        } catch (Exception e) {
+            log.error("receiveVenusRobin消息处理异常", e);
+        } finally {
+
+            try {
+                channel.basicAck(message.getMessageProperties().getDeliveryTag(), false);
+            } catch (IOException e) {
+                log.error("receiveVenusRobin Ack Fail ");
+            }
+        }
+    }
+
+    @RabbitListener(queues = Constants.CONTENT_VENDOR_VENUS_ROBIN)
+    public void receiveVenusRobin6(Channel channel, Message message) {
+        try {
+
+            String msg = new String(message.getBody());
+            JSONObject msgObj = JSONObject.parseObject(msg);
+
+            log.info("VenusRobin rabbit mq receive a message{}", msg.toString());
+
+            TaskMsg taskMsg = JSONObject.toJavaObject(msgObj, TaskMsg.class);
+            log.info("转换对象{}", taskMsg);
+
+            handlerMessage(taskMsg);
+
+        } catch (Exception e) {
+            log.error("receiveVenusRobin消息处理异常", e);
+        } finally {
+
+            try {
+                channel.basicAck(message.getMessageProperties().getDeliveryTag(), false);
+            } catch (IOException e) {
+                log.error("receiveVenusRobin Ack Fail ");
+            }
+        }
+    }
+
+    @RabbitListener(queues = Constants.CONTENT_VENDOR_VENUS_ROBIN)
+    public void receiveVenusRobin7(Channel channel, Message message) {
+        try {
+
+            String msg = new String(message.getBody());
+            JSONObject msgObj = JSONObject.parseObject(msg);
+
+            log.info("VenusRobin rabbit mq receive a message{}", msg.toString());
+
+            TaskMsg taskMsg = JSONObject.toJavaObject(msgObj, TaskMsg.class);
+            log.info("转换对象{}", taskMsg);
+
+            handlerMessage(taskMsg);
+
+        } catch (Exception e) {
+            log.error("receiveVenusRobin消息处理异常", e);
+        } finally {
+
+            try {
+                channel.basicAck(message.getMessageProperties().getDeliveryTag(), false);
+            } catch (IOException e) {
+                log.error("receiveVenusRobin Ack Fail ");
+            }
+        }
+    }
+
+    @RabbitListener(queues = Constants.CONTENT_VENDOR_VENUS_ROBIN)
+    public void receiveVenusRobin8(Channel channel, Message message) {
+        try {
+
+            String msg = new String(message.getBody());
+            JSONObject msgObj = JSONObject.parseObject(msg);
+
+            log.info("VenusRobin rabbit mq receive a message{}", msg.toString());
+
+            TaskMsg taskMsg = JSONObject.toJavaObject(msgObj, TaskMsg.class);
+            log.info("转换对象{}", taskMsg);
+
+            handlerMessage(taskMsg);
+
+        } catch (Exception e) {
+            log.error("receiveVenusRobin消息处理异常", e);
+        } finally {
+
+            try {
+                channel.basicAck(message.getMessageProperties().getDeliveryTag(), false);
+            } catch (IOException e) {
+                log.error("receiveVenusRobin Ack Fail ");
+            }
+        }
+    }
+
+    @RabbitListener(queues = Constants.CONTENT_VENDOR_VENUS_ROBIN)
+    public void receiveVenusRobin9(Channel channel, Message message) {
+        try {
+
+            String msg = new String(message.getBody());
+            JSONObject msgObj = JSONObject.parseObject(msg);
+
+            log.info("VenusRobin rabbit mq receive a message{}", msg.toString());
+
+            TaskMsg taskMsg = JSONObject.toJavaObject(msgObj, TaskMsg.class);
+            log.info("转换对象{}", taskMsg);
+
+            handlerMessage(taskMsg);
+
+        } catch (Exception e) {
+            log.error("receiveVenusRobin消息处理异常", e);
+        } finally {
+
+            try {
+                channel.basicAck(message.getMessageProperties().getDeliveryTag(), false);
+            } catch (IOException e) {
+                log.error("receiveVenusRobin Ack Fail ");
+            }
+        }
+    }
+
+    @RabbitListener(queues = Constants.CONTENT_VENDOR_VENUS_ROBIN)
+    public void receiveVenusRobin10(Channel channel, Message message) {
+        try {
+
+            String msg = new String(message.getBody());
+            JSONObject msgObj = JSONObject.parseObject(msg);
+
+            log.info("VenusRobin rabbit mq receive a message{}", msg.toString());
+
+            TaskMsg taskMsg = JSONObject.toJavaObject(msgObj, TaskMsg.class);
+            log.info("转换对象{}", taskMsg);
+
+            handlerMessage(taskMsg);
+
+        } catch (Exception e) {
+            log.error("receiveVenusRobin消息处理异常", e);
+        } finally {
+
+            try {
+                channel.basicAck(message.getMessageProperties().getDeliveryTag(), false);
+            } catch (IOException e) {
+                log.error("receiveVenusRobin Ack Fail ");
+            }
+        }
+    }
+    */
 
 }

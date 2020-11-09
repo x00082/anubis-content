@@ -11,18 +11,41 @@ import java.util.List;
  */
 public enum TaskOperationEnum {
 
-    content_item,//拆分
+    content_item,//拆分原始
+    content_item_robin,
+
+    content_vendor,//拆分厂商
+    content_vendor_robin,
 
     //厂商任务
     content_qiniu,
+    content_qiniu_robin,
+
     content_tencent,
+    content_tencent_robin,
+
     content_ksyun,
+    content_ksyun_robin,
+
     content_venus,
+    content_venus_robin,
+
     content_baishan,
+    content_baishan_robin,
+
     content_chinacache,
+    content_chinacache_robin,
+
     content_net,
+    content_net_robin,
+
     content_jdcloud,
+    content_jdcloud_robin,
+
     content_aliyun,
+    content_aliyun_robin,
+
+    default_error,
 
     ;
 
@@ -32,6 +55,13 @@ public enum TaskOperationEnum {
             taskOps.add(tp.toString());
         }
         return taskOps;
+    }
+
+    public static TaskOperationEnum of(String value) {
+        for(TaskOperationEnum ut : TaskOperationEnum.values()) {
+            if(ut.name().equals(value)) return ut;
+        }
+        return TaskOperationEnum.default_error;
     }
 
     public static TaskOperationEnum getVendorOperation(String value) {

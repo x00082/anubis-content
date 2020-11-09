@@ -36,6 +36,14 @@ public interface ContentService {
 
     public void saveContentItem(TaskMsg taskMsg) throws ContentException;
 
+    public void saveContentVendor(TaskMsg taskMsg) throws ContentException;
+
+    public void contentItemRobin(TaskMsg taskMsg) throws ContentException;
+
+    public void contentVendorRobin(TaskMsg taskMsg) throws ContentException;
+
+    public void clearErrorTask(TaskMsg taskMsg) throws ContentException;
+
 
     ApiReceipt setUserContentNumber(ContentLimitDTO command);
 

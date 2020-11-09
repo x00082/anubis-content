@@ -30,7 +30,7 @@ public class ConfigServiceImpl implements ConfigService {
         if(info == null){
             info = new VendorInfo();
             info.setVendorInfo(infoDTO);
-            vendorInfoRepository.saveAndFlush(info);
+            vendorInfoRepository.save(info);
         }else{
             log.info("{}厂商信息已存在", infoDTO.getVendor());
 
@@ -49,7 +49,7 @@ public class ConfigServiceImpl implements ConfigService {
             return ApiReceipt.error("0x004008", "无有效数据");
         }else{
             info.setVendorInfo(infoDTO);
-            vendorInfoRepository.saveAndFlush(info);
+            vendorInfoRepository.save(info);
         }
 
         return ApiReceipt.ok();
@@ -85,7 +85,7 @@ public class ConfigServiceImpl implements ConfigService {
         }
 
         info.setStatus(infoDTO.getStatus());
-        vendorInfoRepository.saveAndFlush(info);
+        vendorInfoRepository.save(info);
         return ApiReceipt.ok();
     }
 }

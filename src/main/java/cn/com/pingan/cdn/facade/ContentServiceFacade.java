@@ -35,6 +35,9 @@ public interface ContentServiceFacade {
 
     public ApiReceipt prefetch(GateWayHeaderDTO dto, FreshCommand command)throws ContentException;
 
+
+    public ApiReceipt reDO(String id, boolean flag)throws ContentException;
+
     public QueryHisDTO queryHis(GateWayHeaderDTO dto, QueryHisCommand command);
 
 

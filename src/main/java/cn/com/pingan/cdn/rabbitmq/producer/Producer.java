@@ -69,4 +69,12 @@ public class Producer {
             throw new RestfulException(ErrEnum.ErrMQPushMsg.getCode(), ErrEnum.ErrMQPushMsg.getErrMsg());
         }
     }
+
+    public void sendAllMsg(TaskMsg msg) throws RestfulException {
+        if(msg.getDelay() > 0){
+            sendDelayMsg(msg);
+        }else{
+            sendTaskMsg(msg);
+        }
+    }
 }

@@ -24,11 +24,18 @@ import java.util.Date;
  */
 @Data
 @Entity
+/*
 @Table(name="content_item",
         uniqueConstraints = {
                 @UniqueConstraint(columnNames = {"item_id"})
         },
         indexes = {
+                @Index(columnList = "request_id")
+        })
+*/
+@Table(name="content_item",
+        indexes = {
+                @Index(columnList = "item_id"),
                 @Index(columnList = "request_id")
         })
 public class ContentItem {

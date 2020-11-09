@@ -7,10 +7,17 @@ import javax.persistence.*;
 
 @Data
 @Entity
+/*
 @Table(name="vendor_info", uniqueConstraints = {
         @UniqueConstraint(columnNames = {"vendor"})
         },
         indexes = {
+                @Index(columnList = "status")
+        })
+        */
+@Table(name="vendor_info",
+        indexes = {
+                @Index(columnList = "vendor"),
                 @Index(columnList = "status")
         })
 public class VendorInfo {

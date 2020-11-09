@@ -117,6 +117,11 @@ public class ContentServiceFacadeImpl implements ContentServiceFacade {
     }
 
     @Override
+    public ApiReceipt reDO(String id, boolean flag) throws ContentException {
+        return contentService.redoContentTask(id, flag);
+    }
+
+    @Override
     public QueryHisDTO queryHis(GateWayHeaderDTO dto, QueryHisCommand command) {
         QueryHisDTO queryHisDTO = new QueryHisDTO();
         int pageIndex = command.getPageIndex();

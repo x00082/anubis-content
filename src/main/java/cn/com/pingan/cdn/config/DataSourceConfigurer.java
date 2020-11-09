@@ -8,6 +8,7 @@
  */
 package cn.com.pingan.cdn.config;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.jdbc.DataSourceBuilder;
@@ -24,22 +25,33 @@ import javax.sql.DataSource;
  * @date 2020年10月15日 上午10:25:08 
  *  
  */
+@Slf4j
 @Configuration
 public class DataSourceConfigurer {
-    
+
+    /*
+    @Value("${spring.datasource.mysql.max-pool-size}")
+    private int maxPoolSize;
+
+    @Value("${spring.datasource.mysql.min-idle}")
+    private int minIdel;
+
+    */
     @Bean(name = "pgsqlDataSource")
     //@Qualifier("pgsqlDataSource")
     @ConfigurationProperties(prefix="spring.datasource.pgsql")
     @Primary
     public DataSource PgsqlDataSource() {
-        DataSource ds = DataSourceBuilder.create().build();
-        return ds;
+        DataSource pd = DataSourceBuilder.create().type(org.apache.commons.dbcp2.BasicDataSource.class).build();
+        return pd;
     }
 
     @Bean(name = "mysqlDataSource")
     @Qualifier("mysqlDataSource")
     @ConfigurationProperties(prefix="spring.datasource.mysql")
     public DataSource MysqlDataSource() {
-        return DataSourceBuilder.create().build();
+        //HikariDataSource md = new HikariDataSource();
+        DataSource md = DataSourceBuilder.create().type(org.apache.commons.dbcp2.BasicDataSource.class).build();
+        return md;
     }
 }

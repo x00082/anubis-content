@@ -9,6 +9,7 @@
 package cn.com.pingan.cdn.controller;
 
 import cn.com.pingan.cdn.common.ApiReceipt;
+import cn.com.pingan.cdn.common.RedocDTO;
 import cn.com.pingan.cdn.exception.ContentException;
 import cn.com.pingan.cdn.exception.DomainException;
 import cn.com.pingan.cdn.exception.ErrorCode;
@@ -156,6 +157,26 @@ public class ContentController {
             log.info("content/preheat end result:{}", JSON.toJSONString(result));
             return result;
         }
+
+        @PutMapping("/reDo")
+        public ApiReceipt reDo(@Valid @RequestBody RedocDTO command) throws ContentException, DomainException {
+            log.info("content/preheat start command:{}", JSON.toJSONString(command));
+            // TODO
+            GateWayHeaderDTO dto = this.getGateWayInfo(request);
+            if (StringUtils.isEmpty(dto.getUsername()) || StringUtils.isEmpty(dto.getUid()) || StringUtils.isEmpty(dto.getSpcode())) {
+                return ApiReceipt.error(ErrorCode.NOHEADER);
+            }
+
+
+            //越权校验
+            if(!"true".equalsIgnoreCase(dto.getIsAdmin())){
+                return  ApiReceipt.error(ErrorCode.FORBIDOPT);
+            }
+
+            ApiReceipt result =this.facade.reDO(command.getTaskId(), command.getForce());
+            log.info("content/preheat end result:{}", JSON.toJSONString(result));
+            return result;
+        }
         
         @GetMapping("/test")
         public ApiReceipt testurl(String s) throws ContentException, DomainException {
@@ -187,6 +208,8 @@ public class ContentController {
             log.info("content/fresh/url end result:{}", JSONObject.toJSONString(result));
             return result;
         }
+
+
         
         
         /***
