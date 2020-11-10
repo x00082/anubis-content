@@ -80,6 +80,7 @@ public class DelayConsumer {
         }
     }
 
+    /*
     @RabbitListener(queues = Constants.CONTENT_DELAY_QUEUE)
     public void receiveDelay3(Channel channel, Message message){
         try {
@@ -295,4 +296,5 @@ public class DelayConsumer {
             }
         }
     }
+    */
 }

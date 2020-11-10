@@ -70,11 +70,12 @@ public class Producer {
         }
     }
 
-    public void sendAllMsg(TaskMsg msg) throws RestfulException {
+    public String sendAllMsg(TaskMsg msg) throws RestfulException {
         if(msg.getDelay() > 0){
             sendDelayMsg(msg);
         }else{
             sendTaskMsg(msg);
         }
+        return msg.getTaskId();
     }
 }

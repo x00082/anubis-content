@@ -538,6 +538,7 @@ public class VendorConsumer {
         }
     }
 
+
     @RabbitListener(queues = Constants.CONTENT_VENDOR_VENUS)
     public void receiveVenus2(Channel channel, Message message) {
         try {
@@ -564,6 +565,7 @@ public class VendorConsumer {
         }
     }
 
+    /*
     @RabbitListener(queues = Constants.CONTENT_VENDOR_VENUS)
     public void receiveVenus3(Channel channel, Message message) {
         try {
@@ -771,6 +773,7 @@ public class VendorConsumer {
             }
         }
     }
+    */
 
     /******************************************自建轮询******************************************/
     @RabbitListener(queues = Constants.CONTENT_VENDOR_VENUS_ROBIN)

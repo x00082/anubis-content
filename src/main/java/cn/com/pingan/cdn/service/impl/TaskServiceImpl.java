@@ -196,46 +196,46 @@ public class TaskServiceImpl implements TaskService {
     public Boolean handlerNewRequest(VendorContentTask task, TaskMsg msg) throws RestfulException {
         log.info("enter handlerNewRequest:{}",task);
         Boolean flag = true;//原本控制是否需要循环，目前都为true
-
-        VendorInfo vendorInfo = vendorInfoRepository.findByVendor(task.getVendor());
-        String vendorStatus;
-        if(vendorInfo == null){
-            log.warn("[{}] vendorInfo db is null", task.getVendor());
-            vendorStatus = defaultVendorStatus;
-        }else{
-            vendorStatus = vendorInfo.getStatus();
-        }
-        if ("down".equals(vendorStatus)) {
-            msg.setDelay(1 * 60 * 1000L);
-            rabbitListenerConfig.stop(msg.getOperation().name());//关闭监听
-            this.pushTaskMsg(msg);//放回队列
-            return flag;
-        }
-        if (msg.getIsLimit()) {//
-            //请求QPS限制
-            int qps = vendorInfo!=null?vendorInfo.getTotalQps():requestQps;
-            String redisKey = msg.getOperation().toString();
-            // 0-成功，-1执行异常，-100超限
-            int result = handlerTaskLimit(msg, redisKey,qps);
-            if (-100 == result) {
-                log.warn("redis:{} Limit:{}", redisKey, qps);
-                //msg.setDelay(1000L);
-                return flag;
-            } else if (-1 == result) {
-                log.warn("redis:{} Limit:{} 执行异常", redisKey, qps);
-                msg.setDelay(timeOutMs);
-                return flag;//3秒后重试
-            }
-        }
-
-        JSONObject response = null;
-        RefreshPreloadData data = new RefreshPreloadData();
-        List<String> urls = new ArrayList<>();
-        urls.add(task.getContent());
-        data.setUrls(urls);
-
-        VendorClientService vendorClient = getVendorClientVO(VendorEnum.getByCode(task.getVendor()));
         try{
+            VendorInfo vendorInfo = vendorInfoRepository.findByVendor(task.getVendor());
+            String vendorStatus;
+            if(vendorInfo == null){
+                log.warn("[{}] vendorInfo db is null", task.getVendor());
+                vendorStatus = defaultVendorStatus;
+            }else{
+                vendorStatus = vendorInfo.getStatus();
+            }
+            if ("down".equals(vendorStatus)) {
+                msg.setDelay(1 * 60 * 1000L);
+                rabbitListenerConfig.stop(msg.getOperation().name());//关闭监听
+                this.pushTaskMsg(msg);//放回队列
+                return flag;
+            }
+            if (msg.getIsLimit()) {//
+                //请求QPS限制
+                int qps = vendorInfo!=null?vendorInfo.getTotalQps():requestQps;
+                String redisKey = msg.getOperation().toString();
+                // 0-成功，-1执行异常，-100超限
+                int result = handlerTaskLimit(msg, redisKey,qps);
+                if (-100 == result) {
+                    log.warn("redis:{} Limit:{}", redisKey, qps);
+                    //msg.setDelay(1000L);
+                    return flag;
+                } else if (-1 == result) {
+                    log.warn("redis:{} Limit:{} 执行异常", redisKey, qps);
+                    msg.setDelay(timeOutMs);
+                    return flag;//3秒后重试
+                }
+            }
+
+            JSONObject response = null;
+            RefreshPreloadData data = new RefreshPreloadData();
+            List<String> urls = new ArrayList<>();
+            urls.add(task.getContent());
+            data.setUrls(urls);
+
+            VendorClientService vendorClient = getVendorClientVO(VendorEnum.getByCode(task.getVendor()));
+
             switch (task.getType().name()){
                 case "url":
                     response = vendorClient.refreshUrl(data);
@@ -282,7 +282,7 @@ public class TaskServiceImpl implements TaskService {
                 vendorTaskRepository.save(task);
 
             }else {
-                log.error("response:{} err ", response);
+                log.error("response err:[{}]", response);
                 throw new Exception(task.getTaskId() + ": response err");
             }
 
@@ -290,7 +290,9 @@ public class TaskServiceImpl implements TaskService {
             log.error("HandlerNewRequest Exception:{}",e);
             msg.setRetryNum(msg.getRetryNum() + 1);
             if(msg.getRetryNum() > timeOutLimit){
+                log.error("[{}]HandlerNewRequest超过最大重试限制[{}]", task.getTaskId(), timeOutLimit);
                 task.setStatus(TaskStatus.FAIL);
+                vendorTaskRepository.save(task);
             }else{
                 msg.setDelay(timeOutMs);
             }
@@ -424,6 +426,8 @@ public class TaskServiceImpl implements TaskService {
             msg.setRetryNum(msg.getRetryNum() + 1);
             if(msg.getRetryNum() > timeOutLimit){
                 task.setStatus(TaskStatus.FAIL);
+                log.error("[{}]HandlerRoundRobin超过最大重试限制[{}]", task.getTaskId(), timeOutLimit);
+                vendorTaskRepository.save(task);
             }else{
                 msg.setDelay(timeOutMs);
             }
