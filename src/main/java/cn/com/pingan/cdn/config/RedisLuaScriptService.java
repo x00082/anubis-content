@@ -41,6 +41,9 @@ public class RedisLuaScriptService {
     @Resource(name = "vendorQpsLuaScript")
     private RedisScript<Long> qpsLuaScript;
 
+    @Resource(name = "vendorQpsAndSizeLuaScript")
+    private RedisScript<Long> qpsAndSizeLuaScript;
+
     @Resource(name = "getUserLimitLuaScript")
     private RedisScript<String> getUserLimitLuaScript;
 
@@ -91,6 +94,21 @@ public class RedisLuaScriptService {
         }
     }
 
+    /**
+     * 执行脚本
+     * @param keys
+     * @param args
+     * @return
+     */
+    public int executeQpsAndTotalScript(List<String> keys, List<String> args) {
+        try {
+            Long scriptValue = redisTemplate.execute(qpsAndSizeLuaScript,keys,args.toArray());
+            return scriptValue.intValue();
+        } catch (Exception e) {
+            log.error("execute script error", e);
+            return -1;
+        }
+    }
 
     /**
      * 执行脚本

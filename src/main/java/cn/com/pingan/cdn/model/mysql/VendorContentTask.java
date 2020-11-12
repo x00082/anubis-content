@@ -43,6 +43,8 @@ import java.util.Date;
                 @Index(columnList = "task_id"),
                 @Index(columnList = "item_id"),
                 @Index(columnList = "request_id"),
+                @Index(columnList = "job_id"),
+                @Index(columnList = "merge_id"),
                 @Index(columnList = "status"),
                 @Index(columnList = "create_time")
         })
@@ -88,4 +90,7 @@ public class VendorContentTask {
 
     @Column(length=128, name="request_id", nullable = false)
     private String requestId;
+
+    @Column(length=128, name="merge_id")
+    private String mergeId;
 }

@@ -40,6 +40,14 @@ public class RedisLuaConfig {
         return redisScript;
     }
 
+    @Bean("vendorQpsAndSizeLuaScript")
+    public RedisScript<Long> vendorQpsAndSizeLuaScript() {
+        DefaultRedisScript<Long> redisScript = new DefaultRedisScript<>();
+        redisScript.setLocation(new ClassPathResource("lua/qpsAndSize.lua"));
+        redisScript.setResultType(Long.class);
+        return redisScript;
+    }
+
     @Bean("getUserLimitLuaScript")
     public RedisScript<String> getUserLimitLuaScript() {
         DefaultRedisScript<String> redisScript = new DefaultRedisScript<>();

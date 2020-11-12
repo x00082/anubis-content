@@ -18,7 +18,6 @@ import cn.com.pingan.cdn.gateWay.GateWayHeaderDTO;
 import cn.com.pingan.cdn.validator.content.FreshCommand;
 import cn.com.pingan.cdn.validator.content.QueryHisCommand;
 import com.alibaba.fastjson.JSON;
-import com.alibaba.fastjson.JSONObject;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -37,7 +36,7 @@ import javax.validation.Valid;
  *  
  */
 @RestController
-@RequestMapping("/content")
+@RequestMapping("/base/content")
 public class ContentController {
 
         public static int SINGLE_URL_REFRESH_LIMIT = 60; //单次url刷新上限
@@ -177,41 +176,7 @@ public class ContentController {
             log.info("content/preheat end result:{}", JSON.toJSONString(result));
             return result;
         }
-        
-        @GetMapping("/test")
-        public ApiReceipt testurl(String s) throws ContentException, DomainException {
-            ApiReceipt result = new ApiReceipt();
-            return  ApiReceipt.error(ErrorCode.PARAMILLEGAL);
-            
-            //this.facade.test();
-            //return result;
-        }
-        
-        @PostMapping("/test/refreshurl")
-        public ApiReceipt test(@Valid @RequestBody FreshCommand command) throws ContentException, DomainException {
-            GateWayHeaderDTO dto = new GateWayHeaderDTO();
-            dto.setIsAdmin("true");
-            dto.setSpcode("1563872277077");
-            dto.setUid("e72c4493b8da6b489e7f8d8a641b1481196e026c42815942380dfec61cdce93c");
-            ApiReceipt result = this.facade.refreshUrl(dto,command);
-            log.info("content/fresh/url end result:{}", JSON.toJSONString(result));
-            return result;
-        }
 
-        @PostMapping("/test/queryHis")
-        public ApiReceipt testQueryHis(@Valid @RequestBody QueryHisCommand command) throws ContentException, DomainException {
-            GateWayHeaderDTO dto = new GateWayHeaderDTO();
-            dto.setIsAdmin("true");
-            dto.setSpcode("1563872277077");
-            dto.setUid("e72c4493b8da6b489e7f8d8a641b1481196e026c42815942380dfec61cdce93c");
-            ApiReceipt result =ApiReceipt.ok().data(this.facade.queryHis(dto,command));
-            log.info("content/fresh/url end result:{}", JSONObject.toJSONString(result));
-            return result;
-        }
-
-
-        
-        
         /***
         * @Description:  操作历史查询接口
         * @Param:

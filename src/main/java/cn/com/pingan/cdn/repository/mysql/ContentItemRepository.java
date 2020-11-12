@@ -34,6 +34,11 @@ public interface ContentItemRepository extends JpaRepository<ContentItem, Long>,
 
     @Modifying
     @Transactional
+    @Query(value = "select * from content_item i where i.item_id in ?1", nativeQuery = true)
+    List<ContentItem> findByItemIdList(List<String> itemIds);
+
+    @Modifying
+    @Transactional
     @Query(value = "delete from content_item  where create_time <?1", nativeQuery = true)
     void clear(Date time);
 }

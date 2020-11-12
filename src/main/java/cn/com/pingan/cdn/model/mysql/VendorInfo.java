@@ -41,19 +41,20 @@ public class VendorInfo {
     @Column(name = "merge_dir_count")
     private int mergeDirCount;
 
-    @Column(name = "merge_prefetc_count")
-    private int mergePrefetcCount;
+    @Column(name = "merge_preheat_count")
+    private int mergePreheatCount;
 
     @Column(name = "status", length=16, nullable = false)
     private String status;//up,down
 
     public void setVendorInfo(VendorInfoDTO infoDTO){
 
+        this.vendor = infoDTO.getVendor();
         this.totalQps = infoDTO.getTotalQps();
         this.totalSize = infoDTO.getTotalSize();
         this.mergeUrlCount = infoDTO.getMergeUrlCount();
         this.mergeDirCount = infoDTO.getMergeDirCount();
-        this.mergePrefetcCount = infoDTO.getMergePrefetcCount();
+        this.mergePreheatCount = infoDTO.getMergePreheatCount();
         this.status = infoDTO.getStatus();
     }
 
@@ -64,7 +65,7 @@ public class VendorInfo {
         infoDTO.setTotalSize(totalSize);
         infoDTO.setMergeUrlCount(mergeUrlCount);
         infoDTO.setMergeDirCount(mergeDirCount);
-        infoDTO.setMergePrefetcCount(mergePrefetcCount);
+        infoDTO.setMergePreheatCount(mergePreheatCount);
         infoDTO.setStatus(status);
         return infoDTO;
     }

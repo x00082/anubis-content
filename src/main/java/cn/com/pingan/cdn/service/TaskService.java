@@ -26,6 +26,11 @@ public interface TaskService {
     //public JSONObject queryRefreshPreloadTaskStatus(RefreshPreloadTaskStatusDTO request) throws RestfulException;
 
     public Boolean handlerNewRequest(VendorContentTask task, TaskMsg msg) throws RestfulException;
+    
+    public Boolean handlerNewRequestUrl(TaskMsg msg) throws RestfulException;
+    public Boolean handlerNewRequestDir(TaskMsg msg) throws RestfulException;
+    public Boolean handlerNewRequestPreload(TaskMsg msg) throws RestfulException;
+    public Boolean handlerRoundRobin(TaskMsg msg) throws RestfulException;
 
     public Boolean handlerRoundRobin(VendorContentTask task, TaskMsg msg) throws RestfulException;
 

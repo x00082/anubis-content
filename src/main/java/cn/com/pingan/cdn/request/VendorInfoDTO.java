@@ -20,7 +20,7 @@ public class VendorInfoDTO {
 
     private int mergeDirCount;
 
-    private int mergePrefetcCount;
+    private int mergePreheatCount;
 
     private String status;//up,down
 }

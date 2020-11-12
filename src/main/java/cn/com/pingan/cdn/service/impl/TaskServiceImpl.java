@@ -27,10 +27,12 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.stereotype.Service;
 
+import java.awt.*;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.NoSuchElementException;
+import java.util.stream.Collectors;
 
 /**
  * @Classname TaskServiceImpl
@@ -57,8 +59,13 @@ public class TaskServiceImpl implements TaskService {
 
     private String roundRobinLimitPrefix = "robin_";
 
+    private String subQpsAndSizePrefix = "qpsAndSize_";
+
     @Value("${task.new.request.qps.default:50}")
     private Integer requestQps;
+
+    @Value("${task.new.request.size.default:500}")
+    private Integer requestSize;
 
     @Value("${task.robin.qps.default:10}")
     private Integer robinQps;
@@ -154,6 +161,25 @@ public class TaskServiceImpl implements TaskService {
 
     @Override
     public int handlerTask(TaskMsg msg) throws RestfulException {
+
+        if( -1 != msg.getOperation().toString().indexOf("_robin")){
+            handlerRoundRobin(msg);
+            return 0;
+        }
+
+        if(msg.getType().equals(RefreshType.url)) {
+            handlerNewRequestUrl(msg);
+        }else if(msg.getType().equals(RefreshType.dir)){
+            handlerNewRequestDir(msg);
+        }else{
+            handlerNewRequestPreload(msg);
+        }
+        return 0;
+    }
+
+    /*
+    @Override
+    public int handlerTask(TaskMsg msg) throws RestfulException {
         log.info("enter handlerTask:{}",msg);
         VendorContentTask task = vendorTaskRepository.findByTaskId(msg.getTaskId());
         if(task ==null || task.getVersion() != msg.getVersion()){
@@ -185,7 +211,7 @@ public class TaskServiceImpl implements TaskService {
         }
 
         return 0;
-    }
+    }*/
 
     @Override
     public int handlerMergeTask(TaskMsg msg) throws RestfulException {
@@ -301,6 +327,268 @@ public class TaskServiceImpl implements TaskService {
     }
 
     @Override
+    public Boolean handlerNewRequestUrl(TaskMsg msg) throws RestfulException {
+        log.info("enter handlerNewRequestUrl:{}",msg);
+        String taskId = msg.getTaskId();
+        boolean isMerge = msg.getIsMerge();
+        boolean flag = true;
+        try {
+            flag = handlerNewRequest(msg);
+            if(!flag){
+                return false;
+            }
+        }catch (Exception e){
+            log.error("handlerNewRequestUrl Exception:{}",e);
+            msg.setRetryNum(msg.getRetryNum() + 1);
+            if(msg.getRetryNum() > timeOutLimit){
+                log.error("[{}]handlerNewRequestUrl超过最大重试限制[{}]", taskId, timeOutLimit);
+                if(isMerge){
+                    List<VendorContentTask> vendorContentTaskList = vendorTaskRepository.findByMergeId(taskId);
+                    for(VendorContentTask v :vendorContentTaskList){
+                        v.setMessage("重试失败");
+                        v.setStatus(TaskStatus.FAIL);
+                        v.setUpdateTime(new Date());
+                    }
+                    vendorTaskRepository.saveAll(vendorContentTaskList);
+                }else{
+                    //TODO
+                }
+                return false;
+            }else{
+                msg.setDelay(timeOutMs);
+            }
+        }
+        producer.sendAllMsg(msg);
+        log.info("handlerNewRequestUrl end:{}", msg);
+        return true;
+    }
+
+    @Override
+    public Boolean handlerNewRequestDir(TaskMsg msg) throws RestfulException {
+        log.info("enter handlerNewRequestDir:{}",msg);
+        String taskId = msg.getTaskId();
+        boolean isMerge = msg.getIsMerge();
+        boolean flag = true;
+        try {
+            flag = handlerNewRequest(msg);
+            if(flag){
+                return false;
+            }
+        }catch (Exception e){
+            log.error("handlerNewRequestDir Exception:{}",e);
+            msg.setRetryNum(msg.getRetryNum() + 1);
+            if(msg.getRetryNum() > timeOutLimit){
+                log.error("[{}]handlerNewRequestDir超过最大重试限制[{}]", taskId, timeOutLimit);
+                if(isMerge){
+                    List<VendorContentTask> vendorContentTaskList = vendorTaskRepository.findByMergeId(taskId);
+                    for(VendorContentTask v :vendorContentTaskList){
+                        v.setMessage("重试失败");
+                        v.setStatus(TaskStatus.FAIL);
+                        v.setUpdateTime(new Date());
+                    }
+                    vendorTaskRepository.saveAll(vendorContentTaskList);
+                }else{
+                    //TODO
+                }
+                return false;
+            }else{
+                msg.setDelay(timeOutMs);
+            }
+        }
+        producer.sendAllMsg(msg);
+        log.info("handlerNewRequestDir end:{}", msg);
+        return true;
+    }
+
+    @Override
+    public Boolean handlerNewRequestPreload(TaskMsg msg) throws RestfulException {
+        log.info("enter handlerNewRequestPreload:{}",msg);
+        String taskId = msg.getTaskId();
+        boolean isMerge = msg.getIsMerge();
+        boolean flag = true;
+        try {
+            flag = handlerNewRequest(msg);
+            if(flag){
+                return false;
+            }
+        }catch (Exception e){
+            log.error("handlerNewRequestPreload Exception:{}",e);
+            msg.setRetryNum(msg.getRetryNum() + 1);
+            if(msg.getRetryNum() > timeOutLimit){
+                log.error("[{}]handlerNewRequestPreload超过最大重试限制[{}]", taskId, timeOutLimit);
+                if(isMerge){
+                    List<VendorContentTask> vendorContentTaskList = vendorTaskRepository.findByMergeId(taskId);
+                    for(VendorContentTask v :vendorContentTaskList){
+                        v.setMessage("重试失败");
+                        v.setStatus(TaskStatus.FAIL);
+                        v.setUpdateTime(new Date());
+                    }
+                    vendorTaskRepository.saveAll(vendorContentTaskList);
+                }else{
+                    //TODO
+                }
+                return false;
+            }else{
+                msg.setDelay(timeOutMs);
+            }
+        }
+        producer.sendAllMsg(msg);
+        log.info("handlerNewRequestPreload end:{}", msg);
+        return true;
+    }
+
+    @Override
+    public Boolean handlerRoundRobin(TaskMsg msg) throws RestfulException {
+        log.info("enter handlerRoundRobin:{}", msg);
+        String taskId = msg.getTaskId();
+        try {
+            VendorInfo vendorInfo = vendorInfoRepository.findByVendor(msg.getVendor());
+            String vendorStatus;
+            if (vendorInfo == null) {
+                log.warn("[{}] vendorInfo db is null", msg.getVendor());
+                vendorStatus = defaultVendorStatus;
+            } else {
+                vendorStatus = vendorInfo.getStatus();
+            }
+            if ("down".equals(vendorStatus)) {
+                msg.setDelay(1 * 60 * 1000L);
+                rabbitListenerConfig.stop(msg.getOperation().name());//关闭监听
+                this.pushTaskMsg(msg);//放回队列
+                return false;
+            }
+            if (msg.getIsLimit()) {//
+                //请求QPS限制
+                int limit = robinQps;
+                String redisKey = msg.getOperation().toString();
+                // 0-成功，-1执行异常，-100超限
+                int result = handlerTaskLimit(msg, redisKey, limit);
+                if (-100 == result) {
+                    log.warn("redis:{} Limit:{}", redisKey, limit);
+                    //msg.setDelay(1000L);
+                    producer.sendAllMsg(msg);
+                    return false;
+                } else if (-1 == result) {
+                    log.warn("redis:{} Limit:{} 执行异常", redisKey, limit);
+                    throw new Exception(taskId + ": redis err");
+                }
+            }
+
+            JSONObject response;
+
+            RefreshPreloadTaskStatusDTO dto = new RefreshPreloadTaskStatusDTO();
+            String type;
+            if(msg.getType().equals(RefreshType.url) || msg.getType().equals(RefreshType.dir)){
+                type = "refresh";
+            }else if(msg.getType().equals(RefreshType.preheat)){
+                type = "preload";
+            }else{
+                log.error("无效Task");
+                return false;
+            }
+
+            RefreshPreloadItem item = new RefreshPreloadItem();
+            item.setJobId(taskId);
+            item.setJobType(type);
+
+            List<RefreshPreloadItem> itemList = new ArrayList<>();
+            itemList.add(item);
+            dto.setTaskList(itemList);
+
+            VendorClientService vendorClient = getVendorClientVO(VendorEnum.getByCode(msg.getVendor()));
+            response = vendorClient.queryRefreshPreloadTask(dto);
+            if(response == null || !response.containsKey("data")){
+                log.error("response is null or no data");
+                throw new Exception(taskId + ": response no data");
+            }
+            log.info("response:{}", response);
+
+            JSONArray jsonArray = response.getJSONArray("data");
+            if (jsonArray != null && jsonArray.size() > 0) {
+                TaskStatus ts = TaskStatus.ROUND_ROBIN;
+                String message = "";
+                for (int i = 0; i < jsonArray.size(); i++) {
+                    JSONObject json = jsonArray.getJSONObject(i);
+                    if (json != null && json.getString("jobId") != null && json.getString("jobId").equals(taskId)) {
+                        if (Constants.STATUS_SUCCESS.equals(json.getString("status"))) {
+                            ts = TaskStatus.SUCCESS;
+                            message = StringUtils.isNoneBlank(json.getString("message"))?json.getString("message"):"厂商执行成功";
+                            msg.setRetryNum(0);
+                            log.info("刷新预热任务完成，任务编号[{}]", json.getString("jobId"));
+                        } else if (Constants.STATUS_FAIL.equals(json.getString("status"))) {
+                            ts = TaskStatus.FAIL;
+                            message = StringUtils.isNoneBlank(json.getString("message"))?json.getString("message"):"厂商执行失败";
+                            msg.setRetryNum(0);
+                            log.info("刷新预热任务失败，任务编号[{}]", json.getString("jobId"));
+                        } else if (Constants.STATUS_WAIT.equals(json.getString("status"))) {
+                            msg.setRoundRobinNum(msg.getRoundRobinNum() + 1);
+                            if(msg.getRoundRobinNum() > roundLimit){
+                                ts = TaskStatus.FAIL;
+                                message = "轮询超出重试次数";
+                            }else{
+                                msg.setDelay(roundMs);
+                            }
+                            log.info("刷新预热任务未完成，任务编号[{}], 等待{}ms后查询", json.getString("jobId"), roundMs);
+                            msg.setRetryNum(0);
+                        } else {
+                            log.info("返回值状态异常，期望的状态是SUCCESS/FAIL/WAIT,收到的状态是[{}]", json.getString("status"));
+                            msg.setRetryNum(msg.getRetryNum() + 1);
+                            if(msg.getRetryNum() > timeOutLimit){
+                                ts = TaskStatus.FAIL;
+                                message = "超出重试次数";
+                            }else{
+                                msg.setDelay(timeOutMs);
+                            };
+                        }
+                        break;
+                    }
+                }
+                if(ts.equals(TaskStatus.SUCCESS) || ts.equals(TaskStatus.FAIL)){
+                    if(msg.getIsMerge()){
+                        List<VendorContentTask> vendorContentTaskList = vendorTaskRepository.findByMergeId(taskId);
+                        if(vendorContentTaskList.size()>0) {
+                            for (VendorContentTask v : vendorContentTaskList) {
+                                v.setMessage(message);
+                                v.setStatus(ts);
+                                v.setUpdateTime(new Date());
+                            }
+                            vendorTaskRepository.saveAll(vendorContentTaskList);
+                        }
+                    }else{
+                        throw new Exception(taskId + ": not merge");
+                    }
+                    return true;
+                }
+
+
+            }else{
+                log.info("返回无效数据{}", response);
+                throw new Exception(taskId + ": response err");
+            }
+        }catch (Exception e){
+            log.error("HandlerRoundRobin Exception:{}",e);
+            msg.setRetryNum(msg.getRetryNum() + 1);
+            if(msg.getRetryNum() > timeOutLimit){
+                if(msg.getIsMerge()){
+                    List<VendorContentTask> vendorContentTaskList = vendorTaskRepository.findByMergeId(taskId);
+                    for(VendorContentTask v :vendorContentTaskList){
+                        v.setMessage("轮询超出重试次数");
+                        v.setStatus(TaskStatus.FAIL);
+                        v.setUpdateTime(new Date());
+                    }
+                    vendorTaskRepository.saveAll(vendorContentTaskList);
+                }else{
+                    //TODO
+                }
+                return false;
+            }else{
+                msg.setDelay(timeOutMs);
+            }
+        }
+        producer.sendAllMsg(msg);
+        return true;
+    }
+
+    @Override
     public Boolean handlerRoundRobin(VendorContentTask task, TaskMsg msg) throws RestfulException {
         log.info("enter handlerRoundRobin:{}",task);
         Boolean flag = true;
@@ -316,7 +604,7 @@ public class TaskServiceImpl implements TaskService {
         if ("down".equals(vendorStatus)) {
             msg.setDelay(1 * 60 * 1000L);
             rabbitListenerConfig.stop(msg.getOperation().name());//关闭监听
-            this.pushTaskMsg(msg);//放回队列
+            producer.sendAllMsg(msg);//放回队列
             return flag;
         }
         if (msg.getIsLimit()) {//
@@ -543,6 +831,133 @@ public class TaskServiceImpl implements TaskService {
         return vendorInfoRepository.findByVendor(vendor);
     }
 
+    private Boolean handlerNewRequest(TaskMsg msg) throws Exception {
+
+        String taskId = msg.getTaskId();
+        boolean isMerge = msg.getIsMerge();
+        RefreshType type = msg.getType();
+        VendorInfo vendorInfo = vendorInfoRepository.findByVendor(msg.getVendor());
+        String vendorStatus;
+        if(vendorInfo == null){
+            log.warn("[{}] vendorInfo db is null", msg.getVendor());
+            vendorStatus = defaultVendorStatus;
+        }else{
+            vendorStatus = vendorInfo.getStatus();
+        }
+        if ("down".equals(vendorStatus)) {
+            msg.setDelay(1 * 60 * 1000L);
+            rabbitListenerConfig.stop(msg.getOperation().name());//关闭监听
+            producer.sendAllMsg(msg);//放回队列
+            return false;
+        }
+        if (msg.getIsLimit()) {//
+            //请求QPS限制
+            int qps = vendorInfo!=null?vendorInfo.getTotalQps():requestQps;
+            int size = vendorInfo!=null?vendorInfo.getTotalSize():requestSize;
+            String redisKey = subQpsAndSizePrefix + msg.getVendor();
+            // 0-成功，-1执行异常，-100超限
+            int result = handlerQpsAndSizeLimit(redisKey,1, msg.getSize(), qps, size);
+            if (-100 == result) {
+                log.warn("redis:{} LimitQps:{}", redisKey, qps);
+                //msg.setDelay(1000L);
+                return true;
+            }else if(-200 == result) {
+                log.warn("redis:{} LimitSize:{}", redisKey, size);
+                //msg.setDelay(1000L);
+                return true;
+            } else if (-1 == result) {
+                log.warn("redis:{} Limit: 执行异常", redisKey);
+                throw new Exception(taskId + ": redis err");
+            }
+        }
+        List<VendorContentTask> vendorContentTaskList = null;
+        if(isMerge){
+            vendorContentTaskList = vendorTaskRepository.findByMergeId(taskId);
+        }else{
+            throw new Exception(taskId + ": not merge");
+        }
+        List<String> urls = vendorContentTaskList.stream().map(i->i.getContent()).collect(Collectors.toList());
+
+        JSONObject response = null;
+        RefreshPreloadData data = new RefreshPreloadData();
+        data.setUrls(urls);
+
+        VendorClientService vendorClient = getVendorClientVO(VendorEnum.getByCode(msg.getVendor()));
+        switch (type.name()){
+            case "url":
+                response = vendorClient.refreshUrl(data);
+                break;
+            case "dir":
+                response = vendorClient.refreshDir(data);
+                break;
+            case "preheat":
+                response = vendorClient.preloadUrl(data);
+                break;
+            default:
+                throw new Exception();
+        }
+
+        if(response == null){
+            log.error("response is null");
+            throw new Exception(taskId + ": response is null");
+        }
+
+        log.info("response:{}", response);
+        if(response.containsKey("status") && response.containsKey("message")){
+            TaskStatus ts = TaskStatus.WAIT;
+            String jobId = null;
+            String message = response.getString("message");
+            if(response.getString("status").equals(Constants.STATUS_WAIT)) {
+                ts = TaskStatus.WAIT;
+                if(response.getString("message").equals(Constants.QPS_LIMIT)){
+                    log.error("vendor:{}  QPS LIMIT", response.getString("vendor"));
+                    msg.setDelay(timeOutMs);
+
+                }else{
+                    jobId = response.getJSONObject("data") == null ? null : response.getJSONObject("data").getString("taskId");
+                    if(StringUtils.isNoneBlank(jobId)) {
+                        ts = TaskStatus.ROUND_ROBIN;
+                        msg.setDelay(30000L);//30秒后查询
+                        msg.setRetryNum(0);//状态改变，清空计数
+                        msg.setOperation(TaskOperationEnum.getVendorOperationRobin(msg.getVendor()));
+                        msg.setTaskId(jobId);
+                    }else{
+                        log.error("[{}]无效的jobId", msg.getVendor());
+                    }
+                }
+            }else if(response.getString("status").equals(Constants.STATUS_FAIL)){
+                msg.setRetryNum(msg.getRetryNum() + 1);
+                if(msg.getRetryNum() > timeOutLimit){
+                    ts = TaskStatus.FAIL;
+                }else{
+                    msg.setDelay(timeOutMs);
+                }
+            }
+            for(VendorContentTask v :vendorContentTaskList){
+                v.setMessage(message);
+                v.setStatus(ts);
+                if(StringUtils.isNoneBlank(jobId)){
+                    v.setJobId(jobId);
+                    v.setMergeId(jobId);
+                }
+                v.setUpdateTime(new Date());
+            }
+            vendorTaskRepository.saveAll(vendorContentTaskList);
+            if(ts.equals(TaskStatus.FAIL)){
+                log.error("[{}]HandlerNewRequest失败", taskId);
+                return false;
+            }else if(ts.equals(TaskStatus.ROUND_ROBIN)){
+                log.info("[{}]HandlerNewRequest成功", taskId);
+            }
+
+        }else {
+            log.error("response err:[{}]", response);
+            throw new Exception(taskId + ": response err");
+        }
+        return true;
+    }
+
+
     private int handlerTaskLimit(TaskMsg msg, String key, int limit){
         //VendorInfo vendorInfo = this.findVendorInfo(TaskOperationEnum.getVendorString(msg.getOperation()));
         //请求QPS限制
@@ -552,6 +967,18 @@ public class TaskServiceImpl implements TaskService {
         args.add(String.valueOf(limit));
         // 0-成功，-1执行异常，-100超限
         return luaScriptService.executeQpsScript(keys, args);
+    }
+
+    private int handlerQpsAndSizeLimit(String key, int curentLimit, int curentSize, int limit, int size){
+        List<String> keys = new ArrayList<>();
+        keys.add(key);
+        List<String> args = new ArrayList<>();
+        args.add(String.valueOf(curentLimit));
+        args.add(String.valueOf(curentSize));
+        args.add(String.valueOf(limit));
+        args.add(String.valueOf(size));
+        // 0-成功，-1执行异常，-100超限
+        return luaScriptService.executeQpsAndTotalScript(keys, args);
     }
 
 

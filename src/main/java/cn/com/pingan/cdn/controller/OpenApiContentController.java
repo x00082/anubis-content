@@ -12,7 +12,6 @@ import cn.com.pingan.cdn.request.VendorInfoDTO;
 import cn.com.pingan.cdn.request.openapi.ContentDefaultNumDTO;
 import cn.com.pingan.cdn.request.openapi.OpenApiFreshCommand;
 import com.alibaba.fastjson.JSON;
-import com.alibaba.fastjson.JSONObject;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -29,7 +28,7 @@ import java.io.IOException;
  */
 @Slf4j
 @RestController
-@RequestMapping("/api")
+@RequestMapping("/base/api")
 public class OpenApiContentController {
 
 
@@ -223,14 +222,6 @@ public class OpenApiContentController {
         }
         ApiReceipt result=this.facade.getVendorInfo(vendor);
         log.info("查询vendor/content/info end result:{}", JSON.toJSONString(result));
-        return result;
-    }
-
-    @GetMapping("/test/vendor/content/info/query")
-    public ApiReceipt testQueryHis(@RequestParam String vendor) throws ContentException, DomainException {
-        log.info("查询vendor/content/info start command:{}", vendor);
-        ApiReceipt result = this.facade.getVendorInfo(vendor);
-        log.info("查询vendor/content/info end result:{}", JSONObject.toJSONString(result));
         return result;
     }
 
