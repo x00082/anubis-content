@@ -11,7 +11,7 @@ import lombok.NoArgsConstructor;
  */
 @Data
 @NoArgsConstructor
-public class RedocDTO {
+public class RedoDTO {
 
     private String taskId;
 

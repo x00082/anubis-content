@@ -46,7 +46,7 @@ public class ConfigServiceImpl implements ConfigService {
         if(info == null){
             log.info("{}厂商信息不存在", infoDTO.getVendor());
 
-            return ApiReceipt.error("0x004008", "无有效数据");
+            return ApiReceipt.error("0x004008", "厂商信息不存在");
         }else{
             info.setVendorInfo(infoDTO);
             vendorInfoRepository.save(info);
@@ -71,7 +71,7 @@ public class ConfigServiceImpl implements ConfigService {
         VendorInfo info = vendorInfoRepository.findByVendor(vendor);
         if(info == null){
             log.info("{}厂商信息不存在", vendor);
-            return ApiReceipt.error("0x004008", "无有效数据");
+            return ApiReceipt.error("0x004008", "厂商信息不存在");
         }
         return ApiReceipt.ok().data(info.getVendorInfo());
     }
@@ -81,7 +81,7 @@ public class ConfigServiceImpl implements ConfigService {
         VendorInfo info = vendorInfoRepository.findByVendor(infoDTO.getVendor());
         if(info == null){
             log.info("{}厂商信息不存在", infoDTO.getVendor());
-            return ApiReceipt.error("0x004008", "无有效数据");
+            return ApiReceipt.error("0x004008", "厂商信息不存在");
         }
 
         info.setStatus(infoDTO.getStatus());

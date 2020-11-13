@@ -79,7 +79,6 @@ public class ContentServiceFacadeImpl implements ContentServiceFacade {
      */
     @Override
     public ApiReceipt refreshDir(GateWayHeaderDTO dto, FreshCommand command) throws ContentException {
-        // TODO 自动生成的方法存根
         
         return contentService.saveContent(dto, command.getData(), RefreshType.dir);
     }
@@ -94,9 +93,7 @@ public class ContentServiceFacadeImpl implements ContentServiceFacade {
      */
     @Override
     public ApiReceipt refreshUrl(GateWayHeaderDTO dto, FreshCommand command) throws ContentException {
-        // TODO 自动生成的方法存根
-        
-        
+
         return contentService.saveContent(dto, command.getData(), RefreshType.url);
     }
 
@@ -110,10 +107,13 @@ public class ContentServiceFacadeImpl implements ContentServiceFacade {
      */
     @Override
     public ApiReceipt prefetch(GateWayHeaderDTO dto, FreshCommand command) throws ContentException {
-        // TODO 自动生成的方法存根
-        
-        
+
         return contentService.saveContent(dto, command.getData(), RefreshType.preheat);
+    }
+
+    @Override
+    public ApiReceipt queryDetails(String requestId) throws ContentException {
+        return contentService.getContentTaskDetails(requestId);
     }
 
     @Override

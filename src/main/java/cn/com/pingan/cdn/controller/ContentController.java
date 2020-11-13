@@ -9,12 +9,15 @@
 package cn.com.pingan.cdn.controller;
 
 import cn.com.pingan.cdn.common.ApiReceipt;
-import cn.com.pingan.cdn.common.RedocDTO;
+import cn.com.pingan.cdn.common.RedoDTO;
+import cn.com.pingan.cdn.common.StaticValue;
 import cn.com.pingan.cdn.exception.ContentException;
 import cn.com.pingan.cdn.exception.DomainException;
 import cn.com.pingan.cdn.exception.ErrorCode;
 import cn.com.pingan.cdn.facade.ContentServiceFacade;
 import cn.com.pingan.cdn.gateWay.GateWayHeaderDTO;
+import cn.com.pingan.cdn.request.VendorInfoDTO;
+import cn.com.pingan.cdn.request.openapi.ContentDefaultNumDTO;
 import cn.com.pingan.cdn.validator.content.FreshCommand;
 import cn.com.pingan.cdn.validator.content.QueryHisCommand;
 import com.alibaba.fastjson.JSON;
@@ -25,10 +28,10 @@ import org.springframework.web.bind.annotation.*;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.validation.Valid;
+import java.io.IOException;
 
 
-
-/** 
+/**
  * @ClassName: ContentController 
  * @Description: TODO() 
  * @author lujun
@@ -36,14 +39,8 @@ import javax.validation.Valid;
  *  
  */
 @RestController
-@RequestMapping("/base/content")
+@RequestMapping("/content")
 public class ContentController {
-
-        public static int SINGLE_URL_REFRESH_LIMIT = 60; //单次url刷新上限
-
-        public static int SINGLE_DIR_REFRESH_LIMIT = 10;  //单次目录刷新上限
-
-        public static int SINGLE_URL_PRELOAD_LIMIT = 60;  //单次url预热上限
 
         private static final Logger log = org.slf4j.LoggerFactory.getLogger(ContentController.class);
         
@@ -65,21 +62,22 @@ public class ContentController {
                 return ApiReceipt.error(ErrorCode.NOHEADER);
             }
 
-            if (null == command.getData() || command.getData().size() == 0) {
-
-                return ApiReceipt.error(ErrorCode.PARAMILLEGAL);
-            }
-
-            if (command.getData().size() > SINGLE_DIR_REFRESH_LIMIT) {
-                return ApiReceipt.error(ErrorCode.OUTLIMITSINGLE);
-            }
-
             //越权校验
             if (!"true".equals(dto.getIsAdmin())) {
                 if (StringUtils.isEmpty(command.getSpCode()) || !dto.getSpcode().equals(command.getSpCode())) {
                     return ApiReceipt.error(ErrorCode.FORBIDOPT);
                 }
             }
+
+            if (null == command.getData() || command.getData().size() == 0) {
+
+                return ApiReceipt.error(ErrorCode.PARAMILLEGAL);
+            }
+
+            if (command.getData().size() > StaticValue.SINGLE_DIR_REFRESH_LIMIT) {
+                return ApiReceipt.error(ErrorCode.OUTLIMITSINGLE);
+            }
+
 
             ApiReceipt result = this.facade.refreshDir(dto, command);
             log.info("content/fresh/dir end result:{}", JSON.toJSONString(result));
@@ -100,21 +98,22 @@ public class ContentController {
                 return ApiReceipt.error(ErrorCode.NOHEADER);
             }
 
-            if (null == command.getData() || command.getData().size() == 0) {
-
-                return ApiReceipt.error(ErrorCode.PARAMILLEGAL);
-            }
-
-            if (command.getData().size() > SINGLE_URL_REFRESH_LIMIT) {
-                return ApiReceipt.error(ErrorCode.OUTLIMITSINGLE);
-            }
-
             //越权校验
             if (!"true".equals(dto.getIsAdmin())) {
                 if (StringUtils.isEmpty(command.getSpCode()) || !dto.getSpcode().equals(command.getSpCode())) {
                     return ApiReceipt.error(ErrorCode.FORBIDOPT);
                 }
             }
+
+            if (null == command.getData() || command.getData().size() == 0) {
+
+                return ApiReceipt.error(ErrorCode.PARAMILLEGAL);
+            }
+
+            if (command.getData().size() > StaticValue.SINGLE_URL_REFRESH_LIMIT) {
+                return ApiReceipt.error(ErrorCode.OUTLIMITSINGLE);
+            }
+
 
             ApiReceipt result=this.facade.refreshUrl(dto,command);
             log.info("content/fresh/url end result:{}", JSON.toJSONString(result));
@@ -136,15 +135,6 @@ public class ContentController {
                 return ApiReceipt.error(ErrorCode.NOHEADER);
             }
 
-            if (null == command.getData() || command.getData().size() == 0) {
-
-                return ApiReceipt.error(ErrorCode.PARAMILLEGAL);
-            }
-
-            if (command.getData().size() > SINGLE_URL_PRELOAD_LIMIT) {
-                return ApiReceipt.error(ErrorCode.OUTLIMITSINGLE);
-            }
-
             //越权校验
             if (!"true".equals(dto.getIsAdmin())) {
                 if (StringUtils.isEmpty(command.getSpCode()) || !dto.getSpcode().equals(command.getSpCode())) {
@@ -152,13 +142,22 @@ public class ContentController {
                 }
             }
 
+            if (null == command.getData() || command.getData().size() == 0) {
+
+                return ApiReceipt.error(ErrorCode.PARAMILLEGAL);
+            }
+
+            if (command.getData().size() > StaticValue.SINGLE_URL_PRELOAD_LIMIT) {
+                return ApiReceipt.error(ErrorCode.OUTLIMITSINGLE);
+            }
+
             ApiReceipt result =this.facade.prefetch(dto,command);
             log.info("content/preheat end result:{}", JSON.toJSONString(result));
             return result;
         }
 
-        @PutMapping("/reDo")
-        public ApiReceipt reDo(@Valid @RequestBody RedocDTO command) throws ContentException, DomainException {
+        @PostMapping("/redo")
+        public ApiReceipt reDo(@Valid @RequestBody RedoDTO command) throws ContentException, DomainException {
             log.info("content/preheat start command:{}", JSON.toJSONString(command));
             // TODO
             GateWayHeaderDTO dto = this.getGateWayInfo(request);
@@ -171,8 +170,13 @@ public class ContentController {
             if(!"true".equalsIgnoreCase(dto.getIsAdmin())){
                 return  ApiReceipt.error(ErrorCode.FORBIDOPT);
             }
-
-            ApiReceipt result =this.facade.reDO(command.getTaskId(), command.getForce());
+            boolean force = false;
+            if(command.getForce() == null){
+                force = false;
+            }else{
+                force = command.getForce();
+            }
+            ApiReceipt result =this.facade.reDO(command.getTaskId(), force);
             log.info("content/preheat end result:{}", JSON.toJSONString(result));
             return result;
         }
@@ -203,6 +207,168 @@ public class ContentController {
             log.info("content/queryHis end result:{}", JSON.toJSONString(result));
             return result;
         }
+
+        @GetMapping("/queryDetails")
+        public ApiReceipt queryDetails(@RequestParam String requestId) throws ContentException, DomainException {
+
+            log.info("content/queryDetails start command:{}", requestId);
+            // TODO
+            GateWayHeaderDTO dto = this.getGateWayInfo(request);
+            if(StringUtils.isEmpty(dto.getUsername()) || StringUtils.isEmpty(dto.getUid())) {
+                return  ApiReceipt.error(ErrorCode.NOHEADER);
+            }
+            //越权校验
+            if(!"true".equals(dto.getIsAdmin())) {
+                if (StringUtils.isEmpty(dto.getSpcode())) {
+                    return  ApiReceipt.error(ErrorCode.FORBIDOPT);
+                }
+            }
+
+            ApiReceipt result = this.facade.queryDetails(requestId);
+            log.info("content/queryDetails end result:{}", JSON.toJSONString(result));
+            return result;
+        }
+
+
+    /**
+     * 设置用户默认用量上限
+     * @param command
+     * @return
+     * @throws ContentException
+     */
+    @PostMapping("/user/content/limit")
+    public ApiReceipt setUserLimitNumber(@RequestBody ContentDefaultNumDTO command) throws ContentException {
+        log.info("user/content/limit start command:{}", JSON.toJSONString(command));
+        GateWayHeaderDTO dto= this.getGateWayInfo(request);
+        if (StringUtils.isEmpty(dto.getUsername()) || StringUtils.isEmpty(dto.getUid()) || StringUtils.isEmpty(dto.getSpcode())) {
+            return ApiReceipt.error(ErrorCode.NOHEADER);
+        }
+
+        //越权校验
+        if(!"true".equalsIgnoreCase(dto.getIsAdmin())){
+            return  ApiReceipt.error(ErrorCode.FORBIDOPT);
+        }
+        ApiReceipt result=this.facade.setUserLimitNumber(command);
+        log.info("user/content/limit end result:{}", JSON.toJSONString(result));
+        return result;
+    }
+
+    /**
+     * 查询用户默认用量上限
+     * @param spCode
+     * @return
+     * @throws ContentException
+     * @throws IOException
+     */
+    @GetMapping("/user/content/limit")
+    public ApiReceipt getUserLimitNumber(@RequestParam(required = false) String spCode) throws ContentException, IOException {
+        log.info("查询user/content/limit start command:{}", spCode);
+        GateWayHeaderDTO dto= this.getGateWayInfo(request);
+        if (StringUtils.isEmpty(dto.getUsername()) || StringUtils.isEmpty(dto.getUid()) || StringUtils.isEmpty(dto.getSpcode())) {
+            return ApiReceipt.error(ErrorCode.NOHEADER);
+        }
+        //越权校验
+        if(!"true".equalsIgnoreCase(dto.getIsAdmin())){
+            return  ApiReceipt.error(ErrorCode.FORBIDOPT);
+        }
+        ApiReceipt result=this.facade.getUserLimitNumber(spCode);
+        log.info("查询user/content/limit end result:{}", JSON.toJSONString(result));
+        return result;
+    }
+
+
+    /**
+     * 添加厂商信息
+     * @param command
+     * @return
+     * @throws ContentException
+     */
+    @PostMapping("/vendor/info/add")
+    public ApiReceipt addVendorInfo(@RequestBody VendorInfoDTO command) throws ContentException {
+        log.info("vendor/content/info/add start command:{}", JSON.toJSONString(command));
+        GateWayHeaderDTO dto= this.getGateWayInfo(request);
+        if (StringUtils.isEmpty(dto.getUsername()) || StringUtils.isEmpty(dto.getUid()) || StringUtils.isEmpty(dto.getSpcode())) {
+            return ApiReceipt.error(ErrorCode.NOHEADER);
+        }
+
+        //越权校验
+        if(!"true".equalsIgnoreCase(dto.getIsAdmin())){
+            return  ApiReceipt.error(ErrorCode.FORBIDOPT);
+        }
+        ApiReceipt result=this.facade.addVendorInfo(command);
+        log.info("vendor/content/info/add end result:{}", JSON.toJSONString(result));
+        return result;
+    }
+
+    /**
+     * 查询厂商信息
+     * @param vendor
+     * @return
+     * @throws ContentException
+     * @throws IOException
+     */
+    @GetMapping("/vendor/info/query")
+    public ApiReceipt getVendorInfo(@RequestParam String vendor) throws ContentException, IOException {
+        log.info("查询vendor/content/info start command:{}", vendor);
+        GateWayHeaderDTO dto= this.getGateWayInfo(request);
+        if (StringUtils.isEmpty(dto.getUsername()) || StringUtils.isEmpty(dto.getUid()) || StringUtils.isEmpty(dto.getSpcode())) {
+            return ApiReceipt.error(ErrorCode.NOHEADER);
+        }
+        //越权校验
+        if(!"true".equalsIgnoreCase(dto.getIsAdmin())){
+            return  ApiReceipt.error(ErrorCode.FORBIDOPT);
+        }
+        ApiReceipt result=this.facade.getVendorInfo(vendor);
+        log.info("查询vendor/content/info end result:{}", JSON.toJSONString(result));
+        return result;
+    }
+
+    /**
+     * 设置厂商信息
+     * @param command
+     * @return
+     * @throws ContentException
+     * @throws IOException
+     */
+    @PostMapping("/vendor/info/set")
+    public ApiReceipt setVendorInfo(@RequestBody VendorInfoDTO command) throws ContentException, IOException {
+        log.info("vendor/content/info/set start command:{}", command);
+        GateWayHeaderDTO dto= this.getGateWayInfo(request);
+        if (StringUtils.isEmpty(dto.getUsername()) || StringUtils.isEmpty(dto.getUid()) || StringUtils.isEmpty(dto.getSpcode())) {
+            return ApiReceipt.error(ErrorCode.NOHEADER);
+        }
+        //越权校验
+        if(!"true".equalsIgnoreCase(dto.getIsAdmin())){
+            return  ApiReceipt.error(ErrorCode.FORBIDOPT);
+        }
+        ApiReceipt result=this.facade.setVendorInfo(command);
+        log.info("vendor/content/info/set end result:{}", JSON.toJSONString(result));
+        return result;
+    }
+
+    /**
+     * 设置厂商信息
+     * @param command
+     * @return
+     * @throws ContentException
+     * @throws IOException
+     */
+    @PostMapping("/vendor/info/status")
+    public ApiReceipt setVendorInfoStatus(@RequestBody VendorInfoDTO command) throws ContentException, IOException {
+        log.info("vendor/content/info/set start command:{}", command);
+        GateWayHeaderDTO dto= this.getGateWayInfo(request);
+        if (StringUtils.isEmpty(dto.getUsername()) || StringUtils.isEmpty(dto.getUid()) || StringUtils.isEmpty(dto.getSpcode())) {
+            return ApiReceipt.error(ErrorCode.NOHEADER);
+        }
+        //越权校验
+        if(!"true".equalsIgnoreCase(dto.getIsAdmin())){
+            return  ApiReceipt.error(ErrorCode.FORBIDOPT);
+        }
+        ApiReceipt result=this.facade.setVendorStatus(command);
+        log.info("vendor/content/info/status end result:{}", JSON.toJSONString(result));
+        return result;
+    }
+
 
         
         private GateWayHeaderDTO getGateWayInfo(HttpServletRequest request) {

@@ -34,6 +34,8 @@ public interface ContentService {
 
     public ApiReceipt redoContentTask(String requestId, boolean flag) throws ContentException;
 
+    public ApiReceipt getContentTaskDetails(String requestId) throws ContentException;
+
     public void saveContentItem(TaskMsg taskMsg) throws ContentException;
 
     public void saveContentVendor(TaskMsg taskMsg) throws ContentException;
@@ -45,15 +47,15 @@ public interface ContentService {
     public void clearErrorTask(TaskMsg taskMsg) throws ContentException;
 
 
-    ApiReceipt setUserContentNumber(ContentLimitDTO command);
+    public ApiReceipt setUserContentNumber(ContentLimitDTO command);
 
-    ApiReceipt getUserContentNumber(String spCode) throws IOException;
+    public ApiReceipt getUserContentNumber(String spCode) throws IOException;
 
     public ContentHistory findHisttoryByRequestId(String id)throws ContentException;
     
     public ApiReceipt test() throws ContentException;
 
-    ApiReceipt setUserDefaultContentNumber(ContentDefaultNumDTO command);
+    public ApiReceipt setUserDefaultContentNumber(ContentDefaultNumDTO command);
 
-    ApiReceipt getUserDefaultContentNumber(String spCode) throws IOException;
+    public ApiReceipt getUserDefaultContentNumber(String spCode) throws IOException;
 }

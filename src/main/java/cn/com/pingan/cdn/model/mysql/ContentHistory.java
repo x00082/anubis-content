@@ -8,6 +8,7 @@
  */
 package cn.com.pingan.cdn.model.mysql;
 
+import cn.com.pingan.cdn.common.FlowEmun;
 import cn.com.pingan.cdn.common.HisStatus;
 import cn.com.pingan.cdn.common.RefreshType;
 import lombok.Data;
@@ -57,7 +58,7 @@ public class ContentHistory {
     @Column(name="user_id", length=128, nullable = false)
     private String userId;
     
-    @Column(length=4096, name="content", nullable = false)
+    @Column(columnDefinition="TEXT", name="content", nullable = false)
     private String content;
     
     @Column(name="create_time", nullable = false)
@@ -68,6 +69,10 @@ public class ContentHistory {
     
     @Column(name="content_number", nullable = false)
     private Integer contentNumber;
+
+    @Column(name = "flow_status", length=32, nullable = false)
+    @Enumerated(EnumType.STRING)
+    private FlowEmun flowStatus;
     
     @Column(name="is_admin", length=16, nullable = false)
     private String isAdmin;
