@@ -48,6 +48,14 @@ public class RedisLuaConfig {
         return redisScript;
     }
 
+    @Bean("expireLuaScript")
+    public RedisScript<Long> expireLuaScript() {
+        DefaultRedisScript<Long> redisScript = new DefaultRedisScript<>();
+        redisScript.setLocation(new ClassPathResource("lua/expire.lua"));
+        redisScript.setResultType(Long.class);
+        return redisScript;
+    }
+
     @Bean("getUserLimitLuaScript")
     public RedisScript<String> getUserLimitLuaScript() {
         DefaultRedisScript<String> redisScript = new DefaultRedisScript<>();

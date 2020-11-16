@@ -51,5 +51,12 @@ public interface VendorTaskRepository extends JpaRepository<VendorContentTask, L
     @Query(value = "delete from vendor_task where create_time <?1", nativeQuery = true)
     void clear(Date time);
 
+    @Modifying
+    @Transactional
+    @Query(value = "select * from vendor_task  where create_time <?1 limit ?2", nativeQuery = true)
+    List<VendorContentTask> findByCreateTimeBeforeAndLimit(Date time, int num);
+
+    List<VendorContentTask> findByCreateTimeBefore(Date time);
+
     VendorContentTask findByTaskId(String taskId);
 }

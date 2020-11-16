@@ -17,6 +17,7 @@ import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Date;
+import java.util.List;
 
 /** 
  * @ClassName: ContentHistoryRepository 
@@ -48,6 +49,14 @@ public interface ContentHistoryRepository extends JpaRepository<ContentHistory, 
     @Transactional
     @Query(value = "delete from content_history  where create_time <?1", nativeQuery = true)
     void clear(Date time);
+
+
+    @Modifying
+    @Transactional
+    @Query(value = "select * from content_history  where create_time <?1 limit ?2", nativeQuery = true)
+    List<ContentHistory> findByCreateTimeBeforeAndLimit(Date time, int num);
+
+    List<ContentHistory> findByCreateTimeBefore(Date time);
 
     /*
     @Transactional

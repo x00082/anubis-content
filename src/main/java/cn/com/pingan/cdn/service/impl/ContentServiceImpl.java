@@ -262,44 +262,49 @@ public class ContentServiceImpl implements ContentService {
     }
 
     @Override
-    public ApiReceipt getContentTaskDetails(String requestId) throws ContentException {
+    public ApiReceipt getContentTaskDetails(String requestId){
         log.info("enter getContentTaskDetails[{}]", requestId);
-        ContentHistory contentHistory = this.findHisttoryByRequestId(requestId);
-        if (contentHistory == null) {
-            log.error("用户任务不存在");
-            return ApiReceipt.error("0x004008", "域名无效，禁止操作");
-        }
-        TaskDetailsResponse tdr = new TaskDetailsResponse();
-        tdr.setContentStatus(contentHistory.getFlowStatus());
-        if(contentHistory.getFlowStatus().equals(FlowEmun.split_vendor_done)){
-            Map<String, List<TaskDetailsResponse.UrlStatus>> taskDetailsMap = new HashMap<>();
-            List<VendorContentTask> vendorContentTaskList = vendorTaskRepository.findByRequestId(requestId);
-            for(VendorContentTask vct: vendorContentTaskList){
-                String vendorName = vct.getVendor();
-                TaskDetailsResponse.UrlStatus urlStatus = new TaskDetailsResponse.UrlStatus();
-                if(vct.getStatus().equals(TaskStatus.SUCCESS)){
-                    urlStatus.setStatus("成功");
-                }else if(vct.getStatus().equals(TaskStatus.FAIL)){
-                    urlStatus.setStatus("失败");
-                }else if(vct.getStatus().equals(TaskStatus.ROUND_ROBIN)){
-                    urlStatus.setStatus("轮询中");
-                }else if(vct.getStatus().equals(TaskStatus.PROCESSING)){
-                    urlStatus.setStatus("下发任务成功");
-                }else{
-                    urlStatus.setStatus("等待下发");
-                }
-                urlStatus.setUrl(vct.getContent());
-                if(taskDetailsMap.containsKey(vendorName)){
-                    taskDetailsMap.get(vendorName).add(urlStatus);
-                }else{
-                    List<TaskDetailsResponse.UrlStatus> taskDetailsList = new ArrayList<>();
-                    taskDetailsList.add(urlStatus);
-                    taskDetailsMap.put(vendorName, taskDetailsList);
-                }
+        try {
+            ContentHistory contentHistory = this.findHisttoryByRequestId(requestId);
+            if (contentHistory == null) {
+                log.error("用户任务不存在");
+                return ApiReceipt.error("0x004008", "用户任务不存在");
             }
-            tdr.setTaskDetails(taskDetailsMap);
+            TaskDetailsResponse tdr = new TaskDetailsResponse();
+            tdr.setContentStatus(contentHistory.getFlowStatus());
+            if(contentHistory.getFlowStatus().equals(FlowEmun.split_vendor_done)){
+                Map<String, List<TaskDetailsResponse.UrlStatus>> taskDetailsMap = new HashMap<>();
+                List<VendorContentTask> vendorContentTaskList = vendorTaskRepository.findByRequestId(requestId);
+                for(VendorContentTask vct: vendorContentTaskList){
+                    String vendorName = vct.getVendor();
+                    TaskDetailsResponse.UrlStatus urlStatus = new TaskDetailsResponse.UrlStatus();
+                    if(vct.getStatus().equals(TaskStatus.SUCCESS)){
+                        urlStatus.setStatus("成功");
+                    }else if(vct.getStatus().equals(TaskStatus.FAIL)){
+                        urlStatus.setStatus("失败");
+                    }else if(vct.getStatus().equals(TaskStatus.ROUND_ROBIN)){
+                        urlStatus.setStatus("轮询中");
+                    }else if(vct.getStatus().equals(TaskStatus.PROCESSING)){
+                        urlStatus.setStatus("下发任务成功");
+                    }else{
+                        urlStatus.setStatus("等待下发");
+                    }
+                    urlStatus.setUrl(vct.getContent());
+                    if(taskDetailsMap.containsKey(vendorName)){
+                        taskDetailsMap.get(vendorName).add(urlStatus);
+                    }else{
+                        List<TaskDetailsResponse.UrlStatus> taskDetailsList = new ArrayList<>();
+                        taskDetailsList.add(urlStatus);
+                        taskDetailsMap.put(vendorName, taskDetailsList);
+                    }
+                }
+                tdr.setTaskDetails(taskDetailsMap);
+            }
+            return ApiReceipt.ok(tdr);
+        }catch (Exception e){
+            log.error("getContentTaskDetails异常[{}]",e );
+            return ApiReceipt.error(ErrorCode.INTERERR);
         }
-        return ApiReceipt.ok(tdr);
 
 
 
@@ -671,7 +676,6 @@ public class ContentServiceImpl implements ContentService {
             return;
         }
         //最终轮询一次
-        log.info("发送轮询ContentHistory[{}]消息成功", requestId);
         TaskMsg robinTaskMsg = new TaskMsg();
         robinTaskMsg.setTaskId(requestId);
         robinTaskMsg.setOperation(TaskOperationEnum.content_vendor_robin);
@@ -679,6 +683,7 @@ public class ContentServiceImpl implements ContentService {
         robinTaskMsg.setRetryNum(0);
         robinTaskMsg.setDelay(robinRate);//TODO
         producer.sendDelayMsg(robinTaskMsg);
+        log.info("发送轮询ContentHistory[{}]消息", requestId);
         log.info("saveContentVendor结束[{}]", requestId);
     }
 

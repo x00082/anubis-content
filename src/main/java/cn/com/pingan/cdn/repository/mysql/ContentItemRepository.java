@@ -41,4 +41,5 @@ public interface ContentItemRepository extends JpaRepository<ContentItem, Long>,
     @Transactional
     @Query(value = "delete from content_item  where create_time <?1", nativeQuery = true)
     void clear(Date time);
+
 }
