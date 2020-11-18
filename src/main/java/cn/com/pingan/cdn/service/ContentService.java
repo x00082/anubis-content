@@ -34,6 +34,8 @@ public interface ContentService {
 
     public ApiReceipt redoContentTask(String requestId, boolean flag) throws ContentException;
 
+    public ApiReceipt batchRedoContentTask(List<String> requestIds,  boolean flag) throws ContentException;
+
     public ApiReceipt getContentTaskDetails(String requestId) throws ContentException;
 
     public void saveContentItem(TaskMsg taskMsg) throws ContentException;

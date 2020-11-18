@@ -62,6 +62,7 @@ public class MysqlConfig {
 
     private Map<String, Object> getVendorProperties(DataSource dataSource) {
         Map<String, Object> ret = jpaProperties.getHibernateProperties(new HibernateSettings());
+        //Map<String, String> ret = jpaProperties.getProperties();
         ret.put("hibernate.dialect", "cn.com.pingan.cdn.config.MySQL5InnoDBDialectUtf8mb4");
         return ret;
     }

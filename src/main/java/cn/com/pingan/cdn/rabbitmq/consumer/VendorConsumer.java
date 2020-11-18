@@ -65,7 +65,12 @@ public class VendorConsumer {
             taskService.handlerTask(taskMsg);
         }
         */
-        taskService.handlerTask(taskMsg);
+
+        if( -1 != taskMsg.getOperation().toString().indexOf("_robin")){
+            taskService.handlerRobinTask(taskMsg);
+        }else {
+            taskService.handlerRequestTask(taskMsg);
+        }
     }
 /*
     @RabbitListener(queues = {"#{vendorQueues}"})
@@ -897,6 +902,7 @@ public class VendorConsumer {
             log.info("转换对象{}", taskMsg);
 
             handlerMessage(taskMsg);
+
 
         } catch (Exception e) {
             log.error("receiveQiNiuUrl 消息处理异常", e);

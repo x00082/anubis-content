@@ -194,7 +194,9 @@ public class ContentServiceImpl implements ContentService {
 
 
             TaskMsg historyTaskMsg = new TaskMsg();
+            historyTaskMsg.setId(contentHistory.getId());
             historyTaskMsg.setTaskId(taskId);
+            historyTaskMsg.setSize(data.size());
             historyTaskMsg.setVersion(0);
             historyTaskMsg.setOperation(TaskOperationEnum.content_item);
             producer.sendTaskMsg(historyTaskMsg);
@@ -232,6 +234,8 @@ public class ContentServiceImpl implements ContentService {
             } else if (contentHistory.getStatus().equals(HisStatus.WAIT)) {
                 if(flag){
                     log.info("[{}]请求任务为wait,强制重试", requestId);
+                    contentHistory.setFlowStatus(FlowEmun.redo);
+                    contentHistoryRepository.save(contentHistory);
                 }else{
                     log.info("[{}]请求任务为wait,不需要重试", requestId);
                     return ApiReceipt.ok();
@@ -259,6 +263,76 @@ public class ContentServiceImpl implements ContentService {
             }
         }
 
+    }
+
+    @Override
+    public ApiReceipt batchRedoContentTask(List<String> requestIds, boolean flag) throws ContentException {
+        log.info("batchRedoContentTask[{}]开始", requestIds);
+        try {
+
+            List<ContentHistory> contentHistorys = contentHistoryRepository.findByRequestIdIn(requestIds);
+            if(contentHistorys.size() == 0){
+                log.error("用户任务不存在[{}]", requestIds);
+                return ApiReceipt.error("0x004008", String.format("[%s]原始任务记录不存在，禁止操作", requestIds.toString()));
+            }
+
+
+            List<TaskMsg> msgList = new ArrayList<>();
+            if(contentHistorys.size() != requestIds.size()) {//是否存在
+                List<String> noData = new ArrayList<>();
+                Map<String, ContentHistory> existMap = contentHistorys.stream().collect(Collectors.toMap(i -> i.getRequestId(), i -> i));
+                for (String s : requestIds) {
+                    if (!existMap.containsKey(s)) {
+                        noData.add(s);
+                    }
+                }
+                log.error("用户任务不存在[{}]", requestIds);
+                return ApiReceipt.error("0x004008", String.format("[%s]原始任务记录不存在，禁止操作", noData.toString()));
+            }
+
+
+            List<ContentHistory> toSave = new ArrayList<>();
+            for(ContentHistory ch: contentHistorys){
+                if (ch.getStatus().equals(HisStatus.FAIL)) {//任务已失败或未开始
+                    ch.setStatus(HisStatus.WAIT);
+                    ch.setFlowStatus(FlowEmun.redo);
+                    log.info("[{}]请求任务已失败，设置为wait", ch.getRequestId());
+                    toSave.add(ch);
+                } else if (ch.getStatus().equals(HisStatus.WAIT)) {
+                    if(flag){
+                        log.info("[{}]请求任务为wait,强制重试", ch.getRequestId());
+                        ch.setFlowStatus(FlowEmun.redo);
+                        toSave.add(ch);
+                    }else{
+                        log.info("[{}]请求任务为wait,不需要重试", ch.getRequestId());
+                        continue;
+                    }
+                } else {
+                    log.info("[{}]请求任务已成功，不再重试", ch.getRequestId());
+                    continue;
+
+                }
+                TaskMsg historyTaskMsg = new TaskMsg();
+                historyTaskMsg.setForce(flag);
+                historyTaskMsg.setTaskId(ch.getRequestId());
+                historyTaskMsg.setVersion(1);
+                historyTaskMsg.setOperation(TaskOperationEnum.content_item);
+                msgList.add(historyTaskMsg);
+            }
+            if(toSave.size()>0) {
+                contentHistoryRepository.saveAll(toSave);
+                sendListMQ(msgList);
+            }
+
+            return ApiReceipt.ok();
+        }catch (Exception e){
+            if(e instanceof ContentException){
+                String code = ((ContentException) e).getCode();
+                return ApiReceipt.error(code, e.getMessage());
+            }else{
+                return ApiReceipt.error(ErrorCode.INTERERR);
+            }
+        }
     }
 
     @Override
@@ -318,7 +392,7 @@ public class ContentServiceImpl implements ContentService {
         boolean toNext = false;
         log.info("saveContentItem开始[{}]", requestId);
         try {
-            ContentHistory contentHistory = this.findHisttoryByRequestId(requestId);
+            ContentHistory contentHistory = contentHistoryRepository.findById(taskMsg.getId()).get();
             if (contentHistory == null) {
                 log.error("用户任务不存在,丢弃消息");
                 return;
@@ -333,11 +407,14 @@ public class ContentServiceImpl implements ContentService {
                 log.error("超出重试次数,设置任务失败并丢弃消息");
                 return;
             }
+
+            /*
             if(contentHistory.getFlowStatus().equals(FlowEmun.init)|| contentHistory.getFlowStatus().equals(FlowEmun.redo)){
                 contentHistory.setFlowStatus(FlowEmun.split_item_wait);
                 contentHistory.setUpdateTime(new Date());
                 contentHistoryRepository.save(contentHistory);
             }
+            */
 
             List<String> urls = JSONArray.parseArray(contentHistory.getContent(), String.class);
             List<String> lostUrls = new ArrayList<>();
@@ -450,25 +527,21 @@ public class ContentServiceImpl implements ContentService {
                 log.info("saveContentItem数量[{}]", toSaveList.size());
                 contentItemRepository.saveAll(toSaveList);
                 log.info("saveContentItem入库完成");
-                toNext = true;
             }
-            if(toNext){
-                TaskMsg itemTaskMsg = new TaskMsg();
-                itemTaskMsg.setForce(force);
-                itemTaskMsg.setTaskId(requestId);
-                itemTaskMsg.setOperation(TaskOperationEnum.content_vendor);
-                itemTaskMsg.setVersion(flag?0:1);
-                itemTaskMsg.setRetryNum(0);
-                //itemTaskMsg.setDelay(1000L);
-                producer.sendAllMsg(itemTaskMsg);
-                log.info("saveContentItem发送MQ完成");
-            }else{
-                log.info("saveContentItem没有可执行任务");
-            }
-            contentHistory.setFlowStatus(FlowEmun.split_item_done);
-            contentHistory.setUpdateTime(new Date());
-            contentHistoryRepository.save(contentHistory);
+            contentHistoryRepository.updateFlowStatusById(taskMsg.getId(), FlowEmun.split_item_done.name());
             log.info("saveContentItem任务入库并发送消息成功");
+
+            TaskMsg itemTaskMsg = new TaskMsg();
+            itemTaskMsg.setForce(force);
+            itemTaskMsg.setId(taskMsg.getId());
+            itemTaskMsg.setTaskId(requestId);
+            itemTaskMsg.setOperation(TaskOperationEnum.content_vendor);
+            itemTaskMsg.setVersion(flag?0:1);
+            itemTaskMsg.setRetryNum(0);
+            //itemTaskMsg.setDelay(1000L);
+            producer.sendAllMsg(itemTaskMsg);
+            log.info("saveContentItem发送MQ完成");
+
         }catch (Exception e){
             log.error("获取厂商失败");
             taskMsg.setDelay(limitRetryRate);
@@ -500,7 +573,7 @@ public class ContentServiceImpl implements ContentService {
 
         try {
 
-            ContentHistory contentHistory = this.findHisttoryByRequestId(requestId);
+            ContentHistory contentHistory = contentHistoryRepository.findById(taskMsg.getId()).get();
             if (contentHistory == null) {
                 log.error("用户任务不存在,丢弃消息");
                 return;
@@ -526,11 +599,14 @@ public class ContentServiceImpl implements ContentService {
                 log.error("saveContentVendor超出重试次数,设置任务失败并丢弃消息");
                 return;
             }
+
+            /*
             if(contentHistory.getFlowStatus().equals(FlowEmun.split_item_done)){
                 contentHistory.setFlowStatus(FlowEmun.split_vendor_wait);
                 contentHistory.setUpdateTime(new Date());
                 contentHistoryRepository.save(contentHistory);
             }
+            */
 
             List<VendorContentTask> toSaveList = new ArrayList<>();
             List<TaskMsg> toSendMsg = new ArrayList<>();
@@ -665,9 +741,8 @@ public class ContentServiceImpl implements ContentService {
                 log.info("saveContentVendor[{}]没有可执行任务", requestId);
             }
 
-            contentHistory.setFlowStatus(FlowEmun.split_vendor_done);
-            contentHistory.setUpdateTime(new Date());
-            contentHistoryRepository.save(contentHistory);
+            contentHistoryRepository.updateFlowStatusById(taskMsg.getId(), FlowEmun.split_vendor_done.name());
+
         }catch (Exception e){
             log.error("saveContentVendor异常[{}]", e);
             taskMsg.setDelay(limitRetryRate);
@@ -677,6 +752,7 @@ public class ContentServiceImpl implements ContentService {
         }
         //最终轮询一次
         TaskMsg robinTaskMsg = new TaskMsg();
+        robinTaskMsg.setId(taskMsg.getId());
         robinTaskMsg.setTaskId(requestId);
         robinTaskMsg.setOperation(TaskOperationEnum.content_vendor_robin);
         robinTaskMsg.setVersion(0);
@@ -762,6 +838,7 @@ public class ContentServiceImpl implements ContentService {
         String requestId = taskMsg.getTaskId();
         log.info("contentVendorRobin开始[{}]", requestId);
         try {
+            /*
             //ContentItem contentItem = contentItemRepository.findByItemId(itemId);
             ContentHistory contentHistory = this.findHisttoryByRequestId(requestId);
             if (contentHistory == null) {
@@ -772,6 +849,7 @@ public class ContentServiceImpl implements ContentService {
                 log.info("任务[{}]状态[{}]", requestId, contentHistory.getStatus());
                 return;
             }
+            */
 
             /*
             List<String> vendors = JSONArray.parseArray(contentItem.getVendor(), String.class);
@@ -785,6 +863,15 @@ public class ContentServiceImpl implements ContentService {
             }
             */
             if (taskMsg.getRetryNum() > limitRetry || taskMsg.getRoundRobinNum() > robinNum) {
+                ContentHistory contentHistory = contentHistoryRepository.findById(taskMsg.getId()).get();
+                if (contentHistory == null) {
+                    log.error("用户任务不存在,丢弃消息");
+                    return;
+                }
+                if(contentHistory.getStatus().equals(HisStatus.SUCCESS)|| contentHistory.getStatus().equals(HisStatus.FAIL)){
+                    log.info("任务[{}]状态[{}]", requestId, contentHistory.getStatus());
+                    return;
+                }
                 contentHistory.setStatus(HisStatus.FAIL);
                 contentHistory.setUpdateTime(new Date());
                 contentHistory.setMessage("任务超时失败");
@@ -839,18 +926,33 @@ public class ContentServiceImpl implements ContentService {
                 contentItemRepository.saveAll(contentItemList);
                 log.info("设置Item状态结束");
             }
+
+            /*
             if(itemStatusMap.keySet().size() != contentHistory.getContentNumber()){//确认数量
                 stat = HisStatus.FAIL;
                 desc = "Item任务数量异常";
                 log.error("厂商任务数[{}]与原始url数量[{}]不一致",itemStatusMap.keySet().size(), contentHistory.getContentNumber());
             }
-
+            */
 
             if(stat.equals(HisStatus.FAIL) || stat.equals(HisStatus.SUCCESS)){
-                contentHistory.setStatus(stat);
-                contentHistory.setUpdateTime(new Date());
-                contentHistory.setMessage(desc);
-                contentHistoryRepository.save(contentHistory);
+                ContentHistory contentHistory = contentHistoryRepository.findById(taskMsg.getId()).get();
+                if (contentHistory == null) {
+                    log.error("用户任务不存在,丢弃消息");
+                    return;
+                }
+                if(contentHistory.getStatus().equals(HisStatus.SUCCESS)|| contentHistory.getStatus().equals(HisStatus.FAIL)){
+                    log.info("任务[{}]状态[{}]", requestId, contentHistory.getStatus());
+                    return;
+                }
+
+                if(itemStatusMap.keySet().size() != contentHistory.getContentNumber()){//确认数量
+                    stat = HisStatus.FAIL;
+                    desc = "Item任务数量异常";
+                    log.error("厂商任务数[{}]与原始url数量[{}]不一致",itemStatusMap.keySet().size(), contentHistory.getContentNumber());
+                }
+
+                contentHistoryRepository.updateStatusAndMessageById(taskMsg.getId(), stat.name(), desc);
                 log.info("VendorRobin轮询结果为[{}]", desc);
                 return;
             }

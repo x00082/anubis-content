@@ -12,15 +12,17 @@ import javax.persistence.*;
  */
 @Data
 @Entity
-/*
-@Table(name="line_vendor", schema="${task.db.schema:test}" , uniqueConstraints = {
+
+@Table(name="line_vendor", uniqueConstraints = {
         @UniqueConstraint(columnNames = {"line_id"})
 })
-*/
+
+/*
 @Table(name="line_vendor",
         indexes = {
                 @Index(columnList = "line_id")
         })
+*/
 public class LineVendor {
     @Id
     @GeneratedValue(strategy= GenerationType.IDENTITY)

@@ -4,7 +4,6 @@ import cn.com.pingan.cdn.client.*;
 import cn.com.pingan.cdn.common.*;
 import cn.com.pingan.cdn.config.RedisLuaScriptService;
 import cn.com.pingan.cdn.exception.RestfulException;
-import cn.com.pingan.cdn.model.mysql.ContentHistory;
 import cn.com.pingan.cdn.model.mysql.ContentItem;
 import cn.com.pingan.cdn.model.mysql.VendorContentTask;
 import cn.com.pingan.cdn.model.mysql.VendorInfo;
@@ -27,11 +26,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.stereotype.Service;
 
-import java.awt.*;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.List;
-import java.util.NoSuchElementException;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 /**
@@ -72,6 +68,9 @@ public class TaskServiceImpl implements TaskService {
 
     @Value("${task.vendor.status.default:up}")
     private String defaultVendorStatus;
+
+
+    public static Map<String,Object> mergeHashMap= new ConcurrentHashMap<String,Object>();
 
 
     private ObjectMapper objectMapper = new ObjectMapper();
@@ -160,7 +159,7 @@ public class TaskServiceImpl implements TaskService {
     }
 
     @Override
-    public int handlerTask(TaskMsg msg) throws RestfulException {
+    public int handlerRequestTask(TaskMsg msg) throws RestfulException {
 
         if( -1 != msg.getOperation().toString().indexOf("_robin")){
             handlerRoundRobin(msg);
@@ -174,6 +173,13 @@ public class TaskServiceImpl implements TaskService {
         }else{
             handlerNewRequestPreload(msg);
         }
+        return 0;
+    }
+
+    @Override
+    public int handlerRobinTask(TaskMsg msg) throws RestfulException {
+
+        handlerRoundRobin(msg);
         return 0;
     }
 
@@ -229,7 +235,7 @@ public class TaskServiceImpl implements TaskService {
                 log.warn("[{}] vendorInfo db is null", task.getVendor());
                 vendorStatus = defaultVendorStatus;
             }else{
-                vendorStatus = vendorInfo.getStatus();
+                vendorStatus = vendorInfo.getStatus().name();
             }
             if ("down".equals(vendorStatus)) {
                 msg.setDelay(1 * 60 * 1000L);
@@ -371,7 +377,7 @@ public class TaskServiceImpl implements TaskService {
         boolean flag = true;
         try {
             flag = handlerNewRequest(msg);
-            if(flag){
+            if(!flag){
                 return false;
             }
         }catch (Exception e){
@@ -408,7 +414,7 @@ public class TaskServiceImpl implements TaskService {
         boolean flag = true;
         try {
             flag = handlerNewRequest(msg);
-            if(flag){
+            if(!flag){
                 return false;
             }
         }catch (Exception e){
@@ -448,7 +454,7 @@ public class TaskServiceImpl implements TaskService {
                 log.warn("[{}] vendorInfo db is null", msg.getVendor());
                 vendorStatus = defaultVendorStatus;
             } else {
-                vendorStatus = vendorInfo.getStatus();
+                vendorStatus = vendorInfo.getStatus().name();
             }
             if ("down".equals(vendorStatus)) {
                 msg.setDelay(1 * 60 * 1000L);
@@ -511,12 +517,14 @@ public class TaskServiceImpl implements TaskService {
                     if (json != null && json.getString("jobId") != null && json.getString("jobId").equals(taskId)) {
                         if (Constants.STATUS_SUCCESS.equals(json.getString("status"))) {
                             ts = TaskStatus.SUCCESS;
-                            message = StringUtils.isNoneBlank(json.getString("message"))?json.getString("message"):"厂商执行成功";
+                            //message = StringUtils.isNoneBlank(json.getString("message"))?json.getString("message"):"厂商执行成功";
+                            message = "厂商执行成功";
                             msg.setRetryNum(0);
                             log.info("刷新预热任务完成，任务编号[{}]", json.getString("jobId"));
                         } else if (Constants.STATUS_FAIL.equals(json.getString("status"))) {
                             ts = TaskStatus.FAIL;
-                            message = StringUtils.isNoneBlank(json.getString("message"))?json.getString("message"):"厂商执行失败";
+                            //message = StringUtils.isNoneBlank(json.getString("message"))?json.getString("message"):"厂商执行失败";
+                            message = "厂商执行失败";
                             msg.setRetryNum(0);
                             log.info("刷新预热任务失败，任务编号[{}]", json.getString("jobId"));
                         } else if (Constants.STATUS_WAIT.equals(json.getString("status"))) {
@@ -599,7 +607,7 @@ public class TaskServiceImpl implements TaskService {
             log.warn("[{}] vendorInfo db is null", task.getVendor());
             vendorStatus = defaultVendorStatus;
         }else{
-            vendorStatus = vendorInfo.getStatus();
+            vendorStatus = vendorInfo.getStatus().name();
         }
         if ("down".equals(vendorStatus)) {
             msg.setDelay(1 * 60 * 1000L);
@@ -805,7 +813,7 @@ public class TaskServiceImpl implements TaskService {
         item.setUpdateTime(new Date());
         contentItemRepository.save(item);
         log.info("设置拆分任务状态：{}", HisStatus.FAIL);
-        contentHistoryRepository.updateStatusAndMessage(item.getRequestId(), HisStatus.FAIL.name(),"任务执行失败");
+        contentHistoryRepository.updateStatusAndMessageByRequestId(item.getRequestId(), HisStatus.FAIL.name(),"任务执行失败");
         log.info("设置用户请求历史任务状态：{}", HisStatus.FAIL);
 
         return false;
@@ -842,7 +850,7 @@ public class TaskServiceImpl implements TaskService {
             log.warn("[{}] vendorInfo db is null", msg.getVendor());
             vendorStatus = defaultVendorStatus;
         }else{
-            vendorStatus = vendorInfo.getStatus();
+            vendorStatus = vendorInfo.getStatus().name();
         }
         if ("down".equals(vendorStatus)) {
             msg.setDelay(1 * 60 * 1000L);

@@ -38,7 +38,9 @@ public interface ContentServiceFacade {
 
     public ApiReceipt queryDetails(String requestId)throws ContentException;
 
-    public ApiReceipt reDO(String id, boolean flag)throws ContentException;
+    public ApiReceipt redo(String id, boolean flag)throws ContentException;
+
+    public ApiReceipt batchRedo(List<String> requestIds, boolean flag)throws ContentException;
 
     public QueryHisDTO queryHis(GateWayHeaderDTO dto, QueryHisCommand command);
 

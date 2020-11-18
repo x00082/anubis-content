@@ -176,7 +176,32 @@ public class ContentController {
             }else{
                 force = command.getForce();
             }
-            ApiReceipt result =this.facade.reDO(command.getTaskId(), force);
+            ApiReceipt result =this.facade.redo(command.getTaskId(), force);
+            log.info("content/preheat end result:{}", JSON.toJSONString(result));
+            return result;
+        }
+
+        @PostMapping("/redo/batch")
+        public ApiReceipt batchRedo(@Valid @RequestBody RedoDTO command) throws ContentException, DomainException {
+            log.info("content/preheat start command:{}", JSON.toJSONString(command));
+            // TODO
+            GateWayHeaderDTO dto = this.getGateWayInfo(request);
+            if (StringUtils.isEmpty(dto.getUsername()) || StringUtils.isEmpty(dto.getUid()) || StringUtils.isEmpty(dto.getSpcode())) {
+                return ApiReceipt.error(ErrorCode.NOHEADER);
+            }
+
+
+            //越权校验
+            if(!"true".equalsIgnoreCase(dto.getIsAdmin())){
+                return  ApiReceipt.error(ErrorCode.FORBIDOPT);
+            }
+            boolean force = false;
+            if(command.getForce() == null){
+                force = false;
+            }else{
+                force = command.getForce();
+            }
+            ApiReceipt result =this.facade.batchRedo(command.getTaskIds(), force);
             log.info("content/preheat end result:{}", JSON.toJSONString(result));
             return result;
         }

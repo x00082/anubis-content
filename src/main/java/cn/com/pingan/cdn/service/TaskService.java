@@ -17,7 +17,9 @@ public interface TaskService {
 
     public int addTaskVersion(TaskMsg msg) throws RestfulException;
 
-    public int handlerTask(TaskMsg msg) throws RestfulException;
+    public int handlerRequestTask(TaskMsg msg) throws RestfulException;
+
+    public int handlerRobinTask(TaskMsg msg) throws RestfulException;
 
     public int handlerMergeTask(TaskMsg msg) throws RestfulException;
 

@@ -25,7 +25,7 @@ import java.util.Date;
 
 @Data
 @Entity
-/*
+
 @Table(name="vendor_task",
         uniqueConstraints = {
                 @UniqueConstraint(columnNames = {"task_id"})
@@ -33,11 +33,13 @@ import java.util.Date;
         indexes = {
                 @Index(columnList = "item_id"),
                 @Index(columnList = "request_id"),
+                @Index(columnList = "job_id"),
+                @Index(columnList = "merge_id"),
                 @Index(columnList = "status"),
                 @Index(columnList = "create_time")
         })
-        */
 
+/*
 @Table(name="vendor_task",
         indexes = {
                 @Index(columnList = "task_id"),
@@ -48,6 +50,7 @@ import java.util.Date;
                 @Index(columnList = "status"),
                 @Index(columnList = "create_time")
         })
+        */
 public class VendorContentTask {
     @Id
     @GeneratedValue(strategy=GenerationType.IDENTITY)

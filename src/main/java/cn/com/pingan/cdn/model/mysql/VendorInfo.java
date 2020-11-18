@@ -1,5 +1,6 @@
 package cn.com.pingan.cdn.model.mysql;
 
+import cn.com.pingan.cdn.common.VendorStatusEnum;
 import cn.com.pingan.cdn.request.VendorInfoDTO;
 import lombok.Data;
 
@@ -7,19 +8,21 @@ import javax.persistence.*;
 
 @Data
 @Entity
-/*
+
 @Table(name="vendor_info", uniqueConstraints = {
         @UniqueConstraint(columnNames = {"vendor"})
         },
         indexes = {
                 @Index(columnList = "status")
         })
-        */
+
+/*
 @Table(name="vendor_info",
         indexes = {
                 @Index(columnList = "vendor"),
                 @Index(columnList = "status")
         })
+*/
 public class VendorInfo {
 
     @Id
@@ -45,7 +48,8 @@ public class VendorInfo {
     private int mergePreheatCount;
 
     @Column(name = "status", length=16, nullable = false)
-    private String status;//up,down
+    @Enumerated(EnumType.STRING)
+    private VendorStatusEnum status;//up,down
 
     public void setVendorInfo(VendorInfoDTO infoDTO){
 

@@ -44,6 +44,12 @@ public class MqServiceConfig implements RabbitListenerConfigurer {
     public SimpleRabbitListenerContainerFactory taskContainerFactory(SimpleRabbitListenerContainerFactoryConfigurer configurer, ConnectionFactory connectionFactory) {
         SimpleRabbitListenerContainerFactory factory = new SimpleRabbitListenerContainerFactory();
         configurer.configure(factory, connectionFactory);
+        /*
+        factory.setConnectionFactory(connectionFactory);
+        factory.setBatchListener(true);
+        factory.setBatchSize(10);
+        factory.setConsumerBatchEnabled(true);
+        */
         return factory;
     }
 

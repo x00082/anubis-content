@@ -1,8 +1,10 @@
 package cn.com.pingan.cdn.service.impl;
 
 import cn.com.pingan.cdn.common.ApiReceipt;
+import cn.com.pingan.cdn.common.VendorStatusEnum;
 import cn.com.pingan.cdn.exception.ErrorCode;
 import cn.com.pingan.cdn.model.mysql.VendorInfo;
+import cn.com.pingan.cdn.rabbitmq.config.RabbitListenerConfig;
 import cn.com.pingan.cdn.repository.mysql.VendorInfoRepository;
 import cn.com.pingan.cdn.request.VendorInfoDTO;
 import cn.com.pingan.cdn.service.ConfigService;
@@ -22,6 +24,9 @@ public class ConfigServiceImpl implements ConfigService {
 
     @Autowired
     VendorInfoRepository vendorInfoRepository;
+
+    @Autowired
+    RabbitListenerConfig rabbitListenerConfig;
 
     @Override
     public ApiReceipt addVendorInfo(VendorInfoDTO infoDTO) {
@@ -50,6 +55,21 @@ public class ConfigServiceImpl implements ConfigService {
         }else{
             info.setVendorInfo(infoDTO);
             vendorInfoRepository.save(info);
+        }
+
+        if (VendorStatusEnum.down.equals(infoDTO.getStatus())) {
+            rabbitListenerConfig.stop("content_" + infoDTO.getVendor());
+            rabbitListenerConfig.stop("content_" + infoDTO.getVendor() + "_url");
+            rabbitListenerConfig.stop("content_" + infoDTO.getVendor() + "_dir");
+            rabbitListenerConfig.stop("content_" + infoDTO.getVendor() + "_preheat");
+            rabbitListenerConfig.stop("content_" + infoDTO.getVendor() + "_robin");
+
+        }else if(VendorStatusEnum.up.equals(infoDTO.getStatus())){
+            rabbitListenerConfig.start("content_" + infoDTO.getVendor());
+            rabbitListenerConfig.start("content_" + infoDTO.getVendor() + "_url");
+            rabbitListenerConfig.start("content_" + infoDTO.getVendor() + "_dir");
+            rabbitListenerConfig.start("content_" + infoDTO.getVendor() + "_preheat");
+            rabbitListenerConfig.start("content_" + infoDTO.getVendor() + "_robin");
         }
 
         return ApiReceipt.ok();
@@ -86,6 +106,21 @@ public class ConfigServiceImpl implements ConfigService {
 
         info.setStatus(infoDTO.getStatus());
         vendorInfoRepository.save(info);
+
+        if (VendorStatusEnum.down.equals(infoDTO.getStatus())) {
+            rabbitListenerConfig.stop("content_" + infoDTO.getVendor());
+            rabbitListenerConfig.stop("content_" + infoDTO.getVendor() + "_url");
+            rabbitListenerConfig.stop("content_" + infoDTO.getVendor() + "_dir");
+            rabbitListenerConfig.stop("content_" + infoDTO.getVendor() + "_preheat");
+            rabbitListenerConfig.stop("content_" + infoDTO.getVendor() + "_robin");
+
+        }else if(VendorStatusEnum.up.equals(infoDTO.getStatus())){
+            rabbitListenerConfig.start("content_" + infoDTO.getVendor());
+            rabbitListenerConfig.start("content_" + infoDTO.getVendor() + "_url");
+            rabbitListenerConfig.start("content_" + infoDTO.getVendor() + "_dir");
+            rabbitListenerConfig.start("content_" + infoDTO.getVendor() + "_preheat");
+            rabbitListenerConfig.start("content_" + infoDTO.getVendor() + "_robin");
+        }
         return ApiReceipt.ok();
     }
 }

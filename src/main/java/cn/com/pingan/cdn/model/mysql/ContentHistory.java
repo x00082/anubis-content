@@ -25,16 +25,18 @@ import java.util.Date;
  */
 @Data
 @Entity
-/*
+
 @Table(name="content_history",
         uniqueConstraints = {
                 @UniqueConstraint(columnNames = {"request_id"})
         })
-*/
+
+/*
 @Table(name="content_history",
         indexes = {
                 @Index(columnList = "request_id")
         })
+        */
 public class ContentHistory {
 
     @Id

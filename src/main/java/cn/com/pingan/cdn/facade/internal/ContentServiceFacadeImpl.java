@@ -117,8 +117,13 @@ public class ContentServiceFacadeImpl implements ContentServiceFacade {
     }
 
     @Override
-    public ApiReceipt reDO(String id, boolean flag) throws ContentException {
+    public ApiReceipt redo(String id, boolean flag) throws ContentException {
         return contentService.redoContentTask(id, flag);
+    }
+
+    @Override
+    public ApiReceipt batchRedo(List<String> requestIds, boolean flag) throws ContentException {
+        return contentService.batchRedoContentTask(requestIds, flag);
     }
 
     @Override
@@ -129,6 +134,7 @@ public class ContentServiceFacadeImpl implements ContentServiceFacade {
         pageIndex = pageIndex > 0 ? pageIndex - 1 : pageIndex;
         pageSize = (pageSize > 0 && pageSize <= 100) ? pageSize : 100;
         Sort sort = new Sort(Sort.Direction.DESC, "id");
+        //Sort sort = Sort.by(Sort.Direction.DESC, "id");
         PageRequest pageRequest = PageRequest.of(pageIndex, pageSize, sort);
 
         //管理员取command的账户数据中的用户UUID，commad是主账号则包含子账号
@@ -191,13 +197,13 @@ public class ContentServiceFacadeImpl implements ContentServiceFacade {
                     }
                     cond.add(criteriaBuilder.and(criteriaBuilder.and(in)));//存入结果集
                 }
-                if (!StringUtils.isEmpty(command.getType().name())) {
+                if (command.getType() != null && !StringUtils.isEmpty(command.getType().name())) {
                     cond.add(criteriaBuilder.equal(root.get("type"), command.getType()));
                 }
                 if (!StringUtils.isEmpty(command.getTaskId())) {
                     cond.add(criteriaBuilder.equal(root.get("requestId"), command.getTaskId()));
                 }
-                if (!StringUtils.isEmpty(command.getStatus().name())) {
+                if (command.getStatus() != null && !StringUtils.isEmpty(command.getStatus().name())) {
                     cond.add(criteriaBuilder.equal(root.get("status"), command.getStatus()));
                 }
                 if (null != startDate) {//大于等于

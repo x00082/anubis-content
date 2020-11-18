@@ -14,14 +14,15 @@ import java.util.Date;
  */
 @Data
 @Entity
-/*
+
 @Table(name="uesr_limit", uniqueConstraints = {
         @UniqueConstraint(columnNames = {"user_id"})
 })
-*/
+/*
 @Table(name="uesr_limit", indexes = {
         @Index(columnList = "user_id")
         })
+*/
 public class UserLimit {
     @Id
     @GeneratedValue(strategy= GenerationType.IDENTITY)

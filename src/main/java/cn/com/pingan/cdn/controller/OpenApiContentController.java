@@ -28,7 +28,7 @@ import javax.servlet.http.HttpServletRequest;
  */
 @Slf4j
 @RestController
-@RequestMapping("/api")
+@RequestMapping("/content/api")
 public class OpenApiContentController {
 
 
@@ -40,7 +40,7 @@ public class OpenApiContentController {
 
     @PostMapping("/refresh/url")
     public ApiReceipt refreshUrl(@RequestBody OpenApiFreshCommand command) throws ContentException, DomainException {
-        log.info("content/fresh/url start command:{}", JSON.toJSONString(command));
+        log.info("api/fresh/url start command:{}", JSON.toJSONString(command));
         GateWayHeaderDTO dto= this.getGateWayInfo(request);
         if (StringUtils.isEmpty(dto.getUsername()) || StringUtils.isEmpty(dto.getUid()) || StringUtils.isEmpty(dto.getSpcode())) {
             return ApiReceipt.error(ErrorCode.NOHEADER);
@@ -71,7 +71,7 @@ public class OpenApiContentController {
 
     @PostMapping("/refresh/dir")
     public ApiReceipt refreshDir(@RequestBody OpenApiFreshCommand command) throws ContentException, DomainException {
-        log.info("content/fresh/dir start command:{}", JSON.toJSONString(command));
+        log.info("api/fresh/dir start command:{}", JSON.toJSONString(command));
         GateWayHeaderDTO dto= this.getGateWayInfo(request);
         if (StringUtils.isEmpty(dto.getUsername()) || StringUtils.isEmpty(dto.getUid()) || StringUtils.isEmpty(dto.getSpcode())) {
             return ApiReceipt.error(ErrorCode.NOHEADER);
@@ -100,7 +100,7 @@ public class OpenApiContentController {
 
     @PostMapping("/preload")
     public ApiReceipt prefetch(@RequestBody OpenApiFreshCommand command) throws ContentException,DomainException{
-        log.info("content/preheat start command:{}", JSON.toJSONString(command));
+        log.info("api/preheat start command:{}", JSON.toJSONString(command));
 
         GateWayHeaderDTO dto=this.getGateWayInfo(request);
         if (StringUtils.isEmpty(dto.getUsername()) || StringUtils.isEmpty(dto.getUid()) || StringUtils.isEmpty(dto.getSpcode())) {
@@ -124,7 +124,7 @@ public class OpenApiContentController {
         }
 
         ApiReceipt result =this.facade.openApiPreload(dto,command.getData());
-        log.info("content/preheat end result:{}", JSON.toJSONString(result));
+        log.info("api/preheat end result:{}", JSON.toJSONString(result));
         return result;
     }
 

@@ -29,20 +29,35 @@ import java.util.List;
 @Repository
 public interface ContentHistoryRepository extends JpaRepository<ContentHistory, Long>, JpaSpecificationExecutor<ContentHistory> {
 
-
-
     ContentHistory findByRequestId(String requestId);
+
+
+    List<ContentHistory> findByRequestIdIn(List<String> requestIds);
 
     @Modifying
     @Transactional
     @Query(value = "update content_history h set h.status = ?2, h.update_time=current_timestamp where h.request_id =?1", nativeQuery = true)
     int updateStatus(String id, String status);
 
-
     @Modifying
     @Transactional
     @Query(value = "update content_history h set h.status = ?2, h.update_time=current_timestamp, h.message = ?3 where h.request_id =?1", nativeQuery = true)
-    int updateStatusAndMessage(String id, String status, String message);
+    int updateStatusAndMessageByRequestId(String id, String status, String message);
+
+    @Modifying
+    @Transactional
+    @Query(value = "update content_history h set h.status = ?2, h.update_time=current_timestamp, h.message = ?3 where h.id =?1", nativeQuery = true)
+    int updateStatusAndMessageById(Long id, String status, String message);
+
+    @Modifying
+    @Transactional
+    @Query(value = "update content_history h set h.flow_status = ?2, h.update_time=current_timestamp where h.request_id =?1", nativeQuery = true)
+    int updateFlowStatusByRequestId(String id, String status);
+
+    @Modifying
+    @Transactional
+    @Query(value = "update content_history h set h.flow_status = ?2, h.update_time=current_timestamp where h.id =?1", nativeQuery = true)
+    int updateFlowStatusById(Long id, String status);
 
 
     @Modifying

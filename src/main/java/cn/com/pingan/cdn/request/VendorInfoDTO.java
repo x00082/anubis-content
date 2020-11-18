@@ -1,5 +1,6 @@
 package cn.com.pingan.cdn.request;
 
+import cn.com.pingan.cdn.common.VendorStatusEnum;
 import lombok.Data;
 
 /**
@@ -22,5 +23,5 @@ public class VendorInfoDTO {
 
     private int mergePreheatCount;
 
-    private String status;//up,down
+    private VendorStatusEnum status;//up,down
 }
