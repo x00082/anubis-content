@@ -33,6 +33,10 @@ public class Constants {
     
     //
 
+    public static final String CONTENT_FANOUT_EXCHANGE = "anubisContentFanoutExchange";
+
+
+
     public static final String CONTENT_DELAY_EXCHANGE="anubisContentDelayExchange";//延时
     public static final String DELAYED_EXCHANGE_TYPE="x-delayed-message";
     public static final String CONTENT_DELAY_QUEUE="anubisContentDelayQueue";

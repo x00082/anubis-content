@@ -10,7 +10,6 @@ package cn.com.pingan.cdn.model.mysql;
 
 import cn.com.pingan.cdn.common.HisStatus;
 import cn.com.pingan.cdn.common.RefreshType;
-import lombok.Data;
 
 import javax.persistence.*;
 import java.util.Date;
@@ -22,6 +21,8 @@ import java.util.Date;
  * @date 2020年10月9日 上午11:10:40 
  *  
  */
+
+/*
 @Data
 @Entity
 
@@ -32,6 +33,7 @@ import java.util.Date;
         indexes = {
                 @Index(columnList = "request_id")
         })
+        */
 /*
 @Table(name="content_item",
         indexes = {

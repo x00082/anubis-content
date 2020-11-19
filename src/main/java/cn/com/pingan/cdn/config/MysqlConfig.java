@@ -8,6 +8,7 @@
  */
 package cn.com.pingan.cdn.config;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.orm.jpa.HibernateSettings;
@@ -32,6 +33,7 @@ import java.util.Map;
  * @date 2020年10月15日 下午2:35:03 
  *  
  */
+@Slf4j
 @Configuration
 @EnableTransactionManagement
 @EnableJpaRepositories(entityManagerFactoryRef="entityManagerFactoryMysql",
@@ -61,9 +63,11 @@ public class MysqlConfig {
     private JpaProperties jpaProperties;
 
     private Map<String, Object> getVendorProperties(DataSource dataSource) {
+        //log.info("hibernate [{}]", jpaProperties);
         Map<String, Object> ret = jpaProperties.getHibernateProperties(new HibernateSettings());
         //Map<String, String> ret = jpaProperties.getProperties();
         ret.put("hibernate.dialect", "cn.com.pingan.cdn.config.MySQL5InnoDBDialectUtf8mb4");
+        //log.info("hibernate [{}]", ret);
         return ret;
     }
 

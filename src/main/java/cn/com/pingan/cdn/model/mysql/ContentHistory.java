@@ -75,6 +75,15 @@ public class ContentHistory {
     @Column(name = "flow_status", length=32, nullable = false)
     @Enumerated(EnumType.STRING)
     private FlowEmun flowStatus;
+
+    @Column(name = "all_vendor_num")
+    private Integer allVendorNum = 0;
+
+    @Column(name = "success_vendor_num")
+    private Integer successVendorNum = 0;
+
+    @Column(name = "version")
+    private Integer version = 0;
     
     @Column(name="is_admin", length=16, nullable = false)
     private String isAdmin;

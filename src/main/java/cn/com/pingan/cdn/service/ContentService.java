@@ -14,6 +14,7 @@ import cn.com.pingan.cdn.common.RefreshType;
 import cn.com.pingan.cdn.exception.ContentException;
 import cn.com.pingan.cdn.gateWay.GateWayHeaderDTO;
 import cn.com.pingan.cdn.model.mysql.ContentHistory;
+import cn.com.pingan.cdn.rabbitmq.message.FanoutMsg;
 import cn.com.pingan.cdn.rabbitmq.message.TaskMsg;
 import cn.com.pingan.cdn.request.openapi.ContentDefaultNumDTO;
 
@@ -38,11 +39,13 @@ public interface ContentService {
 
     public ApiReceipt getContentTaskDetails(String requestId) throws ContentException;
 
-    public void saveContentItem(TaskMsg taskMsg) throws ContentException;
+    public void saveVendorTask(TaskMsg taskMsg) throws ContentException;
 
-    public void saveContentVendor(TaskMsg taskMsg) throws ContentException;
+    public int fflushDomainVendor(FanoutMsg taskMsg);
 
-    public void contentItemRobin(TaskMsg taskMsg) throws ContentException;
+    //public void saveContentVendor(TaskMsg taskMsg) throws ContentException;
+
+    //public void contentItemRobin(TaskMsg taskMsg) throws ContentException;
 
     public void contentVendorRobin(TaskMsg taskMsg) throws ContentException;
 

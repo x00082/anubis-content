@@ -35,6 +35,9 @@ public class VendorInfo {
     @Column(name = "total_qps", nullable = false)
     private int totalQps;
 
+    @Column(name = "robin_qps", nullable = false)
+    private int robinQps;
+
     @Column(name = "total_size")
     private int totalSize;
 

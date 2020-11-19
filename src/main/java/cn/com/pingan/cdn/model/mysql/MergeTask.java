@@ -1,9 +1,8 @@
 package cn.com.pingan.cdn.model.mysql;
 
-import javax.persistence.Column;
-import javax.persistence.GeneratedValue;
-import javax.persistence.GenerationType;
-import javax.persistence.Id;
+import lombok.Data;
+
+import javax.persistence.*;
 import java.util.Date;
 
 /**
@@ -12,7 +11,8 @@ import java.util.Date;
  * @Date 2020/10/19 14:29
  * @Created by Luj
  */
-
+@Data
+@Entity
 public class MergeTask {
 
     @Id

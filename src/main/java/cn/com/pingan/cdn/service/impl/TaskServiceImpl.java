@@ -4,6 +4,7 @@ import cn.com.pingan.cdn.client.*;
 import cn.com.pingan.cdn.common.*;
 import cn.com.pingan.cdn.config.RedisLuaScriptService;
 import cn.com.pingan.cdn.exception.RestfulException;
+import cn.com.pingan.cdn.model.mysql.ContentHistory;
 import cn.com.pingan.cdn.model.mysql.ContentItem;
 import cn.com.pingan.cdn.model.mysql.VendorContentTask;
 import cn.com.pingan.cdn.model.mysql.VendorInfo;
@@ -12,7 +13,6 @@ import cn.com.pingan.cdn.rabbitmq.constants.Constants;
 import cn.com.pingan.cdn.rabbitmq.message.TaskMsg;
 import cn.com.pingan.cdn.rabbitmq.producer.Producer;
 import cn.com.pingan.cdn.repository.mysql.ContentHistoryRepository;
-import cn.com.pingan.cdn.repository.mysql.ContentItemRepository;
 import cn.com.pingan.cdn.repository.mysql.VendorInfoRepository;
 import cn.com.pingan.cdn.repository.mysql.VendorTaskRepository;
 import cn.com.pingan.cdn.service.TaskService;
@@ -69,9 +69,9 @@ public class TaskServiceImpl implements TaskService {
     @Value("${task.vendor.status.default:up}")
     private String defaultVendorStatus;
 
-
     public static Map<String,Object> mergeHashMap= new ConcurrentHashMap<String,Object>();
 
+    public static Map<String,VendorInfo> vendorInfoMap= new ConcurrentHashMap<String,VendorInfo>();
 
     private ObjectMapper objectMapper = new ObjectMapper();
 
@@ -111,9 +111,6 @@ public class TaskServiceImpl implements TaskService {
 
     @Autowired
     private  VendorInfoRepository vendorInfoRepository;
-
-    @Autowired
-    ContentItemRepository contentItemRepository;
 
     @Autowired
     ContentHistoryRepository contentHistoryRepository;
@@ -221,6 +218,15 @@ public class TaskServiceImpl implements TaskService {
 
     @Override
     public int handlerMergeTask(TaskMsg msg) throws RestfulException {
+        return 0;
+    }
+
+    @Override
+    public int fflushVendorInfoMap(String vendor) {
+        log.info("enter fflushVendorInfoMap:{}",vendor);
+        if(vendorInfoMap.containsKey(vendor)){
+            vendorInfoMap.remove(vendor);
+        }
         return 0;
     }
 
@@ -448,7 +454,16 @@ public class TaskServiceImpl implements TaskService {
         log.info("enter handlerRoundRobin:{}", msg);
         String taskId = msg.getTaskId();
         try {
-            VendorInfo vendorInfo = vendorInfoRepository.findByVendor(msg.getVendor());
+
+            VendorInfo vendorInfo = null;
+            if(vendorInfoMap.containsKey(msg.getVendor())){
+                vendorInfo = vendorInfoMap.get(msg.getVendor());
+            }else{
+                vendorInfo = vendorInfoRepository.findByVendor(msg.getVendor());
+                if(vendorInfo != null){
+                    vendorInfoMap.put(msg.getVendor(), vendorInfo);
+                }
+            }
             String vendorStatus;
             if (vendorInfo == null) {
                 log.warn("[{}] vendorInfo db is null", msg.getVendor());
@@ -459,7 +474,7 @@ public class TaskServiceImpl implements TaskService {
             if ("down".equals(vendorStatus)) {
                 msg.setDelay(1 * 60 * 1000L);
                 rabbitListenerConfig.stop(msg.getOperation().name());//关闭监听
-                this.pushTaskMsg(msg);//放回队列
+                producer.sendAllMsg(msg);//放回队列
                 return false;
             }
             if (msg.getIsLimit()) {//
@@ -551,16 +566,45 @@ public class TaskServiceImpl implements TaskService {
                     }
                 }
                 if(ts.equals(TaskStatus.SUCCESS) || ts.equals(TaskStatus.FAIL)){
+                    Set<String> ids = new HashSet<String>();
                     if(msg.getIsMerge()){
                         List<VendorContentTask> vendorContentTaskList = vendorTaskRepository.findByMergeId(taskId);
                         if(vendorContentTaskList.size()>0) {
                             for (VendorContentTask v : vendorContentTaskList) {
+                                ids.add(v.getRequestId());
                                 v.setMessage(message);
                                 v.setStatus(ts);
                                 v.setUpdateTime(new Date());
                             }
                             vendorTaskRepository.saveAll(vendorContentTaskList);
+                            if(ts.equals(TaskStatus.SUCCESS)){
+                                for(String id :ids){
+                                    contentHistoryRepository.updateSuccessNumByRequestIdAndVersion(id, msg.getHisVersion());
+                                }
+                            }else{
+                                if(ids.size() == 1){
+                                    contentHistoryRepository.updateStatusAndMessageByRequestIdAndVersion(new ArrayList<String>(ids).get(0), msg.getHisVersion(), HisStatus.FAIL.name(), message);
+                                }
+                                List<ContentHistory> chs = contentHistoryRepository.findByRequestIdIn(new ArrayList<String>(ids));
+                                if(chs.size()>0){
+                                    boolean f = false;
+                                    for(ContentHistory ch: chs){
+                                        if(ch.getVersion()!= msg.getHisVersion()){
+                                            continue;
+                                        }
+                                        ch.setStatus(HisStatus.FAIL);
+                                        ch.setMessage(message);
+                                        ch.setUpdateTime(new Date());
+                                        f = true;
+                                    }
+                                    if(f) contentHistoryRepository.saveAll(chs);
+                                }
+                            }
+
+
                         }
+
+
                     }else{
                         throw new Exception(taskId + ": not merge");
                     }
@@ -806,7 +850,7 @@ public class TaskServiceImpl implements TaskService {
     @Override
     public Boolean handlerFail(VendorContentTask task, TaskMsg msg) throws RestfulException{
         log.info("handlerFail:{}",task);
-
+/*
         ContentItem item = contentItemRepository.findByItemId(task.getItemId());
         item.setStatus(HisStatus.FAIL);
         item.setMessage(StringUtils.isNoneBlank(task.getMessage())?task.getMessage():"任务执行失败");
@@ -814,6 +858,7 @@ public class TaskServiceImpl implements TaskService {
         contentItemRepository.save(item);
         log.info("设置拆分任务状态：{}", HisStatus.FAIL);
         contentHistoryRepository.updateStatusAndMessageByRequestId(item.getRequestId(), HisStatus.FAIL.name(),"任务执行失败");
+        */
         log.info("设置用户请求历史任务状态：{}", HisStatus.FAIL);
 
         return false;
@@ -844,7 +889,15 @@ public class TaskServiceImpl implements TaskService {
         String taskId = msg.getTaskId();
         boolean isMerge = msg.getIsMerge();
         RefreshType type = msg.getType();
-        VendorInfo vendorInfo = vendorInfoRepository.findByVendor(msg.getVendor());
+        VendorInfo vendorInfo = null;
+        if(vendorInfoMap.containsKey(msg.getVendor())){
+            vendorInfo = vendorInfoMap.get(msg.getVendor());
+        }else{
+            vendorInfo = vendorInfoRepository.findByVendor(msg.getVendor());
+            if(vendorInfo != null){
+                vendorInfoMap.put(msg.getVendor(), vendorInfo);
+            }
+        }
         String vendorStatus;
         if(vendorInfo == null){
             log.warn("[{}] vendorInfo db is null", msg.getVendor());

@@ -1,9 +1,11 @@
 package cn.com.pingan.cdn.service.impl;
 
+import cn.com.pingan.cdn.common.FanoutType;
 import cn.com.pingan.cdn.common.TaskOperationEnum;
 import cn.com.pingan.cdn.common.TaskStatus;
 import cn.com.pingan.cdn.config.RedisLuaScriptService;
 import cn.com.pingan.cdn.model.mysql.VendorContentTask;
+import cn.com.pingan.cdn.rabbitmq.message.FanoutMsg;
 import cn.com.pingan.cdn.rabbitmq.message.TaskMsg;
 import cn.com.pingan.cdn.rabbitmq.producer.Producer;
 import cn.com.pingan.cdn.repository.mysql.VendorTaskRepository;
@@ -100,6 +102,19 @@ public class CheckTaskServiceImpl {
             log.info("处理超时任务检测异常[{}]", e);
         }
         log.info("end set expire task...");
+    }
+
+    @Scheduled(fixedRateString = "${task.fflush.domain.fixedRate:300000}", initialDelay = 10000)
+    public void fflush(){
+        log.info("start fflush.domain...");
+        try {
+            FanoutMsg msg = new FanoutMsg();
+            msg.setOperation(FanoutType.fflush_domain_vendor);
+            producer.sendFanoutMsg(msg);
+        }catch (Exception e){
+            log.info("处理超时任务检测异常[{}]", e);
+        }
+        log.info("end fflush.domain...");
     }
 
 }

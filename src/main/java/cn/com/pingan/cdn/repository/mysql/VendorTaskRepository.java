@@ -34,17 +34,10 @@ public interface VendorTaskRepository extends JpaRepository<VendorContentTask, L
     @Query(value = "update vendor_task t set t.status = ?2, t.update_time=current_timestamp where t.task_id =?1", nativeQuery = true)
     int updateStatus(String id, TaskStatus status);
 
-    List<VendorContentTask> findByItemId(String itemId);
 
     List<VendorContentTask> findByRequestId(String requestId);
 
     List<VendorContentTask> findByMergeId(String mergeId);
-
-    @Modifying
-    @Transactional
-    @Query(value = "select * from vendor_task t  where t.item_id in ?1", nativeQuery = true)
-    List<VendorContentTask> findByItemIdList(List<String> itemIds);
-
 
     @Modifying
     @Transactional

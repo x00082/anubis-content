@@ -31,7 +31,6 @@ import java.util.Date;
                 @UniqueConstraint(columnNames = {"task_id"})
         },
         indexes = {
-                @Index(columnList = "item_id"),
                 @Index(columnList = "request_id"),
                 @Index(columnList = "job_id"),
                 @Index(columnList = "merge_id"),
@@ -88,8 +87,10 @@ public class VendorContentTask {
     @Column(name="version")
     private int version;
 
+    /*
     @Column(length=128, name="item_id", nullable = false)
     private String itemId;
+    */
 
     @Column(length=128, name="request_id", nullable = false)
     private String requestId;

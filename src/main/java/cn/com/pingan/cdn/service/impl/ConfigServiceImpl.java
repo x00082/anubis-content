@@ -1,10 +1,13 @@
 package cn.com.pingan.cdn.service.impl;
 
 import cn.com.pingan.cdn.common.ApiReceipt;
+import cn.com.pingan.cdn.common.FanoutType;
 import cn.com.pingan.cdn.common.VendorStatusEnum;
 import cn.com.pingan.cdn.exception.ErrorCode;
 import cn.com.pingan.cdn.model.mysql.VendorInfo;
 import cn.com.pingan.cdn.rabbitmq.config.RabbitListenerConfig;
+import cn.com.pingan.cdn.rabbitmq.message.FanoutMsg;
+import cn.com.pingan.cdn.rabbitmq.producer.Producer;
 import cn.com.pingan.cdn.repository.mysql.VendorInfoRepository;
 import cn.com.pingan.cdn.request.VendorInfoDTO;
 import cn.com.pingan.cdn.service.ConfigService;
@@ -27,6 +30,9 @@ public class ConfigServiceImpl implements ConfigService {
 
     @Autowired
     RabbitListenerConfig rabbitListenerConfig;
+
+    @Autowired
+    Producer producer;
 
     @Override
     public ApiReceipt addVendorInfo(VendorInfoDTO infoDTO) {
@@ -71,7 +77,10 @@ public class ConfigServiceImpl implements ConfigService {
             rabbitListenerConfig.start("content_" + infoDTO.getVendor() + "_preheat");
             rabbitListenerConfig.start("content_" + infoDTO.getVendor() + "_robin");
         }
-
+        FanoutMsg fmsg = new FanoutMsg();
+        fmsg.setKey(infoDTO.getVendor());
+        fmsg.setOperation(FanoutType.fflush_vendor);
+        producer.sendFanoutMsg(fmsg);
         return ApiReceipt.ok();
     }
 
@@ -121,6 +130,10 @@ public class ConfigServiceImpl implements ConfigService {
             rabbitListenerConfig.start("content_" + infoDTO.getVendor() + "_preheat");
             rabbitListenerConfig.start("content_" + infoDTO.getVendor() + "_robin");
         }
+        FanoutMsg fmsg = new FanoutMsg();
+        fmsg.setKey(infoDTO.getVendor());
+        fmsg.setOperation(FanoutType.fflush_vendor);
+        producer.sendFanoutMsg(fmsg);
         return ApiReceipt.ok();
     }
 }

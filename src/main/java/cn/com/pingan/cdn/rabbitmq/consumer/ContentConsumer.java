@@ -51,7 +51,7 @@ public class ContentConsumer {
             TaskMsg taskMsg = JSONObject.toJavaObject(msgObj, TaskMsg.class);
             log.info("转换对象{}", taskMsg);
 
-            contentService.saveContentItem(taskMsg);
+            contentService.saveVendorTask(taskMsg);
 
         }catch (Exception e){
             log.info("用户拆分任务失败", e);
@@ -78,7 +78,7 @@ public class ContentConsumer {
             TaskMsg taskMsg = JSONObject.toJavaObject(msgObj, TaskMsg.class);
             log.info("转换对象{}", taskMsg);
 
-            contentService.contentItemRobin(taskMsg);
+            //contentService.contentItemRobin(taskMsg);
 
         }catch (Exception e){
             log.info("用户拆分任务失败", e);
@@ -105,7 +105,7 @@ public class ContentConsumer {
             TaskMsg taskMsg = JSONObject.toJavaObject(msgObj, TaskMsg.class);
             log.info("转换对象{}", taskMsg);
 
-            contentService.saveContentVendor(taskMsg);
+            //contentService.saveVendorTask(taskMsg);
 
         }catch (Exception e){
             log.info("厂商拆分任务失败", e);

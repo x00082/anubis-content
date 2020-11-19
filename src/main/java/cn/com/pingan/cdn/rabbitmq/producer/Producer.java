@@ -4,6 +4,7 @@ package cn.com.pingan.cdn.rabbitmq.producer;
 import cn.com.pingan.cdn.exception.ErrEnum;
 import cn.com.pingan.cdn.exception.RestfulException;
 import cn.com.pingan.cdn.rabbitmq.constants.Constants;
+import cn.com.pingan.cdn.rabbitmq.message.FanoutMsg;
 import cn.com.pingan.cdn.rabbitmq.message.TaskMsg;
 import com.alibaba.fastjson.JSONObject;
 import lombok.extern.slf4j.Slf4j;
@@ -55,6 +56,12 @@ public class Producer {
             log.error("push delay msg to mq failed err:{}", e.getMessage());
             throw new RestfulException(ErrEnum.ErrMQPushMsg.getCode(), ErrEnum.ErrMQPushMsg.getErrMsg());
         }
+    }
+
+
+    public void sendFanoutMsg(FanoutMsg msg){
+        String dtoStr = JSONObject.toJSONString(msg);
+        this.rabbitTemplate.convertAndSend(Constants.CONTENT_FANOUT_EXCHANGE,"", dtoStr);
     }
 
 

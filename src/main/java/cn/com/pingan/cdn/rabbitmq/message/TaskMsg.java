@@ -21,12 +21,13 @@ import lombok.NoArgsConstructor;
 public class TaskMsg {
 
     //主体字段
-    private Long Id;
+    private Long id;
     private String taskId;
     private Integer version;
     private TaskOperationEnum operation;
 
     //辅助字段
+    private Integer hisVersion;
     private Boolean force = false;
     private String vendor;
     private Boolean isLimit = true;

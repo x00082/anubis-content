@@ -3,10 +3,8 @@ package cn.com.pingan.cdn.service.impl;
 import cn.com.pingan.cdn.config.RedisLuaScriptService;
 import cn.com.pingan.cdn.exception.ContentException;
 import cn.com.pingan.cdn.model.mysql.ContentHistory;
-import cn.com.pingan.cdn.model.mysql.ContentItem;
 import cn.com.pingan.cdn.model.mysql.VendorContentTask;
 import cn.com.pingan.cdn.repository.mysql.ContentHistoryRepository;
-import cn.com.pingan.cdn.repository.mysql.ContentItemRepository;
 import cn.com.pingan.cdn.repository.mysql.VendorTaskRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -38,9 +36,6 @@ public class SchenuledTaskServiceImpl {
 
     @Autowired
     ContentHistoryRepository contentHistoryRepository;
-
-    @Autowired
-    ContentItemRepository contentItemRepository;
 
     @Autowired
     VendorTaskRepository vendorTaskRepository;
@@ -97,19 +92,13 @@ public class SchenuledTaskServiceImpl {
 
     private void clearsubTask(String taskId) throws ContentException {
         log.info("清理请求任务[{}]的子任务开始", taskId);
-
-        List<ContentItem> contentItemList = contentItemRepository.findByRequestId(taskId);
-
-        for(ContentItem it: contentItemList){
-            clearVendorTask(it.getItemId());
-            contentItemRepository.deleteById(it.getId());
-        }
+        clearVendorTask(taskId);
         log.info("清理请求任务[{}]的子任务结束");
     }
 
     private void clearVendorTask(String taskId) throws ContentException {
         log.info("清理item任务[{}]的厂商任务开始", taskId);
-        List<VendorContentTask> vlist = vendorTaskRepository.findByItemId(taskId);
+        List<VendorContentTask> vlist = vendorTaskRepository.findByRequestId(taskId);
         for(VendorContentTask vl: vlist  ){
             vendorTaskRepository.deleteById(vl.getId());
         }

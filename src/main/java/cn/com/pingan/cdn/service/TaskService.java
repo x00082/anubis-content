@@ -23,6 +23,9 @@ public interface TaskService {
 
     public int handlerMergeTask(TaskMsg msg) throws RestfulException;
 
+
+    public int fflushVendorInfoMap(String vendor);
+
     //public JSONObject queryRefreshPreloadTask(RefreshPreloadData data) throws RestfulException;
 
     //public JSONObject queryRefreshPreloadTaskStatus(RefreshPreloadTaskStatusDTO request) throws RestfulException;

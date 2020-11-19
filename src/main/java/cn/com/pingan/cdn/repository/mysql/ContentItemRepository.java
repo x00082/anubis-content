@@ -8,24 +8,14 @@
  */
 package cn.com.pingan.cdn.repository.mysql;
 
-import cn.com.pingan.cdn.model.mysql.ContentItem;
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
-import org.springframework.data.jpa.repository.Modifying;
-import org.springframework.data.jpa.repository.Query;
-import org.springframework.transaction.annotation.Transactional;
-
-import java.util.Date;
-import java.util.List;
-
-/** 
+/**
  * @ClassName: contentItemRepository 
  * @Description: TODO() 
  * @author lujun
  * @date 2020年10月9日 上午11:31:19 
  *  
  */
-
+/*
 public interface ContentItemRepository extends JpaRepository<ContentItem, Long>, JpaSpecificationExecutor<ContentItem> {
 
     ContentItem findByItemId(String itemId);
@@ -43,3 +33,4 @@ public interface ContentItemRepository extends JpaRepository<ContentItem, Long>,
     void clear(Date time);
 
 }
+*/
