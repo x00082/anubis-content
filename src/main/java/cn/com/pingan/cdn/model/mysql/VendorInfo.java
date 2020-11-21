@@ -59,6 +59,7 @@ public class VendorInfo {
         this.vendor = infoDTO.getVendor();
         this.totalQps = infoDTO.getTotalQps();
         this.totalSize = infoDTO.getTotalSize();
+        this.robinQps = infoDTO.getRobinQps();
         this.mergeUrlCount = infoDTO.getMergeUrlCount();
         this.mergeDirCount = infoDTO.getMergeDirCount();
         this.mergePreheatCount = infoDTO.getMergePreheatCount();
@@ -70,6 +71,7 @@ public class VendorInfo {
         infoDTO.setVendor(vendor);
         infoDTO.setTotalQps(totalQps);
         infoDTO.setTotalSize(totalSize);
+        infoDTO.setRobinQps(robinQps);
         infoDTO.setMergeUrlCount(mergeUrlCount);
         infoDTO.setMergeDirCount(mergeDirCount);
         infoDTO.setMergePreheatCount(mergePreheatCount);

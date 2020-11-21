@@ -1838,6 +1838,8 @@ public class ContentServiceImpl implements ContentService {
         for(String s:allDomains){
             if(!urlVendorMap.containsKey(s) || urlVendorMap.get(s) == null){
                 lostDomains.add(s);
+            }else{
+                existDomainsMap.put(s, urlVendorMap.get(s));
             }
         }
 
@@ -1927,7 +1929,8 @@ public class ContentServiceImpl implements ContentService {
                     }
                 }
                 domainVendorsMap.put(d.getDomain(), domainVendors);
-                urlVendorMap.put(d.getDomain(), new ArrayList<>(domainVendors));
+                urlVendorMap.putIfAbsent(d.getDomain(), new ArrayList<>(domainVendors));
+                existDomainsMap.put(d.getDomain(), new ArrayList<>(domainVendors));
             });
             log.info("domain-vendors:{}", Utils.objectToString(domainVendorsMap));
         }
@@ -1936,7 +1939,7 @@ public class ContentServiceImpl implements ContentService {
         Map<String, List<String>> vendorUrlsMap = new HashMap<String, List<String>>();
         allDomains.forEach(d -> {
             // 域名所在的厂商
-            List<String> dVendors = urlVendorMap.get(d);
+            List<String> dVendors = existDomainsMap.get(d);
             // 域名要刷新/预取的urls
             List<String> dUrls = domainUrlsMap.get(d);
             dVendors.forEach(v -> {

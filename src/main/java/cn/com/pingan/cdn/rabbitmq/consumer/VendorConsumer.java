@@ -68,7 +68,10 @@ public class VendorConsumer {
 
         if( -1 != taskMsg.getOperation().toString().indexOf("_robin")){
             taskService.handlerRobinTask(taskMsg);
-        }else {
+        }else if( -1 != taskMsg.getOperation().toString().indexOf("_common")){
+            taskService.handlerCommonTask(taskMsg);
+        }
+        else {
             taskService.handlerRequestTask(taskMsg);
         }
     }
@@ -100,7 +103,7 @@ public class VendorConsumer {
     }
 */
 
-    @RabbitListener(queues = Constants.CONTENT_VENDOR_ALIYUN)
+    @RabbitListener(queues = Constants.CONTENT_VENDOR_ALIYUN_COMMON)
     public void receiveALiYun(Channel channel, Message message) {
         try {
 
@@ -229,7 +232,7 @@ public class VendorConsumer {
     }
 
 
-    @RabbitListener(queues = Constants.CONTENT_VENDOR_BAISHAN)
+    @RabbitListener(queues = Constants.CONTENT_VENDOR_BAISHAN_COMMON)
     public void receiveBaiShan(Channel channel, Message message) {
         try {
 
@@ -356,7 +359,7 @@ public class VendorConsumer {
         }
     }
 
-    @RabbitListener(queues = Constants.CONTENT_VENDOR_CHINACHE)
+    @RabbitListener(queues = Constants.CONTENT_VENDOR_CHINACHE_COMMON)
     public void receiveChinaChe(Channel channel, Message message) {
         try {
 
@@ -483,7 +486,7 @@ public class VendorConsumer {
         }
     }
 
-    @RabbitListener(queues = Constants.CONTENT_VENDOR_JDCLOUD)
+    @RabbitListener(queues = Constants.CONTENT_VENDOR_JDCLOUD_COMMON)
     public void receiveJDCloud(Channel channel, Message message) {
         try {
 
@@ -610,7 +613,7 @@ public class VendorConsumer {
         }
     }
 
-    @RabbitListener(queues = Constants.CONTENT_VENDOR_KSYUN)
+    @RabbitListener(queues = Constants.CONTENT_VENDOR_KSYUN_COMMON)
     public void receiveKSYun(Channel channel, Message message) {
         try {
 
@@ -737,7 +740,7 @@ public class VendorConsumer {
         }
     }
 
-    @RabbitListener(queues = Constants.CONTENT_VENDOR_NET)
+    @RabbitListener(queues = Constants.CONTENT_VENDOR_NET_COMMON)
     public void receiveNet(Channel channel, Message message) {
         try {
 
@@ -864,7 +867,7 @@ public class VendorConsumer {
         }
     }
 
-    @RabbitListener(queues = Constants.CONTENT_VENDOR_QINIU)
+    @RabbitListener(queues = Constants.CONTENT_VENDOR_QINIU_COMMON)
     public void receiveQiNiu(Channel channel, Message message) {
         try {
 
@@ -992,7 +995,7 @@ public class VendorConsumer {
         }
     }
 
-    @RabbitListener(queues = Constants.CONTENT_VENDOR_TENCENT)
+    @RabbitListener(queues = Constants.CONTENT_VENDOR_TENCENT_COMMON)
     public void receiveTenCent(Channel channel, Message message) {
         try {
 
@@ -1120,7 +1123,7 @@ public class VendorConsumer {
     }
 
     /******************************************自建请求******************************************/
-    @RabbitListener(queues = Constants.CONTENT_VENDOR_VENUS)
+    @RabbitListener(queues = Constants.CONTENT_VENDOR_VENUS_COMMON)
     public void receiveVenus1(Channel channel, Message message) {
         try {
 

@@ -54,6 +54,11 @@ public class CheckTaskServiceImpl {
 
     private String key = "checkStatus";
 
+    private String fflushKey = "fflushDomain";
+
+    @Value("${task.fflush.domain.fixedRate:300000}")
+    private String fflushRate;
+
     @Scheduled(fixedRateString = "${task.check.fixedRate:60000}", initialDelay = 10000)
     public void queryStatus(){
         log.info("start set timeout task...");
@@ -72,6 +77,7 @@ public class CheckTaskServiceImpl {
                 }
 
                 Set<String> requestIdSet = new HashSet<String>();
+                Map<String, Long> idMap = new HashMap<>();
                 Date now = new Date();
                 Date expireDate = new Date(now.getTime() - expire);
                 log.info("设置[{}]之前的等待超时厂商任务", formatter.format(expireDate));
@@ -82,6 +88,7 @@ public class CheckTaskServiceImpl {
                 log.info("数量:[{}]", task.size());
                 for (VendorContentTask vt : task) {
                     requestIdSet.add(vt.getRequestId());
+                    idMap.put(vt.getRequestId(), vt.getId());
                     vt.setStatus(TaskStatus.FAIL);
                     vt.setMessage("任务超时");
                 }
@@ -90,6 +97,7 @@ public class CheckTaskServiceImpl {
                 for (String s : requestIdSet) {
                     TaskMsg robinTaskMsg = new TaskMsg();
                     robinTaskMsg.setTaskId(s);
+                    robinTaskMsg.setId(idMap.get(s));
                     robinTaskMsg.setOperation(TaskOperationEnum.content_vendor_robin);
                     robinTaskMsg.setVersion(0);
                     robinTaskMsg.setRetryNum(0);
@@ -108,6 +116,18 @@ public class CheckTaskServiceImpl {
     public void fflush(){
         log.info("start fflush.domain...");
         try {
+            List<String> keys = new ArrayList<>();
+            keys.add(fflushKey);
+            List<String> args = new ArrayList<>();
+            args.add(String.valueOf(System.currentTimeMillis()));
+            args.add(fflushRate);
+            // 0-成功，-1执行异常，-100超限
+            int re = luaScriptService.executeExpireScript(keys, args);
+            if(re != 0 ){
+                log.error("没有执行权限");
+                return;
+            }
+
             FanoutMsg msg = new FanoutMsg();
             msg.setOperation(FanoutType.fflush_domain_vendor);
             producer.sendFanoutMsg(msg);
@@ -116,5 +136,18 @@ public class CheckTaskServiceImpl {
         }
         log.info("end fflush.domain...");
     }
+
+    /*
+    @Scheduled(fixedRateString = "${task.merge.fixedRate:5000}", initialDelay = 10000)
+    public void mergeTask(){
+        log.info("start mergeTask...");
+        try {
+            taskService.handlerMergeTask(null, MergeType.delete);
+        }catch (Exception e){
+            log.info("处理merge任务异常[{}]", e);
+        }
+        log.info("end mergeTask...");
+    }
+    */
 
 }

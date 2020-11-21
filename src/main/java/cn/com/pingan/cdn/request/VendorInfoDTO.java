@@ -17,6 +17,8 @@ public class VendorInfoDTO {
 
     private int totalSize;
 
+    private int robinQps;
+
     private int mergeUrlCount;
 
     private int mergeDirCount;

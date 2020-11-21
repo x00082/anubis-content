@@ -7,7 +7,7 @@ local total = tonumber(ARGV[4])
 local json
 
 local tmp = [[{"limit":0, "total":0}]];
-json = cjson.decode(tmp);
+--json = cjson.decode(tmp);
 
 local allLimit = redis.call('get',key);
 if(allLimit) then
@@ -23,14 +23,14 @@ if(allLimit) then
 
     if total ~= 0 then
         local curentTotal = tonumber(json['total']) + totalAdd
-        if curentTotal > limit then
+        if curentTotal > total then
             return -200;
         else
             json['total'] = curentTotal
         end
     end
 else
-    local tmp = [[{"limit":0, "total":0}]];
+    --local tmp = [[{"limit":0, "total":0}]];
     json = cjson.decode(tmp);
     json['limit'] = limitAdd
     json['total'] = totalAdd

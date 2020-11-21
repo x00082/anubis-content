@@ -1,11 +1,12 @@
 package cn.com.pingan.cdn.rabbitmq.message;
 
-import cn.com.pingan.cdn.common.RefreshType;
-import cn.com.pingan.cdn.common.TaskOperationEnum;
+import cn.com.pingan.cdn.common.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+
+import java.util.List;
 
 /**
  * @Classname TaskMsg
@@ -28,6 +29,9 @@ public class TaskMsg {
 
     //辅助字段
     private Integer hisVersion;
+    private String jobId;
+    private TaskStatus taskStatus;
+    private CallBackEnum callBack;
     private Boolean force = false;
     private String vendor;
     private Boolean isLimit = true;
@@ -38,5 +42,6 @@ public class TaskMsg {
     private Long delay = 0L;//ms
     private Integer retryNum = 0;
     private Integer roundRobinNum = 0;
+    private List<RobinStatus> robinStatusList;
 
 }
