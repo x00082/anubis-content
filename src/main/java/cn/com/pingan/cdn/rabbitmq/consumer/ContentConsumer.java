@@ -47,10 +47,7 @@ public class ContentConsumer {
             JSONObject msgObj=JSONObject.parseObject(msg);
 
             log.info("Item rabbit mq receive a message{}", msg.toString());
-
             TaskMsg taskMsg = JSONObject.toJavaObject(msgObj, TaskMsg.class);
-            log.info("转换对象{}", taskMsg);
-
             contentService.saveVendorTask(taskMsg);
 
         }catch (Exception e){
@@ -65,60 +62,6 @@ public class ContentConsumer {
         }
     }
 
-    /******************************************拆分原始轮询******************************************/
-    @RabbitListener(queues = Constants.CONTENT_MESSAGE_ITEM_ROBIN)
-    public void receiveItemRobin(Channel channel, Message message){
-        try {
-
-            String msg=new String(message.getBody());
-            JSONObject msgObj=JSONObject.parseObject(msg);
-
-            log.info("ItemRobin rabbit mq receive a message{}", msg.toString());
-
-            TaskMsg taskMsg = JSONObject.toJavaObject(msgObj, TaskMsg.class);
-            log.info("转换对象{}", taskMsg);
-
-            //contentService.contentItemRobin(taskMsg);
-
-        }catch (Exception e){
-            log.info("用户拆分任务失败", e);
-        }finally {
-
-            try {
-                channel.basicAck(message.getMessageProperties().getDeliveryTag(),false);
-            } catch (IOException e) {
-                log.error("receiveItemRobin Ack Fail ");
-            }
-        }
-    }
-
-    /******************************************拆分厂商任务******************************************/
-    @RabbitListener(queues = Constants.CONTENT_MESSAGE_VENDOR)
-    public void receiveVendor(Channel channel, Message message){
-        try {
-
-            String msg=new String(message.getBody());
-            JSONObject msgObj=JSONObject.parseObject(msg);
-
-            log.info("Vendor rabbit mq receive a message{}", msg.toString());
-
-            TaskMsg taskMsg = JSONObject.toJavaObject(msgObj, TaskMsg.class);
-            log.info("转换对象{}", taskMsg);
-
-            //contentService.saveVendorTask(taskMsg);
-
-        }catch (Exception e){
-            log.info("厂商拆分任务失败", e);
-        }finally {
-
-            try {
-                channel.basicAck(message.getMessageProperties().getDeliveryTag(),false);
-            } catch (IOException e) {
-                log.error("receiveVendor Ack Fail ");
-            }
-        }
-    }
-
     /******************************************拆分厂商任务轮询******************************************/
     @RabbitListener(queues = Constants.CONTENT_MESSAGE_VENDOR_ROBIN)
     public void receiveVendorRobin(Channel channel, Message message){
@@ -128,10 +71,7 @@ public class ContentConsumer {
             JSONObject msgObj=JSONObject.parseObject(msg);
 
             log.info("VendorRobin rabbit mq receive a message{}", msg.toString());
-
             TaskMsg taskMsg = JSONObject.toJavaObject(msgObj, TaskMsg.class);
-            log.info("转换对象{}", taskMsg);
-
             contentService.contentVendorRobin(taskMsg);
 
         }catch (Exception e){

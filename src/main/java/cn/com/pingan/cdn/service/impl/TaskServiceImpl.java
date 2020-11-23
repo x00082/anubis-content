@@ -3,18 +3,16 @@ package cn.com.pingan.cdn.service.impl;
 import cn.com.pingan.cdn.client.*;
 import cn.com.pingan.cdn.common.*;
 import cn.com.pingan.cdn.config.RedisLuaScriptService;
+import cn.com.pingan.cdn.current.JxGaga;
 import cn.com.pingan.cdn.exception.RestfulException;
-import cn.com.pingan.cdn.model.mysql.ContentHistory;
-import cn.com.pingan.cdn.model.mysql.ContentItem;
+import cn.com.pingan.cdn.model.mysql.RobinRecord;
 import cn.com.pingan.cdn.model.mysql.VendorContentTask;
 import cn.com.pingan.cdn.model.mysql.VendorInfo;
 import cn.com.pingan.cdn.rabbitmq.config.RabbitListenerConfig;
 import cn.com.pingan.cdn.rabbitmq.constants.Constants;
 import cn.com.pingan.cdn.rabbitmq.message.TaskMsg;
 import cn.com.pingan.cdn.rabbitmq.producer.Producer;
-import cn.com.pingan.cdn.repository.mysql.ContentHistoryRepository;
-import cn.com.pingan.cdn.repository.mysql.VendorInfoRepository;
-import cn.com.pingan.cdn.repository.mysql.VendorTaskRepository;
+import cn.com.pingan.cdn.service.DateBaseService;
 import cn.com.pingan.cdn.service.TaskService;
 import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
@@ -28,6 +26,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 
 /**
@@ -108,15 +107,8 @@ public class TaskServiceImpl implements TaskService {
     @Autowired
     private AnubisNotifyService anubisNotifyService;
 
-
     @Autowired
-    private VendorTaskRepository vendorTaskRepository;
-
-    @Autowired
-    private  VendorInfoRepository vendorInfoRepository;
-
-    @Autowired
-    ContentHistoryRepository contentHistoryRepository;
+    DateBaseService dateBaseService;
 
     @Autowired
     private Producer producer;
@@ -145,7 +137,7 @@ public class TaskServiceImpl implements TaskService {
     @Override
     public int addTaskVersion(TaskMsg msg) throws RestfulException {
         try {
-            int updateCount = this.vendorTaskRepository.updateVersion(msg.getTaskId(), msg.getVersion(), msg.getVersion() + 1);
+            int updateCount = dateBaseService.getVendorTaskRepository().updateVersion(msg.getTaskId(), msg.getVersion(), msg.getVersion() + 1);
             if (updateCount == 0) {
                 throw new NoSuchElementException();
                 //throw RestfulException.ErrNosuchTask;
@@ -259,11 +251,8 @@ public class TaskServiceImpl implements TaskService {
     public Boolean handlerNewRequestUrl(TaskMsg msg) throws RestfulException {
         log.info("enter handlerNewRequestUrl:{}",msg);
         String taskId = msg.getTaskId();
-        boolean isMerge = msg.getIsMerge();
-        boolean flag = true;
         try {
-            flag = handlerNewRequest(msg);
-            if(!flag){
+            if(!handlerNewRequest(msg)){
                 return false;
             }
         }catch (Exception e){
@@ -271,17 +260,13 @@ public class TaskServiceImpl implements TaskService {
             msg.setRetryNum(msg.getRetryNum() + 1);
             if(msg.getRetryNum() > timeOutLimit){
                 log.error("[{}]handlerNewRequestUrl超过最大重试限制[{}]", taskId, timeOutLimit);
-                if(isMerge){
-                    List<VendorContentTask> vendorContentTaskList = vendorTaskRepository.findByMergeId(taskId);
-                    for(VendorContentTask v :vendorContentTaskList){
-                        v.setMessage("重试失败");
-                        v.setStatus(TaskStatus.FAIL);
-                        v.setUpdateTime(new Date());
-                    }
-                    vendorTaskRepository.saveAll(vendorContentTaskList);
-                }else{
-                    //TODO
+                List<VendorContentTask> vendorContentTaskList = dateBaseService.getVendorTaskRepository().findByMergeId(taskId);
+                for(VendorContentTask v :vendorContentTaskList){
+                    v.setMessage("重试失败");
+                    v.setStatus(TaskStatus.FAIL);
+                    v.setUpdateTime(new Date());
                 }
+                dateBaseService.getVendorTaskRepository().saveAll(vendorContentTaskList);
                 return false;
             }else{
                 msg.setDelay(timeOutMs);
@@ -296,11 +281,8 @@ public class TaskServiceImpl implements TaskService {
     public Boolean handlerNewRequestDir(TaskMsg msg) throws RestfulException {
         log.info("enter handlerNewRequestDir:{}",msg);
         String taskId = msg.getTaskId();
-        boolean isMerge = msg.getIsMerge();
-        boolean flag = true;
         try {
-            flag = handlerNewRequest(msg);
-            if(!flag){
+            if(!handlerNewRequest(msg)){
                 return false;
             }
         }catch (Exception e){
@@ -308,17 +290,13 @@ public class TaskServiceImpl implements TaskService {
             msg.setRetryNum(msg.getRetryNum() + 1);
             if(msg.getRetryNum() > timeOutLimit){
                 log.error("[{}]handlerNewRequestDir超过最大重试限制[{}]", taskId, timeOutLimit);
-                if(isMerge){
-                    List<VendorContentTask> vendorContentTaskList = vendorTaskRepository.findByMergeId(taskId);
-                    for(VendorContentTask v :vendorContentTaskList){
-                        v.setMessage("重试失败");
-                        v.setStatus(TaskStatus.FAIL);
-                        v.setUpdateTime(new Date());
-                    }
-                    vendorTaskRepository.saveAll(vendorContentTaskList);
-                }else{
-                    //TODO
+                List<VendorContentTask> vendorContentTaskList = dateBaseService.getVendorTaskRepository().findByMergeId(taskId);
+                for(VendorContentTask v :vendorContentTaskList){
+                    v.setMessage("重试失败");
+                    v.setStatus(TaskStatus.FAIL);
+                    v.setUpdateTime(new Date());
                 }
+                dateBaseService.getVendorTaskRepository().saveAll(vendorContentTaskList);
                 return false;
             }else{
                 msg.setDelay(timeOutMs);
@@ -333,11 +311,8 @@ public class TaskServiceImpl implements TaskService {
     public Boolean handlerNewRequestPreload(TaskMsg msg) throws RestfulException {
         log.info("enter handlerNewRequestPreload:{}",msg);
         String taskId = msg.getTaskId();
-        boolean isMerge = msg.getIsMerge();
-        boolean flag = true;
         try {
-            flag = handlerNewRequest(msg);
-            if(!flag){
+            if(!handlerNewRequest(msg)){
                 return false;
             }
         }catch (Exception e){
@@ -345,17 +320,13 @@ public class TaskServiceImpl implements TaskService {
             msg.setRetryNum(msg.getRetryNum() + 1);
             if(msg.getRetryNum() > timeOutLimit){
                 log.error("[{}]handlerNewRequestPreload超过最大重试限制[{}]", taskId, timeOutLimit);
-                if(isMerge){
-                    List<VendorContentTask> vendorContentTaskList = vendorTaskRepository.findByMergeId(taskId);
-                    for(VendorContentTask v :vendorContentTaskList){
-                        v.setMessage("重试失败");
-                        v.setStatus(TaskStatus.FAIL);
-                        v.setUpdateTime(new Date());
-                    }
-                    vendorTaskRepository.saveAll(vendorContentTaskList);
-                }else{
-                    //TODO
+                List<VendorContentTask> vendorContentTaskList = dateBaseService.getVendorTaskRepository().findByMergeId(taskId);
+                for(VendorContentTask v :vendorContentTaskList){
+                    v.setMessage("重试失败");
+                    v.setStatus(TaskStatus.FAIL);
+                    v.setUpdateTime(new Date());
                 }
+                dateBaseService.getVendorTaskRepository().saveAll(vendorContentTaskList);
                 return false;
             }else{
                 msg.setDelay(timeOutMs);
@@ -366,17 +337,17 @@ public class TaskServiceImpl implements TaskService {
         return true;
     }
 
+
     @Override
     public Boolean handlerRoundRobin(TaskMsg msg) throws RestfulException {
         log.info("enter handlerRoundRobin:{}", msg);
-        String taskId = msg.getTaskId();
+        //String taskId = msg.getTaskId();
         try {
-
             VendorInfo vendorInfo = null;
             if(vendorInfoMap.containsKey(msg.getVendor())){
                 vendorInfo = vendorInfoMap.get(msg.getVendor());
             }else{
-                vendorInfo = vendorInfoRepository.findByVendor(msg.getVendor());
+                vendorInfo = dateBaseService.getVendorInfoRepository().findByVendor(msg.getVendor());
                 if(vendorInfo != null){
                     vendorInfoMap.put(msg.getVendor(), vendorInfo);
                 }
@@ -407,38 +378,25 @@ public class TaskServiceImpl implements TaskService {
                     return false;
                 } else if (-1 == result) {
                     log.warn("redis:{} Limit:{} 执行异常", redisKey, limit);
-                    throw new Exception(taskId + ": redis err");
+                    throw new Exception(": redis err");
                 }
             }
 
             JSONObject response;
 
-            RefreshPreloadTaskStatusDTO dto = new RefreshPreloadTaskStatusDTO();
-            String type;
-            if(msg.getType().equals(RefreshType.url) || msg.getType().equals(RefreshType.dir)){
-                type = "refresh";
-            }else if(msg.getType().equals(RefreshType.preheat)){
-                type = "preload";
-            }else{
-                log.error("无效Task");
-                return false;
-            }
-
-            RefreshPreloadItem item = new RefreshPreloadItem();
-            item.setJobId(taskId);
-            item.setJobType(type);
-
-            List<RefreshPreloadItem> itemList = new ArrayList<>();
-            itemList.add(item);
-            dto.setTaskList(itemList);
+            RefreshPreloadTaskStatusDTO dto = msg.getRobinTaskDto();
 
             VendorClientService vendorClient = getVendorClientVO(VendorEnum.getByCode(msg.getVendor()));
             response = vendorClient.queryRefreshPreloadTask(dto);
             if(response == null || !response.containsKey("data")){
                 log.error("response is null or no data");
-                throw new Exception(taskId + ": response no data");
+                throw new Exception(": response no data");
             }
             log.info("response:{}", response);
+
+            Map<String, TaskStatus> responseMap = new HashMap<>();
+            List<String> robinTask = new ArrayList<>();
+            List<RefreshPreloadItem> waitItemList = new ArrayList<>();
 
             JSONArray jsonArray = response.getJSONArray("data");
             if (jsonArray != null && jsonArray.size() > 0) {
@@ -446,26 +404,30 @@ public class TaskServiceImpl implements TaskService {
                 String message = "";
                 for (int i = 0; i < jsonArray.size(); i++) {
                     JSONObject json = jsonArray.getJSONObject(i);
-                    if (json != null && json.getString("jobId") != null && json.getString("jobId").equals(taskId)) {
+                    if (json != null && json.getString("jobId") != null ) {
                         if (Constants.STATUS_SUCCESS.equals(json.getString("status"))) {
                             ts = TaskStatus.SUCCESS;
                             //message = StringUtils.isNoneBlank(json.getString("message"))?json.getString("message"):"厂商执行成功";
                             message = "厂商执行成功";
+                            responseMap.put(json.getString("jobId"), TaskStatus.SUCCESS);
                             msg.setRetryNum(0);
                             log.info("刷新预热任务完成，任务编号[{}]", json.getString("jobId"));
                         } else if (Constants.STATUS_FAIL.equals(json.getString("status"))) {
                             ts = TaskStatus.FAIL;
                             //message = StringUtils.isNoneBlank(json.getString("message"))?json.getString("message"):"厂商执行失败";
                             message = "厂商执行失败";
+                            responseMap.put(json.getString("jobId"), TaskStatus.FAIL);
                             msg.setRetryNum(0);
                             log.info("刷新预热任务失败，任务编号[{}]", json.getString("jobId"));
                         } else if (Constants.STATUS_WAIT.equals(json.getString("status"))) {
-                            msg.setRoundRobinNum(msg.getRoundRobinNum() + 1);
+                            //msg.setRoundRobinNum(msg.getRoundRobinNum() + 1);
                             if(msg.getRoundRobinNum() > roundLimit){
                                 ts = TaskStatus.FAIL;
                                 message = "轮询超出重试次数";
+                                responseMap.put(json.getString("jobId"), TaskStatus.FAIL);
                             }else{
                                 msg.setDelay(roundMs);
+                                robinTask.add(json.getString("jobId"));
                             }
                             log.info("刷新预热任务未完成，任务编号[{}], 等待{}ms后查询", json.getString("jobId"), roundMs);
                             msg.setRetryNum(0);
@@ -479,69 +441,136 @@ public class TaskServiceImpl implements TaskService {
                                 msg.setDelay(timeOutMs);
                             };
                         }
-                        break;
                     }
                 }
-                if(ts.equals(TaskStatus.SUCCESS) || ts.equals(TaskStatus.FAIL)){
-                    Set<String> ids = new HashSet<String>();
-                    if(msg.getIsMerge()){
-                        List<VendorContentTask> vendorContentTaskList = vendorTaskRepository.findByMergeId(taskId);
-                        if(vendorContentTaskList.size()>0) {
-                            for (VendorContentTask v : vendorContentTaskList) {
-                                ids.add(v.getRequestId());
-                                v.setMessage(message);
-                                v.setStatus(ts);
-                                v.setUpdateTime(new Date());
+
+                Map<String, Integer> successMap = new HashMap<>();
+                Map<String, Integer> failMap = new HashMap<>();
+                Map<String, Integer> versionMap = new HashMap<>();
+                if(responseMap.keySet().size()>0) {
+                    List<VendorContentTask> vendorContentTaskList = dateBaseService.getVendorTaskRepository().findByMergeIdIn(new ArrayList<>(responseMap.keySet()));
+                    if (vendorContentTaskList.size() > 0) {
+                        for (VendorContentTask v : vendorContentTaskList) {
+                            if(!versionMap.containsKey(v.getRequestId())){
+                                versionMap.put(v.getRequestId(), v.getVersion());//存入version
                             }
-                            vendorTaskRepository.saveAll(vendorContentTaskList);
-                            if(ts.equals(TaskStatus.SUCCESS)){
-                                for(String id :ids){
-                                    contentHistoryRepository.updateSuccessNumByRequestIdAndVersion(id, msg.getHisVersion());
-                                }
-                            }else{
-                                if(ids.size() == 1){
-                                    contentHistoryRepository.updateStatusAndMessageByRequestIdAndVersion(new ArrayList<String>(ids).get(0), msg.getHisVersion(), HisStatus.FAIL.name(), message);
-                                }
-                                List<ContentHistory> chs = contentHistoryRepository.findByRequestIdIn(new ArrayList<String>(ids));
-                                if(chs.size()>0){
-                                    boolean f = false;
-                                    for(ContentHistory ch: chs){
-                                        if(ch.getVersion()!= msg.getHisVersion()){
-                                            continue;
-                                        }
-                                        ch.setStatus(HisStatus.FAIL);
-                                        ch.setMessage(message);
-                                        ch.setUpdateTime(new Date());
-                                        f = true;
-                                    }
-                                    if(f) contentHistoryRepository.saveAll(chs);
-                                }
+
+                            if (responseMap.get(v.getMergeId()).equals(TaskStatus.SUCCESS)) {
+                                successMap.put(v.getRequestId(), successMap.containsKey(v.getRequestId()) ? successMap.get(v.getRequestId()) + 1 : 1);
+                            } else {
+                                failMap.put(v.getRequestId(), 1);
                             }
+                            v.setMessage(responseMap.get(v.getMergeId()).equals(TaskStatus.SUCCESS) ? "任务执行成功" : "任务执行失败");
+                            v.setStatus(responseMap.get(v.getMergeId()));
+                            v.setUpdateTime(new Date());
                         }
+                        dateBaseService.getVendorTaskRepository().saveAll(vendorContentTaskList);
                     }else{
-                        throw new Exception(taskId + ": not merge");
+                        log.error("任务记录不存在，丢弃该消息");
+                        return false;
                     }
-                    return true;
                 }
+
+                //首次轮询时设置状态
+                if(msg.getRoundRobinNum()>0 && robinTask.size()>0){
+                    List<VendorContentTask> waitContentTaskList = dateBaseService.getVendorTaskRepository().findByMergeIdIn(robinTask);
+                    if(waitContentTaskList.size()>0){
+                        for(VendorContentTask waitV: waitContentTaskList){
+                            waitV.setStatus(TaskStatus.ROUND_ROBIN);
+                        }
+                        dateBaseService.getVendorTaskRepository().saveAll(waitContentTaskList);
+                    }
+                }
+
+                if(successMap.keySet().size() >0){
+                    List<RobinCallBack> succList = new ArrayList<>();
+                    for(String id: successMap.keySet()){
+                        log.info("success -> request id[{}], succ[{}], version[{}]", id, successMap.get(id), versionMap.get(id));
+                        RobinCallBack rcb = new RobinCallBack();
+                        rcb.setRequestId(id);
+                        rcb.setNum(successMap.get(id));
+                        rcb.setVersion(versionMap.get(id));
+                        succList.add(rcb);
+                    }
+                    TaskMsg succMsg = new TaskMsg();
+                    succMsg.setOperation(TaskOperationEnum.content_vendor_success);
+                    succMsg.setRobinCallBackList(succList);
+                    producer.sendTaskMsg(succMsg);
+                    log.info("send success msg done");
+                }
+
+                if(failMap.keySet().size()>0) {
+                    List<RobinCallBack> failList = new ArrayList<>();
+                    for (String id : failMap.keySet()) {
+                        log.info("fail -> request id[{}], version[{}]", id, versionMap.get(id));
+                        //dateBaseService.getContentHistoryRepository().updateStatusAndMessageByRequestIdAndVersion(id, HisStatus.FAIL.name(), "任务执行失败", versionMap.get(id));
+                        RobinCallBack rcb = new RobinCallBack();
+                        rcb.setRequestId(id);
+                        rcb.setNum(1);
+                        rcb.setVersion(versionMap.get(id));
+                        failList.add(rcb);
+                    }
+                    TaskMsg succMsg = new TaskMsg();
+                    succMsg.setOperation(TaskOperationEnum.content_vendor_fail);
+                    succMsg.setRobinCallBackList(failList);
+                    producer.sendTaskMsg(succMsg);
+                    log.info("send fail msg done");
+                }
+
+                /*
+                if(failMap.keySet().size()>0){
+                    List<ContentHistory> chs = dateBaseService.getContentHistoryRepository().findByRequestIdIn(new ArrayList<String>(failMap.keySet()));
+                    if(chs.size()>0){
+                        for(ContentHistory ch: chs){
+                            ch.setStatus(HisStatus.FAIL);
+                            ch.setMessage(message);
+                            ch.setUpdateTime(new Date());
+                        }
+                        dateBaseService.getContentHistoryRepository().saveAll(chs);
+                    }
+                }
+                */
+
+                for(RefreshPreloadItem it: dto.getTaskList()){
+                    log.info("jobId[{}], ", it.getJobId());
+                    if(responseMap !=null && responseMap.containsKey(it.getJobId()) && ( responseMap.get(it.getJobId()).equals(TaskStatus.SUCCESS) || responseMap.get(it.getJobId()).equals(TaskStatus.FAIL))){
+                        continue;
+                    }
+                    waitItemList.add(it);
+                }
+                if(waitItemList.size()>0){
+                    log.info("再次轮询[{}]", waitItemList.size());
+                    msg.getRobinTaskDto().getTaskList().clear();
+                    msg.getRobinTaskDto().getTaskList().addAll(waitItemList);
+                    msg.setRoundRobinNum(msg.getRoundRobinNum() + 1);
+                    producer.sendAllMsg(msg);
+                    return true;
+                }else{
+                    log.info("不再轮询");
+                    return false;
+                }
+
+
             }else{
                 log.info("返回无效数据{}", response);
-                throw new Exception(taskId + ": response err");
+                throw new Exception(" response err");
             }
         }catch (Exception e){
             log.error("HandlerRoundRobin Exception:{}",e);
             msg.setRetryNum(msg.getRetryNum() + 1);
             if(msg.getRetryNum() > timeOutLimit){
-                if(msg.getIsMerge()){
-                    List<VendorContentTask> vendorContentTaskList = vendorTaskRepository.findByMergeId(taskId);
-                    for(VendorContentTask v :vendorContentTaskList){
-                        v.setMessage("轮询超出重试次数");
-                        v.setStatus(TaskStatus.FAIL);
-                        v.setUpdateTime(new Date());
-                    }
-                    vendorTaskRepository.saveAll(vendorContentTaskList);
-                }else{
-                    //TODO
+                List<String> ids = new ArrayList<>();
+                for(RefreshPreloadItem it:msg.getRobinTaskDto().getTaskList()){
+                    ids.add(it.getJobId());
                 }
+                List<VendorContentTask> vendorContentTaskList = dateBaseService.getVendorTaskRepository().findByMergeIdIn(ids);
+                for(VendorContentTask v :vendorContentTaskList){
+                    v.setMessage("轮询超出重试次数");
+                    v.setStatus(TaskStatus.FAIL);
+                    v.setUpdateTime(new Date());
+                }
+                dateBaseService.getVendorTaskRepository().saveAll(vendorContentTaskList);
+                //TODO
                 return false;
             }else{
                 msg.setDelay(timeOutMs);
@@ -554,45 +583,96 @@ public class TaskServiceImpl implements TaskService {
     @Override
     public Boolean handlerSuccess(TaskMsg msg) throws RestfulException{
         log.info("handlerSuccess:{}",msg);
-        return false;
+        try {
+            if (msg != null && msg.getRobinCallBackList() != null && msg.getRobinCallBackList().size() > 0) {
+                msg.setRoundRobinNum(msg.getRoundRobinNum() +1);
+                JxGaga gg = JxGaga.of(Executors.newCachedThreadPool(), msg.getRobinCallBackList().size());
+                List<String> rs = new ArrayList<>();
+                log.info("更新用户历史状态->[Success]");
+                for (RobinCallBack rcb : msg.getRobinCallBackList()) {
+                    gg.work(() -> {
+                        dateBaseService.getContentHistoryRepository().updateSuccessNumByRequestIdAndVersion(rcb.getRequestId(), rcb.getNum(), rcb.getVersion());
+                        return "update done";
+                    }, j -> rs.add(j), q -> {
+                        q.getMessage();
+                    });
+                }
+                gg.merge((i) -> {
+                    i.forEach(j -> {
+                        log.info(j);
+                    });
+                    //}, rs, 5, TimeUnit.SECONDS).exit();
+                }, rs).exit();
+                log.info("更新用户历史状态完成");
+            }
+            return true;
+        }catch (Exception e){
+            log.error("更新用户历史状态异常{}", e);
+            if(msg.getRetryNum() > 3 || msg.getRoundRobinNum() >10){
+                return false;
+            }else{
+                msg.setRetryNum(msg.getRetryNum() + 1);
+                msg.setDelay(3000L);
+                producer.sendAllMsg(msg);
+                return true;
+            }
+        }
     }
 
     @Override
     public Boolean handlerFail(TaskMsg msg) throws RestfulException{
         log.info("handlerFail:{}",msg);
-        return false;
+        //dateBaseService.getContentHistoryRepository().updateStatusAndMessageByRequestIdAndVersion(id, HisStatus.FAIL.name(), "任务执行失败",versionMap.get(id));
+        try {
+            if (msg != null && msg.getRobinCallBackList() != null && msg.getRobinCallBackList().size() > 0) {
+                msg.setRoundRobinNum(msg.getRoundRobinNum() +1);
+                JxGaga gg = JxGaga.of(Executors.newCachedThreadPool(), msg.getRobinCallBackList().size());
+                List<String> rs = new ArrayList<>();
+                log.info("更新用户历史状态->[Fail]");
+                for (RobinCallBack rcb : msg.getRobinCallBackList()) {
+                    gg.work(() -> {
+                        dateBaseService.getContentHistoryRepository().updateStatusAndMessageByRequestIdAndVersion(rcb.getRequestId(), HisStatus.FAIL.name(),"任务执行失败", rcb.getVersion());
+                        return "update done";
+                    }, j -> rs.add(j), q -> {
+                        q.getMessage();
+                    });
+                }
+                gg.merge((i) -> {
+                    i.forEach(j -> {
+                        log.info(j);
+                    });
+                    //}, rs, 5, TimeUnit.SECONDS).exit();
+                }, rs).exit();
+                log.info("更新用户历史状态完成");
+            }
+            return true;
+        }catch (Exception e){
+            log.error("更新用户历史状态异常{}", e);
+            if(msg.getRetryNum() > 3 || msg.getRoundRobinNum() >10){
+                return false;
+            }else{
+                msg.setRetryNum(msg.getRetryNum() + 1);
+                msg.setDelay(3000L);
+                producer.sendAllMsg(msg);
+                return true;
+            }
+        }
     }
 
     @Override
     public VendorInfo findVendorInfo(String vendor) throws RestfulException{
-        /*
-        try{
-            VendorInfo info = vendorInfoRepository.findByVendor(vendor);
-            if(info != null){
-                return info;
-            }else{
-                //TODO 抛异常，通知
-                log.error("findVendorInfo:{} null", vendor);
-                throw new NoSuchElementException();
-            }
-        }catch (Exception e){
-            log.error("findVendorInfo:{} err:{}", vendor, e);
-            handleTaskRepositityException(e);
-        }
-        */
-        return vendorInfoRepository.findByVendor(vendor);
+        return dateBaseService.getVendorInfoRepository().findByVendor(vendor);
     }
 
     private Boolean handlerNewRequest(TaskMsg msg) throws Exception {
 
         String taskId = msg.getTaskId();
-        boolean isMerge = msg.getIsMerge();
         RefreshType type = msg.getType();
         VendorInfo vendorInfo = null;
         if(vendorInfoMap.containsKey(msg.getVendor())){
             vendorInfo = vendorInfoMap.get(msg.getVendor());
         }else{
-            vendorInfo = vendorInfoRepository.findByVendor(msg.getVendor());
+            vendorInfo = dateBaseService.getVendorInfoRepository().findByVendor(msg.getVendor());
             if(vendorInfo != null){
                 vendorInfoMap.put(msg.getVendor(), vendorInfo);
             }
@@ -619,21 +699,9 @@ public class TaskServiceImpl implements TaskService {
             int result = handlerQpsAndSizeLimit(redisKey,1, msg.getSize(), qps, size);
             if (-100 == result) {
                 log.warn("redis:{} LimitQps:{}", redisKey, qps);
-                /*
-                if(msg.getSize() <= 20){
-                    handlerMergeTask(msg, MergeType.add);
-                }
-                */
-                //msg.setDelay(1000L);
                 return true;
             }else if(-200 == result) {
                 log.warn("redis:{} LimitSize:{}", redisKey, size);
-                /*
-                if(msg.getSize() <= 20){
-                    handlerMergeTask(msg, MergeType.add);
-                }
-                */
-                //msg.setDelay(1000L);
                 return true;
             } else if (-1 == result) {
                 log.warn("redis:{} Limit: 执行异常", redisKey);
@@ -641,11 +709,7 @@ public class TaskServiceImpl implements TaskService {
             }
         }
         List<VendorContentTask> vendorContentTaskList = null;
-        if(isMerge){
-            vendorContentTaskList = vendorTaskRepository.findByMergeId(taskId);
-        }else{
-            throw new Exception(taskId + ": not merge");
-        }
+        vendorContentTaskList = dateBaseService.getVendorTaskRepository().findByMergeId(taskId);
         List<String> urls = vendorContentTaskList.stream().map(i->i.getContent()).collect(Collectors.toList());
 
         JSONObject response = null;
@@ -706,32 +770,13 @@ public class TaskServiceImpl implements TaskService {
                         }
                         v.setUpdateTime(new Date());
                     }
-                    vendorTaskRepository.saveAll(vendorContentTaskList);
+                    dateBaseService.getVendorTaskRepository().saveAll(vendorContentTaskList);
                     log.error("[{}]HandlerNewRequest失败", taskId);
                     return false;
                 }else{
                     msg.setDelay(timeOutMs);
                 }
             }
-            /*
-            for(VendorContentTask v :vendorContentTaskList){
-                v.setMessage(message);
-                v.setStatus(ts);
-                if(StringUtils.isNoneBlank(jobId)){
-                    v.setJobId(jobId);
-                    v.setMergeId(jobId);
-                }
-                v.setUpdateTime(new Date());
-            }
-            vendorTaskRepository.saveAll(vendorContentTaskList);
-            if(ts.equals(TaskStatus.FAIL)){
-                log.error("[{}]HandlerNewRequest失败", taskId);
-                return false;
-            }else if(ts.equals(TaskStatus.ROUND_ROBIN)){
-                log.info("[{}]HandlerNewRequest成功", taskId);
-            }
-            */
-
         }else {
             log.error("response err:[{}]", response);
             throw new Exception(taskId + ": response err");
@@ -741,7 +786,7 @@ public class TaskServiceImpl implements TaskService {
 
     private Boolean handlerCommon(TaskMsg msg) throws Exception{
         try {
-            if (msg.getCallBack().equals(CallBackEnum.request)) {
+            if (msg.getCallBack().equals(CallBackEnum.request)) {//存入请求返回，并合并轮询请求，再次收敛请求数
                 log.info("handlerCommon request");
                 String redisKey = msg.getOperation().name()+ "_" + CallBackEnum.request.name();
                 // 0-成功，-1执行异常，-100超限
@@ -755,7 +800,7 @@ public class TaskServiceImpl implements TaskService {
                 }
 
                 String mergeId = msg.getTaskId();
-                List<VendorContentTask> vendorContentTaskList = vendorTaskRepository.findByMergeId(mergeId);
+                List<VendorContentTask> vendorContentTaskList = dateBaseService.getVendorTaskRepository().findByMergeId(mergeId);
                 for (VendorContentTask vct : vendorContentTaskList) {
                     vct.setJobId(msg.getJobId());
                     vct.setMergeId(msg.getJobId());
@@ -764,15 +809,22 @@ public class TaskServiceImpl implements TaskService {
                     vct.setUpdateTime(new Date());
                 }
                 log.info("handlerCommon request update");
-                vendorTaskRepository.saveAll(vendorContentTaskList);
+                dateBaseService.getVendorTaskRepository().saveAll(vendorContentTaskList);
                 log.info("handlerCommon request update done");
 
-                msg.setOperation(TaskOperationEnum.getVendorOperationRobin(msg.getVendor()));
-                msg.setTaskId(msg.getJobId());
+                RobinRecord robinRecord = new RobinRecord();
+                robinRecord.setRobinId(msg.getJobId());
+                robinRecord.setType(msg.getType());
+                robinRecord.setVendor(msg.getVendor());
+                dateBaseService.getRobinRecordRepository().save(robinRecord);
+                log.info("记录待轮询[{}]", robinRecord);
+                return false;
+                //msg.setOperation(TaskOperationEnum.getVendorOperationRobin(msg.getVendor()));
+                //msg.setTaskId(msg.getJobId());
             } else{
 
             }
-            return true;
+            return false;
         }catch (Exception e){
             log.info("handlerCommon 异常[{}]", e);
             msg.setRetryNum(msg.getRetryNum() + 1);
@@ -788,88 +840,6 @@ public class TaskServiceImpl implements TaskService {
 
     private synchronized int handlerMerge(TaskMsg msg, MergeType type) throws Exception{
         log.info("enter handlerMergeTask:{}, type[{}]",msg, type);
-
-        List<String> ids;
-        if(type.equals(MergeType.add)) {
-            if (mergeHashMap.containsKey(msg.getOperation().name())) {
-                ids = mergeHashMap.get(msg.getOperation().name());
-                ids.add(msg.getTaskId());
-            } else {
-                ids = Collections.synchronizedList(new LinkedList<String>());
-                ids.add(msg.getTaskId());
-                mergeHashMap.put(msg.getOperation().name(), ids);
-            }
-            log.info("handlerMerge新增完成");
-        }else{
-            List<VendorContentTask> toSaveContentTaskList = new ArrayList<>();
-            List<TaskMsg> toSendMq = new ArrayList<>();
-            for(String k: mergeHashMap.keySet()){
-                ids = mergeHashMap.get(k);
-                VendorInfo vendorInfo = null;
-                String vendorName = TaskOperationEnum.getVendorString(TaskOperationEnum.of(k));
-                if(vendorInfoMap.containsKey(vendorName)){
-                    vendorInfo = vendorInfoMap.get(vendorName);
-                }else{
-                    vendorInfo = vendorInfoRepository.findByVendor(vendorName);
-                    if(vendorInfo != null){
-                        vendorInfoMap.put(vendorName, vendorInfo);
-                    }
-                }
-                int mergeSize = 10;
-                RefreshType refershType = RefreshType.url;
-                if(vendorInfo != null){
-                    if( -1 != k.indexOf("_url")){
-                        mergeSize = vendorInfo.getMergeUrlCount();
-                        refershType = RefreshType.url;
-                    }else if(-1 != k.indexOf("_dir")){
-                        mergeSize = vendorInfo.getMergeDirCount();
-                        refershType = RefreshType.dir;
-                    }else if(-1 != k.indexOf("_preheat")) {
-                        mergeSize = vendorInfo.getMergePreheatCount();
-                        refershType = RefreshType.preheat;
-                    }else{
-                        log.warn("err merge Operation:[{}]", k);
-                    }
-                }
-
-                log.info("handlerMerge查询");
-                List<VendorContentTask> vendorContentTaskList = vendorTaskRepository.findByMergeIdIn(ids);
-                log.info("handlerMerge查询数量[{}]", vendorContentTaskList.size());
-                int curCount =0;
-                String mergeId = UUID.randomUUID().toString().replaceAll("-", "");
-                for(VendorContentTask vct: vendorContentTaskList){
-                    if((curCount % mergeSize) == 0){
-                        mergeId = UUID.randomUUID().toString().replaceAll("-", "");
-                        TaskMsg vendorTaskMsg = new TaskMsg();
-                        vendorTaskMsg.setTaskId(mergeId);
-                        vendorTaskMsg.setOperation(TaskOperationEnum.of(k));
-                        vendorTaskMsg.setVendor(vendorName);
-                        vendorTaskMsg.setVersion(0);
-                        vendorTaskMsg.setHisVersion(0);
-                        vendorTaskMsg.setIsMerge(true);
-                        vendorTaskMsg.setType(refershType);
-                        vendorTaskMsg.setRetryNum(0);
-                        vendorTaskMsg.setSize((vendorContentTaskList.size() - curCount) >= mergeSize?mergeSize:(vendorContentTaskList.size() - curCount));
-                        toSendMq.add(vendorTaskMsg);
-                    }
-                    vct.setMergeId(mergeId);
-                    toSaveContentTaskList.add(vct);
-                    curCount++;
-                }
-            }
-            if(toSaveContentTaskList.size() > 0 ) {
-                log.info("handlerMerge入库数量[{}]", toSaveContentTaskList.size());
-                vendorTaskRepository.saveAll(toSaveContentTaskList);
-                log.info("handlerMerge入库完成");
-                for (TaskMsg mergeMsg : toSendMq) {
-                    producer.sendTaskMsg(mergeMsg);
-                }
-                log.info("handlerMerge消息完成");
-            }
-            mergeHashMap.clear();
-            log.info("handlerMerge清理完成");
-
-        }
         return 0;
     }
 

@@ -12,10 +12,13 @@ import java.util.List;
 public enum TaskOperationEnum {
 
     content_item,//拆分原始
-    content_item_robin,
+    //content_item_robin,
 
-    content_vendor,//拆分厂商
+    //content_vendor,//拆分厂商
     content_vendor_robin,
+    content_vendor_success,
+    content_vendor_fail,
+
 
     //厂商任务
     content_qiniu_common,

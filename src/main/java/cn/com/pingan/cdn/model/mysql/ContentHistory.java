@@ -76,11 +76,11 @@ public class ContentHistory {
     @Enumerated(EnumType.STRING)
     private FlowEmun flowStatus;
 
-    @Column(name = "all_vendor_num")
-    private Integer allVendorNum = 0;
+    @Column(name = "all_task_num")
+    private Integer allTaskNum = 0;
 
-    @Column(name = "success_vendor_num")
-    private Integer successVendorNum = 0;
+    @Column(name = "success_task_num")
+    private Integer successTaskNum = 0;
 
     @Column(name = "version")
     private Integer version = 0;

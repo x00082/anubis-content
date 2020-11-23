@@ -61,16 +61,17 @@ public interface ContentHistoryRepository extends JpaRepository<ContentHistory, 
     @Query(value = "update content_history h set h.flow_status = ?2, h.update_time=current_timestamp where h.id =?1", nativeQuery = true)
     int updateFlowStatusById(Long id, String status);
 
-
+/*
     @Modifying
     @Transactional
     @Query(value = "update content_history h set h.success_vendor_num = h.success_vendor_num + ?2, h.update_time=current_timestamp where h.id =?1 and h.version = ?2", nativeQuery = true)
     int updateSuccessNumByIdAndVersion(Long id, Integer version);
+*/
 
     @Modifying
     @Transactional
-    @Query(value = "update content_history h set h.success_vendor_num = h.success_vendor_num + ?2, h.update_time=current_timestamp where h.request_id =?1 and h.version = ?2", nativeQuery = true)
-    int updateSuccessNumByRequestIdAndVersion(String id, Integer version);
+    @Query(value = "update content_history h set h.success_task_num = h.success_task_num + ?2, h.update_time=current_timestamp where h.request_id =?1 and h.version = ?3", nativeQuery = true)
+    int updateSuccessNumByRequestIdAndVersion(String id, int num, int version);
 
     @Modifying
     @Transactional
@@ -79,8 +80,8 @@ public interface ContentHistoryRepository extends JpaRepository<ContentHistory, 
 
     @Modifying
     @Transactional
-    @Query(value = "update content_history h set h.status = ?3, h.update_time=current_timestamp, h.message = ?4 where h.request_id =?1 and h.version = ?2", nativeQuery = true)
-    int updateStatusAndMessageByRequestIdAndVersion(String id, Integer version, String status, String message);
+    @Query(value = "update content_history h set h.status = ?2, h.update_time=current_timestamp, h.message = ?3 where h.request_id =?1 and h.version = ?4", nativeQuery = true)
+    int updateStatusAndMessageByRequestIdAndVersion(String id, String status, String message, Integer version);
 
     @Modifying
     @Transactional

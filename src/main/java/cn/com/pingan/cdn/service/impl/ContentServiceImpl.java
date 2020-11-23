@@ -24,10 +24,7 @@ import cn.com.pingan.cdn.rabbitmq.config.RabbitListenerConfig;
 import cn.com.pingan.cdn.rabbitmq.message.FanoutMsg;
 import cn.com.pingan.cdn.rabbitmq.message.TaskMsg;
 import cn.com.pingan.cdn.rabbitmq.producer.Producer;
-import cn.com.pingan.cdn.repository.mysql.ContentHistoryRepository;
-import cn.com.pingan.cdn.repository.mysql.LineToVendorRepository;
-import cn.com.pingan.cdn.repository.mysql.UserLimitRepository;
-import cn.com.pingan.cdn.repository.mysql.VendorTaskRepository;
+import cn.com.pingan.cdn.repository.mysql.*;
 import cn.com.pingan.cdn.repository.pgsql.DomainRepository;
 import cn.com.pingan.cdn.request.openapi.ContentDefaultNumDTO;
 import cn.com.pingan.cdn.response.TaskDetailsResponse;
@@ -61,21 +58,10 @@ import java.util.stream.Collectors;
 @Service
 @Slf4j
 public class ContentServiceImpl implements ContentService {
-    
-    @Autowired
-    private ContentHistoryRepository contentHistoryRepository;
+
 
     @Autowired
-    private UserLimitRepository userLimitRepository;
-    
-    @Autowired
-    private DomainRepository domainRepository;
-
-    @Autowired
-    private LineToVendorRepository lineToVendorRepository;
-
-    @Autowired
-    private VendorTaskRepository vendorTaskRepository;
+    DateBaseService dateBaseService;
 
     @Autowired
     private TaskService taskService;
@@ -85,6 +71,9 @@ public class ContentServiceImpl implements ContentService {
 
     @Autowired
     private AnubisNotifyService anubisNotifyService;
+
+    @Autowired
+    RedisLuaScriptService luaScriptService;
     
     @Autowired
     Producer producer;
@@ -113,10 +102,6 @@ public class ContentServiceImpl implements ContentService {
 
     @Value("${task.history.robinRate:180000}")
     private long robinRate;
-
-    
-    @Autowired
-    RedisLuaScriptService luaScriptService;
 
     @Autowired
     ContentLimitJsonConfig contentLimitJsonConfig;
@@ -169,14 +154,12 @@ public class ContentServiceImpl implements ContentService {
             boolean adminFlag = "true".equals(dto.getIsAdmin());
 
             //检查域名状态
-            log.info("检查域名状态开始");
             checkDomainStatus(data, adminFlag, dto);
-            log.info("检查域名状态结束");
+            log.info("检查域名状态完成");
 
             //计数
-            log.info("检查用户计数开始");
             checkUserLimit(adminFlag, type, dto.getSpcode(), data.size());
-            log.info("检查用户计数结束");
+            log.info("检查用户计数完成");
 
             //原始请求入库
             String taskId = UUID.randomUUID().toString().replaceAll("-", "");
@@ -192,8 +175,8 @@ public class ContentServiceImpl implements ContentService {
             contentHistory.setIsAdmin(dto.getIsAdmin());
             contentHistory.setFlowStatus(FlowEmun.init);
 
-            contentHistoryRepository.save(contentHistory);
-            log.info("contentHistory id:{}", contentHistory.getId());
+            dateBaseService.getContentHistoryRepository().save(contentHistory);
+            log.info("用户请求入库完成 id:{}", contentHistory.getId());
 
 
             TaskMsg historyTaskMsg = new TaskMsg();
@@ -206,7 +189,7 @@ public class ContentServiceImpl implements ContentService {
             historyTaskMsg.setOperation(TaskOperationEnum.content_item);
             producer.sendTaskMsg(historyTaskMsg);
 
-            log.info("sendTaskMsg:{} to MQ", historyTaskMsg);
+            log.info("发送到MQ完成:[{}]", historyTaskMsg);
 
             return ApiReceipt.ok().data(taskId);
         }catch (Exception e){
@@ -222,7 +205,7 @@ public class ContentServiceImpl implements ContentService {
 
     @Override
     public ApiReceipt redoContentTask(String requestId, boolean flag){
-        log.info("redoContentTask[{}]开始", requestId);
+        log.info("redoContentTask start [{}]", requestId);
         try {
 
             ContentHistory contentHistory = this.findHisttoryByRequestId(requestId);
@@ -233,7 +216,7 @@ public class ContentServiceImpl implements ContentService {
             if (contentHistory.getStatus().equals(HisStatus.FAIL)) {//任务已失败或未开始
                 contentHistory.setStatus(HisStatus.WAIT);
                 contentHistory.setFlowStatus(FlowEmun.redo);
-                contentHistoryRepository.save(contentHistory);
+                dateBaseService.getContentHistoryRepository().save(contentHistory);
                 log.info("[{}]请求任务已失败，设置为wait", requestId);
 
             } else if (contentHistory.getStatus().equals(HisStatus.WAIT)) {
@@ -241,7 +224,7 @@ public class ContentServiceImpl implements ContentService {
                     log.info("[{}]请求任务为wait,强制重试", requestId);
                     contentHistory.setFlowStatus(FlowEmun.redo);
                     contentHistory.setVersion(contentHistory.getVersion() + 1);
-                    contentHistoryRepository.save(contentHistory);
+                    dateBaseService.getContentHistoryRepository().save(contentHistory);
                 }else{
                     log.info("[{}]请求任务为wait,不需要重试", requestId);
                     return ApiReceipt.ok();
@@ -280,7 +263,7 @@ public class ContentServiceImpl implements ContentService {
         log.info("batchRedoContentTask[{}]开始", requestIds);
         try {
 
-            List<ContentHistory> contentHistorys = contentHistoryRepository.findByRequestIdIn(requestIds);
+            List<ContentHistory> contentHistorys = dateBaseService.getContentHistoryRepository().findByRequestIdIn(requestIds);
             if(contentHistorys.size() == 0){
                 log.error("用户任务不存在[{}]", requestIds);
                 return ApiReceipt.error("0x004008", String.format("[%s]原始任务记录不存在，禁止操作", requestIds.toString()));
@@ -333,7 +316,7 @@ public class ContentServiceImpl implements ContentService {
                 msgList.add(historyTaskMsg);
             }
             if(toSave.size()>0) {
-                contentHistoryRepository.saveAll(toSave);
+                dateBaseService.getContentHistoryRepository().saveAll(toSave);
                 sendListMQ(msgList);
             }
 
@@ -361,7 +344,7 @@ public class ContentServiceImpl implements ContentService {
             tdr.setContentStatus(contentHistory.getFlowStatus());
             if(contentHistory.getFlowStatus().equals(FlowEmun.split_vendor_done)){
                 Map<String, List<TaskDetailsResponse.UrlStatus>> taskDetailsMap = new HashMap<>();
-                List<VendorContentTask> vendorContentTaskList = vendorTaskRepository.findByRequestId(requestId);
+                List<VendorContentTask> vendorContentTaskList = dateBaseService.getVendorTaskRepository().findByRequestId(requestId);
                 for(VendorContentTask vct: vendorContentTaskList){
                     String vendorName = vct.getVendor();
                     TaskDetailsResponse.UrlStatus urlStatus = new TaskDetailsResponse.UrlStatus();
@@ -372,7 +355,7 @@ public class ContentServiceImpl implements ContentService {
                     }else if(vct.getStatus().equals(TaskStatus.ROUND_ROBIN)){
                         urlStatus.setStatus("轮询中");
                     }else if(vct.getStatus().equals(TaskStatus.PROCESSING)){
-                        urlStatus.setStatus("下发任务成功");
+                        urlStatus.setStatus("处理中");
                     }else{
                         urlStatus.setStatus("等待下发");
                     }
@@ -401,9 +384,9 @@ public class ContentServiceImpl implements ContentService {
     public void saveVendorTask(TaskMsg taskMsg) throws ContentException {
         String requestId = taskMsg.getTaskId();
         boolean force = taskMsg.getForce();
-        log.info("saveContentItem开始[{}]", requestId);
+        log.info("saveVendorTask start [{}]", requestId);
         try {
-            ContentHistory contentHistory = contentHistoryRepository.findById(taskMsg.getId()).get();
+            ContentHistory contentHistory = dateBaseService.getContentHistoryRepository().findById(taskMsg.getId()).get();
             if (contentHistory == null) {
                 log.error("用户任务不存在,丢弃消息");
                 return;
@@ -414,7 +397,7 @@ public class ContentServiceImpl implements ContentService {
                 contentHistory.setUpdateTime(new Date());
                 contentHistory.setMessage("拆分任务及其子任务失败超限");
                 contentHistory.setFlowStatus(FlowEmun.split_vendor_err);
-                contentHistoryRepository.save(contentHistory);
+                dateBaseService.getContentHistoryRepository().save(contentHistory);
                 log.error("超出重试次数,设置任务失败并丢弃消息");
                 return;
             }
@@ -422,7 +405,6 @@ public class ContentServiceImpl implements ContentService {
             List<String> urls = JSONArray.parseArray(contentHistory.getContent(), String.class);
             Map<String, List<String>> lostUrlsMap = new HashMap<>();
             Map<String, List<String>> vendorUrlMap;
-            log.info("开始查询厂商");
             vendorUrlMap = getDomainVendorsMapNew(urls);
             if (vendorUrlMap == null) {
                 log.error("获取厂商失败");
@@ -433,11 +415,11 @@ public class ContentServiceImpl implements ContentService {
             }
             log.info("获取厂商成功");
 
-
+            contentHistory.setVersion(contentHistory.getVersion() + 1);
             Map<String, List<VendorContentTask>> toSaveVendorTaskMap = new HashMap<>();
             Map<String, String> vendorTaskId = new HashMap<>();
             if (taskMsg.getVersion() == 0) {//区别新请求与重试
-                log.info("saveContentItem当前为首次请求，存入全部数据");
+                log.info("saveVendorTask当前为首次请求，存入全部数据");
                 lostUrlsMap.putAll(vendorUrlMap);
                 for(String v: lostUrlsMap.keySet()){
                     if(!vendorTaskId.containsKey(v) || StringUtils.isBlank(vendorTaskId.get(v))){
@@ -452,11 +434,10 @@ public class ContentServiceImpl implements ContentService {
                         String taskId = UUID.randomUUID().toString().replaceAll("-", "");
                         VendorContentTask vendorTask = new VendorContentTask();
                         vendorTask.setTaskId(taskId);
-                        //vendorTask.setItemId(itemId);
                         vendorTask.setRequestId(requestId);
                         vendorTask.setVendor(v);
                         vendorTask.setMergeId(vendorTaskId.get(v));
-                        vendorTask.setVersion(0);
+                        vendorTask.setVersion(contentHistory.getVersion());
                         vendorTask.setType(taskMsg.getType());
                         vendorTask.setContent(url);
                         vendorTask.setCreateTime(new Date());
@@ -466,9 +447,10 @@ public class ContentServiceImpl implements ContentService {
                 }
                 taskMsg.setVersion(1);
             }else{
+                log.info("saveVendorTask当前非首次请求，对比数据");
                 int totalTaskSize = 0;
 
-                List<VendorContentTask> existVendorTaskAll = vendorTaskRepository.findByRequestId(requestId);
+                List<VendorContentTask> existVendorTaskAll = dateBaseService.getVendorTaskRepository().findByRequestId(requestId);
                 for(String s:vendorUrlMap.keySet()){
                     totalTaskSize += vendorUrlMap.get(s).size();
                 }
@@ -476,6 +458,7 @@ public class ContentServiceImpl implements ContentService {
 
 
                 if(existVendorTaskAll.size() == 0) {
+                    log.info("缺失全部子任务");
                     lostUrlsMap.putAll(vendorUrlMap);
                     for(String v: lostUrlsMap.keySet()){
                         if(!vendorTaskId.containsKey(v) || StringUtils.isBlank(vendorTaskId.get(v))){
@@ -490,11 +473,10 @@ public class ContentServiceImpl implements ContentService {
                             String taskId = UUID.randomUUID().toString().replaceAll("-", "");
                             VendorContentTask vendorTask = new VendorContentTask();
                             vendorTask.setTaskId(taskId);
-                            //vendorTask.setItemId(itemId);
                             vendorTask.setRequestId(requestId);
                             vendorTask.setVendor(v);
                             vendorTask.setMergeId(vendorTaskId.get(v));
-                            vendorTask.setVersion(0);
+                            vendorTask.setVersion(contentHistory.getVersion());
                             vendorTask.setType(taskMsg.getType());
                             vendorTask.setContent(url);
                             vendorTask.setCreateTime(new Date());
@@ -504,6 +486,7 @@ public class ContentServiceImpl implements ContentService {
                     }
 
                 }else if(existVendorTaskAll.size() == totalTaskSize) {
+                    log.info("子任务不缺失，只重试失败的任务");
                     for (VendorContentTask vct : existVendorTaskAll) {
                         if (vct.getStatus().equals(TaskStatus.FAIL)) {
                             if(!vendorTaskId.containsKey(vct.getVendor()) || StringUtils.isBlank(vendorTaskId.get(vct.getVendor()))){
@@ -515,13 +498,14 @@ public class ContentServiceImpl implements ContentService {
                                 toSaveVendorTaskMap.put(vct.getVendor(), vendorContentTaskList);
                             }
                             vct.setStatus(TaskStatus.WAIT);
-                            vct.setVersion(0);
+                            vct.setVersion(contentHistory.getVersion());
                             vct.setUpdateTime(new Date());
                             vct.setMergeId(vendorTaskId.get(vct.getVendor()));
                             toSaveVendorTaskMap.get(vct.getVendor()).add(vct);
                         }
                     }
                 }else{
+                    log.info("子任务数量异常，清理后重新入库");
                     clearVendorTask(requestId);
                     lostUrlsMap.putAll(vendorUrlMap);
                     for(String v: lostUrlsMap.keySet()){
@@ -537,11 +521,10 @@ public class ContentServiceImpl implements ContentService {
                             String taskId = UUID.randomUUID().toString().replaceAll("-", "");
                             VendorContentTask vendorTask = new VendorContentTask();
                             vendorTask.setTaskId(taskId);
-                            //vendorTask.setItemId(itemId);
                             vendorTask.setRequestId(requestId);
                             vendorTask.setVendor(v);
                             vendorTask.setMergeId(vendorTaskId.get(v));
-                            vendorTask.setVersion(0);
+                            vendorTask.setVersion(contentHistory.getVersion());
                             vendorTask.setType(taskMsg.getType());
                             vendorTask.setContent(url);
                             vendorTask.setCreateTime(new Date());
@@ -560,35 +543,44 @@ public class ContentServiceImpl implements ContentService {
             }
 
             if(toSaveList.size()>0) {//TODO时间长
-                log.info("saveVendorTask数量[{}]", toSaveList.size());
-                vendorTaskRepository.saveAll(toSaveList);
-                log.info("saveVendorTask入库完成");
-
+                dateBaseService.getVendorTaskRepository().saveAll(toSaveList);
+                log.info("saveVendorTask入库完成，数量[{}]", toSaveList.size());
             }
             contentHistory.setUpdateTime(new Date());
             contentHistory.setFlowStatus(FlowEmun.split_vendor_done);
-            contentHistory.setAllVendorNum(vendorTaskId.keySet().size());
-            contentHistory.setSuccessVendorNum(0);
-            contentHistory.setVersion(contentHistory.getVersion() + 1);
-            contentHistoryRepository.save(contentHistory);
-            log.info("saveContentItem任务入库并发送消息成功");
+            contentHistory.setAllTaskNum(toSaveList.size());
+            contentHistory.setSuccessTaskNum(0);
 
+            dateBaseService.getContentHistoryRepository().save(contentHistory);
+            log.info("saveVendorTask设置请求任务[{}]状态为:[split_vendor_done]", requestId);
 
+            List<MergeRecord> records = new ArrayList<>();
             for(String v: vendorTaskId.keySet()){
-                TaskMsg vendorTaskMsg = new TaskMsg();
-                vendorTaskMsg.setTaskId(vendorTaskId.get(v));
-                vendorTaskMsg.setOperation(TaskOperationEnum.getVendorOperation(v, taskMsg.getType()));
-                vendorTaskMsg.setVendor(v);
-                vendorTaskMsg.setVersion(0);
-                vendorTaskMsg.setHisVersion(contentHistory.getVersion());
-                vendorTaskMsg.setIsMerge(true);
-                vendorTaskMsg.setType(taskMsg.getType());
-                vendorTaskMsg.setRetryNum(0);
-                vendorTaskMsg.setSize(toSaveVendorTaskMap.get(v).size());
-                producer.sendTaskMsg(vendorTaskMsg);
-                log.info("saveContentVendor发送[{}]", v);
+                if(toSaveVendorTaskMap.get(v).size() >= 20 &&  toSaveVendorTaskMap.get(v).size() <= 50) {
+                    TaskMsg vendorTaskMsg = new TaskMsg();
+                    vendorTaskMsg.setTaskId(vendorTaskId.get(v));
+                    vendorTaskMsg.setOperation(TaskOperationEnum.getVendorOperation(v, taskMsg.getType()));
+                    vendorTaskMsg.setVendor(v);
+                    vendorTaskMsg.setVersion(0);
+                    vendorTaskMsg.setHisVersion(contentHistory.getVersion());
+                    vendorTaskMsg.setIsMerge(true);
+                    vendorTaskMsg.setType(taskMsg.getType());
+                    vendorTaskMsg.setRetryNum(0);
+                    vendorTaskMsg.setSize(toSaveVendorTaskMap.get(v).size());
+                    producer.sendTaskMsg(vendorTaskMsg);
+                    log.info("saveContentVendor发送[{}]", v);
+                }else{//TODO
+                    MergeRecord record = new MergeRecord();
+                    record.setMergeId(vendorTaskId.get(v));
+                    records.add(record);
+                    log.info("record:[{}]", vendorTaskId.get(v));
+                }
             }
-            log.info("saveContentVendor发送MQ完成");
+            if(records.size()>0){
+                dateBaseService.getMergeRecordRepository().saveAll(records);
+                log.info("记录合并[{}]", records.size());
+            }
+            log.info("saveVendorTask发送MQ完成");
 
 
             log.info("轮询ContentHistory[{}]", requestId);
@@ -601,10 +593,10 @@ public class ContentServiceImpl implements ContentService {
             robinTaskMsg.setRetryNum(0);
             robinTaskMsg.setDelay(3 * 60 *1000L);//TODO
             producer.sendDelayMsg(robinTaskMsg);
-            log.info("saveContentItem结束[{}]", requestId);
+            log.info("saveVendorTask结束[{}]", requestId);
 
         }catch (Exception e){
-            log.error("saveContentItem异常{}", e);
+            log.error("saveVendorTask异常{}", e);
             taskMsg.setDelay(limitRetryRate);
             taskMsg.setRetryNum(taskMsg.getRetryNum() + 1);
             producer.sendDelayMsg(taskMsg);
@@ -621,467 +613,43 @@ public class ContentServiceImpl implements ContentService {
     }
 
 
-/*
-    @Override
-    public void saveContentItem(TaskMsg taskMsg) throws ContentException {
-        String requestId = taskMsg.getTaskId();
-        boolean force = taskMsg.getForce();
-        Boolean flag = false;
-        boolean toNext = false;
-        log.info("saveContentItem开始[{}]", requestId);
-        try {
-            ContentHistory contentHistory = contentHistoryRepository.findById(taskMsg.getId()).get();
-            if (contentHistory == null) {
-                log.error("用户任务不存在,丢弃消息");
-                return;
-            }
-
-            if (taskMsg.getRetryNum() > limitRetry) {
-                contentHistory.setStatus(HisStatus.FAIL);
-                contentHistory.setUpdateTime(new Date());
-                contentHistory.setMessage("拆分任务及其子任务失败超限");
-                contentHistory.setFlowStatus(FlowEmun.split_item_err);
-                contentHistoryRepository.save(contentHistory);
-                log.error("超出重试次数,设置任务失败并丢弃消息");
-                return;
-            }
-
-            /*
-            if(contentHistory.getFlowStatus().equals(FlowEmun.init)|| contentHistory.getFlowStatus().equals(FlowEmun.redo)){
-                contentHistory.setFlowStatus(FlowEmun.split_item_wait);
-                contentHistory.setUpdateTime(new Date());
-                contentHistoryRepository.save(contentHistory);
-            }
-            */
-/*
-            List<String> urls = JSONArray.parseArray(contentHistory.getContent(), String.class);
-            List<String> lostUrls = new ArrayList<>();
-            RefreshType type = contentHistory.getType();
-
-            List<ContentItem> existItemsAll = null;
-            List<ContentItem> toSaveList = new ArrayList<>();
-            List<TaskMsg> toSendMsg = new ArrayList<>();
-            if (taskMsg.getVersion() == 0) {//区别新请求与重试
-                log.info("saveContentItem当前为首次请求，存入全部数据");
-                lostUrls.addAll(urls);
-                taskMsg.setVersion(1);
-                flag = true;
-            } else {
-                log.info("saveContentItem当前为重试请求，补全差异数据");
-                existItemsAll = contentItemRepository.findByRequestId(requestId);
-                if (existItemsAll.size() != contentHistory.getContentNumber()) {
-                    if(existItemsAll.size() > contentHistory.getContentNumber()){
-                        clearsubTask(requestId);
-                        existItemsAll.clear();
-                    }
-                    if (existItemsAll.size() == 0) {
-                        lostUrls.addAll(urls);
-                    } else {
-                        Map<String, ContentItem> existUrlMap = existItemsAll.stream().collect(Collectors.toMap(i -> i.getContent(), i -> i));
-                        for (String s : urls) {
-                            if (!existUrlMap.containsKey(s)) {
-                                log.info("添加缺失url:{}", s);
-                                lostUrls.add(s);
-                            }
-                        }
-                    }
-                }
-                log.info("saveContentItem重置任务状态开始");
-                for(ContentItem it: existItemsAll) {//已存在的失败任务重发
-                    if(force){
-                        if (it.getStatus().equals(HisStatus.FAIL)){
-                            it.setUpdateTime(new Date());
-                            it.setStatus(HisStatus.WAIT);
-                            toSaveList.add(it);
-                            toNext = true;
-                        }else if(it.getStatus().equals(HisStatus.WAIT)){
-                            toNext = true;
-                        }
-                    }else {
-                        if (it.getStatus().equals(HisStatus.FAIL)) {
-                            it.setUpdateTime(new Date());
-                            it.setStatus(HisStatus.WAIT);
-                            toSaveList.add(it);
-                            toNext = true;
-                        }
-                    }
-                }
-                log.info("saveContentItem重置任务状态结束");
-            }
-            if (lostUrls.size() > 0) {//有缺失的数据
-                Map<String, Set<String>> domainVendorsMap;
-                log.info("开始查询厂商");
-                domainVendorsMap = getDomainVendorsMapNew(lostUrls);
-                if (domainVendorsMap == null) {
-                    log.error("获取厂商失败");
-                    taskMsg.setDelay(limitRetryRate);
-                    taskMsg.setRetryNum(taskMsg.getRetryNum() + 1);
-                    producer.sendTaskMsg(taskMsg);
-                    return;
-                }
-                log.info("获取厂商成功");
-
-                for (String u : lostUrls) {
-                    String itemId = UUID.randomUUID().toString().replaceAll("-", "");
-                    ContentItem item = new ContentItem();
-                    item.setRequestId(requestId);
-                    item.setItemId(itemId);
-                    item.setType(type);
-                    item.setContent(u);
-                    item.setCreateTime(new Date());
-                    item.setStatus(HisStatus.WAIT);
-
-                    URL domainUrl = new URL(u);
-                    String host = domainUrl.getHost();
-                    item.setVendor(JSONObject.toJSONString(domainVendorsMap.get(host)));
-                    toSaveList.add(item);
-                }
-            }
-            if(toSaveList.size()>0) {//TODO时间长
-                log.info("saveContentItem数量[{}]", toSaveList.size());
-                contentItemRepository.saveAll(toSaveList);
-                log.info("saveContentItem入库完成");
-            }
-            contentHistoryRepository.updateFlowStatusById(taskMsg.getId(), FlowEmun.split_item_done.name());
-            log.info("saveContentItem任务入库并发送消息成功");
-
-            TaskMsg itemTaskMsg = new TaskMsg();
-            itemTaskMsg.setForce(force);
-            itemTaskMsg.setId(taskMsg.getId());
-            itemTaskMsg.setTaskId(requestId);
-            itemTaskMsg.setOperation(TaskOperationEnum.content_vendor);
-            itemTaskMsg.setVersion(flag?0:1);
-            itemTaskMsg.setRetryNum(0);
-            //itemTaskMsg.setDelay(1000L);
-            producer.sendAllMsg(itemTaskMsg);
-            log.info("saveContentItem发送MQ完成");
-
-        }catch (Exception e){
-            log.error("获取厂商失败");
-            taskMsg.setDelay(limitRetryRate);
-            taskMsg.setRetryNum(taskMsg.getRetryNum() + 1);
-            producer.sendDelayMsg(taskMsg);
-            return;
-        }
-
-        /*
-        log.info("轮询ContentHistory[{}]", requestId);
-        TaskMsg robinTaskMsg = new TaskMsg();
-        robinTaskMsg.setTaskId(requestId);
-        robinTaskMsg.setOperation(TaskOperationEnum.content_item_robin);
-        robinTaskMsg.setVersion(0);
-        robinTaskMsg.setRetryNum(0);
-        robinTaskMsg.setDelay(3 * 60 *1000L);//TODO
-        producer.sendDelayMsg(robinTaskMsg);
-        log.info("saveContentItem结束[{}]", requestId);
-
-    }
-    */
-
-/*
-    @Override
-    public void saveContentVendor(TaskMsg taskMsg) throws ContentException{
-        String requestId = taskMsg.getTaskId();
-        boolean force = taskMsg.getForce();
-        //String itemId = taskMsg.getTaskId();
-        List<String> itemIds = new ArrayList<>();
-        log.info("saveContentVendor开始[{}]", requestId);
-
-        try {
-
-            ContentHistory contentHistory = contentHistoryRepository.findById(taskMsg.getId()).get();
-            if (contentHistory == null) {
-                log.error("用户任务不存在,丢弃消息");
-                return;
-            }
-            List<ContentItem> allContentItemList = contentItemRepository.findByRequestId(requestId);
-            RefreshType type = null;
-            if (allContentItemList.size() == 0) {
-                log.error("[{}]丢失条目任务", requestId);
-                return;
-            }
-
-            if (taskMsg.getRetryNum() > limitRetry) {
-                for (ContentItem ci : allContentItemList) {
-                    ci.setStatus(HisStatus.FAIL);
-                    ci.setUpdateTime(new Date());
-                    ci.setMessage("拆分任务超时失败");
-                }
-                contentItemRepository.saveAll(allContentItemList);
-                contentHistory.setFlowStatus(FlowEmun.split_vendor_err);
-                contentHistory.setStatus(HisStatus.FAIL);
-                contentHistory.setUpdateTime(new Date());
-                contentHistoryRepository.save(contentHistory);
-                log.error("saveContentVendor超出重试次数,设置任务失败并丢弃消息");
-                return;
-            }
-
-            /*
-            if(contentHistory.getFlowStatus().equals(FlowEmun.split_item_done)){
-                contentHistory.setFlowStatus(FlowEmun.split_vendor_wait);
-                contentHistory.setUpdateTime(new Date());
-                contentHistoryRepository.save(contentHistory);
-            }
-            */
-/*
-            List<VendorContentTask> toSaveList = new ArrayList<>();
-            List<TaskMsg> toSendMsg = new ArrayList<>();
-            Map<String, MergeTaskItem> vendorMergeMap = new HashMap<>();
-            int Version = taskMsg.getVersion();
-            for (ContentItem ci : allContentItemList){
-                type = ci.getType();
-                String url = ci.getContent();
-                String itemId = ci.getItemId();
-                itemIds.add(itemId);
-                List<String> lostVendor = new ArrayList<>();
-                List<VendorContentTask> existVendorTaskAll;
-                List<String> vendors = JSONArray.parseArray(ci.getVendor(), String.class);
-                if (Version == 0) {
-                    lostVendor.addAll(vendors);
-                    taskMsg.setVersion(1);
-                } else {
-                    log.info("saveContentVendor补全差异数据");
-                    existVendorTaskAll = vendorTaskRepository.findByItemId(itemId);
-                    if (existVendorTaskAll.size() != vendors.size()) {
-                        if(existVendorTaskAll.size() > vendors.size()){
-                            clearVendorTask(itemId);
-                            existVendorTaskAll.clear();
-                        }
-                        if (existVendorTaskAll.size() == 0) {
-                            lostVendor.addAll(vendors);
-                        } else {
-                            Map<String, VendorContentTask> existVendorMap = existVendorTaskAll.stream().collect(Collectors.toMap(i -> i.getVendor(), i -> i));
-                            for (String s : vendors) {
-                                if (!existVendorMap.containsKey(s)) {
-                                    log.info("添加缺失url:{}", s);
-                                    lostVendor.add(s);
-                                }
-                            }
-                        }
-                    }
-                    log.info("saveContentVendor重任务状态开始");
-                    for (VendorContentTask vc : existVendorTaskAll) {//已存在的失败任务重发
-                        if(force){
-                            log.info("强制任务");
-                            if (!vc.getStatus().equals(TaskStatus.SUCCESS)) {
-                                MergeTaskItem mit;
-                                if (vendorMergeMap.containsKey(vc.getVendor())) {
-                                    mit = vendorMergeMap.get(vc.getVendor());
-                                } else {
-                                    mit = new MergeTaskItem();
-                                    mit.setMergeId(UUID.randomUUID().toString().replaceAll("-", ""));
-
-                                }
-                                vc.setUpdateTime(new Date());
-                                vc.setVersion(1);
-                                vc.setStatus(TaskStatus.WAIT);
-                                vc.setMergeId(mit.getMergeId());
-                                mit.setSize(mit.getSize() + 1);
-                                vendorMergeMap.put(vc.getVendor(), mit);
-                                toSaveList.add(vc);
-                            }
-                        }else {
-                            log.info("普通任务");
-                            if (vc.getStatus().equals(TaskStatus.FAIL)) {
-                                MergeTaskItem mit;
-                                if (vendorMergeMap.containsKey(vc.getVendor())) {
-                                    mit = vendorMergeMap.get(vc.getVendor());
-                                } else {
-                                    mit = new MergeTaskItem();
-                                    mit.setMergeId(UUID.randomUUID().toString().replaceAll("-", ""));
-
-                                }
-                                vc.setUpdateTime(new Date());
-                                vc.setVersion(1);
-                                vc.setStatus(TaskStatus.WAIT);
-                                vc.setMergeId(mit.getMergeId());
-                                mit.setSize(mit.getSize() + 1);
-                                vendorMergeMap.put(vc.getVendor(), mit);
-                                toSaveList.add(vc);
-                            }
-                        }
-                    }
-
-                    log.info("saveContentVendor重任务状态结束");
-                }
-                if (lostVendor.size() > 0) {//有缺失的数据
-                    for (String v : lostVendor) {
-                        String mergeId;
-                        MergeTaskItem mit;
-                        if(vendorMergeMap.containsKey(v)){
-                            mit = vendorMergeMap.get(v);
-                        }else{
-                            mit = new MergeTaskItem();
-                            mit.setMergeId(UUID.randomUUID().toString().replaceAll("-", ""));
-
-                        }
-                        String taskId = UUID.randomUUID().toString().replaceAll("-", "");
-                        VendorContentTask vendorTask = new VendorContentTask();
-                        vendorTask.setTaskId(taskId);
-                        vendorTask.setItemId(itemId);
-                        vendorTask.setRequestId(requestId);
-                        vendorTask.setVendor(v);
-                        vendorTask.setMergeId(mit.getMergeId());
-                        vendorTask.setVersion(0);
-                        vendorTask.setType(type);
-                        vendorTask.setContent(url);
-                        vendorTask.setCreateTime(new Date());
-                        vendorTask.setStatus(TaskStatus.WAIT);
-                        toSaveList.add(vendorTask);
-                        mit.setSize(mit.getSize() + 1);
-                        vendorMergeMap.put(v, mit);
-                    }
-                }
-            }
-            if (toSaveList.size() > 0) {
-                log.info("saveContentVendor数量[{}]", toSaveList.size());
-                vendorTaskRepository.saveAll(toSaveList);
-                //sendListMQ(toSendMsg);
-                log.info("saveContentVendor任务入库成功");
-                for(String s: vendorMergeMap.keySet()){
-                    TaskMsg vendorTaskMsg = new TaskMsg();
-                    vendorTaskMsg.setTaskId(vendorMergeMap.get(s).getMergeId());
-                    vendorTaskMsg.setOperation(TaskOperationEnum.getVendorOperation(s, type));
-                    vendorTaskMsg.setVendor(s);
-                    vendorTaskMsg.setVersion(0);
-                    vendorTaskMsg.setIsMerge(true);
-                    vendorTaskMsg.setType(type);
-                    vendorTaskMsg.setRetryNum(0);
-                    vendorTaskMsg.setSize(vendorMergeMap.get(s).getSize());
-                    producer.sendTaskMsg(vendorTaskMsg);
-                    log.info("saveContentVendor发送[{}]", s);
-                }
-                log.info("saveContentVendor发送MQ完成");
-
-            }else{
-                log.info("saveContentVendor[{}]没有可执行任务", requestId);
-            }
-
-            contentHistoryRepository.updateFlowStatusById(taskMsg.getId(), FlowEmun.split_vendor_done.name());
-
-        }catch (Exception e){
-            log.error("saveContentVendor异常[{}]", e);
-            taskMsg.setDelay(limitRetryRate);
-            taskMsg.setRetryNum(taskMsg.getRetryNum() + 1);
-            producer.sendDelayMsg(taskMsg);
-            return;
-        }
-        //最终轮询一次
-        TaskMsg robinTaskMsg = new TaskMsg();
-        robinTaskMsg.setId(taskMsg.getId());
-        robinTaskMsg.setTaskId(requestId);
-        robinTaskMsg.setOperation(TaskOperationEnum.content_vendor_robin);
-        robinTaskMsg.setVersion(0);
-        robinTaskMsg.setRetryNum(0);
-        robinTaskMsg.setDelay(robinRate);//TODO
-        producer.sendDelayMsg(robinTaskMsg);
-        log.info("发送轮询ContentHistory[{}]消息", requestId);
-        log.info("saveContentVendor结束[{}]", requestId);
-    }
-
-    @Override
-    public void contentItemRobin(TaskMsg taskMsg) throws ContentException {//目前没用，直接轮询了厂商
-        String requestId = taskMsg.getTaskId();
-        log.info("contentItemRobin开始[{}]", requestId);
-        try {
-            ContentHistory contentHistory = this.findHisttoryByRequestId(requestId);
-            if (contentHistory == null) {
-                log.error("用户任务不存在,丢弃消息");
-                return;
-            }
-            if(contentHistory.getStatus().equals(HisStatus.SUCCESS)|| contentHistory.getStatus().equals(HisStatus.FAIL)){
-                log.info("用户任务[{}]状态[{}]", requestId, contentHistory.getStatus());
-                return;
-            }
-
-            List<ContentItem> contentItemList = contentItemRepository.findByRequestId(requestId);
-            List<String> urls = JSONArray.parseArray(contentHistory.getContent(), String.class);
-
-            if(contentItemList.size() != urls.size()){
-                contentHistory.setStatus(HisStatus.FAIL);
-                contentHistory.setUpdateTime(new Date());
-                contentHistory.setMessage("拆分任务入库数量错误");
-                contentHistoryRepository.save(contentHistory);
-                log.error("拆分任务入库数量错误");
-                return;
-            }
-
-            if (taskMsg.getRetryNum() > limitRetry) {
-                contentHistory.setStatus(HisStatus.FAIL);
-                contentHistory.setUpdateTime(new Date());
-                contentHistory.setMessage("拆分任务及其子任务失败超限");
-                contentHistoryRepository.save(contentHistory);
-                log.error("超出重试次数,设置任务失败并丢弃消息");
-                return;
-            }
-
-            HisStatus stat = HisStatus.SUCCESS;
-            String desc = "";
-            for(ContentItem ci:contentItemList ){
-                if(ci.getStatus().equals(HisStatus.WAIT)){
-                    stat = HisStatus.WAIT;
-                }else if(ci.getStatus().equals(HisStatus.FAIL)) {
-                    stat = HisStatus.FAIL;
-                    desc = StringUtils.isNotBlank(ci.getMessage())?ci.getMessage():"执行任务失败";
-                    break;
-                }else{
-                    desc = StringUtils.isNotBlank(ci.getMessage())?ci.getMessage():"执行任务成功";
-                    continue;
-                }
-            }
-            if(stat.equals(HisStatus.FAIL) || stat.equals(HisStatus.SUCCESS)){
-                contentHistory.setStatus(stat);
-                contentHistory.setUpdateTime(new Date());
-                contentHistory.setMessage(desc);
-                contentHistoryRepository.save(contentHistory);
-                log.info("ItemRobin轮询结果为[{}]", desc);
-                return;
-            }
-            taskMsg.setDelay(3 * 60 *1000L);//TODO
-            producer.sendDelayMsg(taskMsg);
-
-        }catch (Exception e){
-            log.error("用户任务轮询异常[{}]", e);
-            taskMsg.setDelay(30000L);
-            taskMsg.setRetryNum(taskMsg.getRetryNum() + 1);
-            producer.sendDelayMsg(taskMsg);
-        }
-        log.info("contentItemRobin结束[{}]", requestId);
-    }
-*/
     @Override
     public void contentVendorRobin(TaskMsg taskMsg) throws ContentException {
         String requestId = taskMsg.getTaskId();
         log.info("contentVendorRobin开始[{}]", requestId);
         try {
 
-            ContentHistory contentHistory = contentHistoryRepository.findById(taskMsg.getId()).get();
-            if (contentHistory == null || contentHistory.getVersion() != taskMsg.getHisVersion()) {
-                log.error("用户任务不存在或版本不一致,丢弃消息");
+            ContentHistory contentHistory = dateBaseService.getContentHistoryRepository().findById(taskMsg.getId()).get();
+            if (contentHistory == null) {
+                log.error("用户任务不存在,丢弃消息");
                 return;
             }
 
+            if(taskMsg.getHisVersion() == null || taskMsg.getHisVersion() != -1 && taskMsg.getHisVersion() != contentHistory.getVersion()){
+                log.error("版本不一致,丢弃消息");
+                return;
+            }
 
             if(contentHistory.getStatus().equals(HisStatus.SUCCESS)|| contentHistory.getStatus().equals(HisStatus.FAIL)){
                 log.info("任务[{}]状态[{}]", requestId, contentHistory.getStatus());
                 return;
             }
 
-            if (taskMsg.getRetryNum() > limitRetry || taskMsg.getRoundRobinNum() > robinNum) {
+            if (taskMsg.getRetryNum() > limitRetry || taskMsg.getRoundRobinNum() > robinNum || taskMsg.getHisVersion() == -1) {
                 contentHistory.setStatus(HisStatus.FAIL);
                 contentHistory.setUpdateTime(new Date());
                 contentHistory.setMessage("任务超时失败");
-                contentHistoryRepository.save(contentHistory);
+                dateBaseService.getContentHistoryRepository().save(contentHistory);
                 log.error("[{}]contentVendorRobin超出重试次数,设置任务失败并丢弃消息",requestId);
                 return;
             }
 
 
-            if(contentHistory.getSuccessVendorNum().equals(contentHistory.getAllVendorNum())){
+            if(contentHistory.getSuccessTaskNum().equals(contentHistory.getAllTaskNum())){
                 contentHistory.setMessage("任务执行成功");
                 contentHistory.setUpdateTime(new Date());
                 contentHistory.setStatus(HisStatus.SUCCESS);
-                contentHistoryRepository.save(contentHistory);
+                dateBaseService.getContentHistoryRepository().save(contentHistory);
                 return;
             }
             taskMsg.setDelay(robinRate);//TODO
@@ -1092,126 +660,17 @@ public class ContentServiceImpl implements ContentService {
             log.error("任务轮询异常[{}]", e);
             taskMsg.setDelay(limitRetryRate);
             taskMsg.setRetryNum(taskMsg.getRetryNum() + 1);
-            producer.sendDelayMsg(taskMsg);
-        }
-        log.info("contentVendorRobin结束[{}]", requestId);
-    }
-
-
-/*
-    @Override
-    public void contentVendorRobin(TaskMsg taskMsg) throws ContentException {
-        String requestId = taskMsg.getTaskId();
-        log.info("contentVendorRobin开始[{}]", requestId);
-        try {
-
-            if (taskMsg.getRetryNum() > limitRetry || taskMsg.getRoundRobinNum() > robinNum) {
-                ContentHistory contentHistory = contentHistoryRepository.findById(taskMsg.getId()).get();
-                if (contentHistory == null) {
-                    log.error("用户任务不存在,丢弃消息");
-                    return;
-                }
-                if(contentHistory.getStatus().equals(HisStatus.SUCCESS)|| contentHistory.getStatus().equals(HisStatus.FAIL)){
-                    log.info("任务[{}]状态[{}]", requestId, contentHistory.getStatus());
-                    return;
-                }
-                contentHistory.setStatus(HisStatus.FAIL);
-                contentHistory.setUpdateTime(new Date());
-                contentHistory.setMessage("任务超时失败");
-                contentHistoryRepository.save(contentHistory);
+            if (taskMsg.getRetryNum() > limitRetry || taskMsg.getRoundRobinNum() > robinNum || taskMsg.getHisVersion() == -1) {
                 log.error("[{}]contentVendorRobin超出重试次数,设置任务失败并丢弃消息",requestId);
                 return;
             }
-
-            Map<String, HisStatus> itemStatusMap = new HashMap<>();
-            List<VendorContentTask> vendorContentTaskList = vendorTaskRepository.findByRequestId(requestId);
-            HisStatus stat = HisStatus.SUCCESS;
-            String desc = "";
-            for(VendorContentTask vc:vendorContentTaskList ){
-                if(!itemStatusMap.containsKey(vc.getItemId())){
-                    itemStatusMap.put(vc.getContent(), HisStatus.SUCCESS);
-                }
-                if(vc.getStatus().equals(TaskStatus.WAIT) || vc.getStatus().equals(TaskStatus.PROCESSING) || vc.getStatus().equals(TaskStatus.ROUND_ROBIN)){
-                    if(!itemStatusMap.get(vc.getContent()).equals(TaskStatus.FAIL)) {
-                        itemStatusMap.put(vc.getContent(), HisStatus.WAIT);
-                        stat = HisStatus.WAIT;
-                    }
-                }else if(vc.getStatus().equals(TaskStatus.FAIL)) {
-                    stat = HisStatus.FAIL;
-                    desc = StringUtils.isNotBlank(vc.getMessage())?vc.getMessage():"执行任务失败";
-                    itemStatusMap.put(vc.getContent(), HisStatus.FAIL);
-                    //break;
-                }else{
-                    desc = StringUtils.isNotBlank(vc.getMessage())?vc.getMessage():"执行任务成功";
-                    continue;
-                }
-            }
-
-            List<String> toSetList = new ArrayList<>();
-            for(String s : itemStatusMap.keySet()){
-                if(itemStatusMap.get(s).equals(HisStatus.SUCCESS) || itemStatusMap.get(s).equals(HisStatus.FAIL)) {
-                    toSetList.add(s);
-                }
-            }
-            if(toSetList.size()>0){
-                log.info("设置Item状态开始");
-                List<ContentItem> contentItemList = contentItemRepository.findByItemIdList(toSetList);
-                for(ContentItem ci: contentItemList){
-                    if(itemStatusMap.containsKey(ci.getItemId())){
-                        ci.setUpdateTime(new Date());
-                        ci.setStatus(itemStatusMap.get(ci.getItemId()));
-                    }else{
-                        stat = HisStatus.FAIL;
-                        desc = "Item任务数量异常";
-                        log.error("轮询item任务数量异常");
-                    }
-                }
-                contentItemRepository.saveAll(contentItemList);
-                log.info("设置Item状态结束");
-            }
-
-            /*
-            if(itemStatusMap.keySet().size() != contentHistory.getContentNumber()){//确认数量
-                stat = HisStatus.FAIL;
-                desc = "Item任务数量异常";
-                log.error("厂商任务数[{}]与原始url数量[{}]不一致",itemStatusMap.keySet().size(), contentHistory.getContentNumber());
-            }
-            */
-/*
-            if(stat.equals(HisStatus.FAIL) || stat.equals(HisStatus.SUCCESS)){
-                ContentHistory contentHistory = contentHistoryRepository.findById(taskMsg.getId()).get();
-                if (contentHistory == null) {
-                    log.error("用户任务不存在,丢弃消息");
-                    return;
-                }
-                if(contentHistory.getStatus().equals(HisStatus.SUCCESS)|| contentHistory.getStatus().equals(HisStatus.FAIL)){
-                    log.info("任务[{}]状态[{}]", requestId, contentHistory.getStatus());
-                    return;
-                }
-
-                if(itemStatusMap.keySet().size() != contentHistory.getContentNumber()){//确认数量
-                    stat = HisStatus.FAIL;
-                    desc = "Item任务数量异常";
-                    log.error("厂商任务数[{}]与原始url数量[{}]不一致",itemStatusMap.keySet().size(), contentHistory.getContentNumber());
-                }
-
-                contentHistoryRepository.updateStatusAndMessageById(taskMsg.getId(), stat.name(), desc);
-                log.info("VendorRobin轮询结果为[{}]", desc);
-                return;
-            }
-            taskMsg.setDelay(robinRate);//TODO
-            taskMsg.setRoundRobinNum(taskMsg.getRoundRobinNum() + 1);
-            producer.sendDelayMsg(taskMsg);
-
-        }catch (Exception e){
-            log.error("任务轮询异常[{}]", e);
-            taskMsg.setDelay(limitRetryRate);
-            taskMsg.setRetryNum(taskMsg.getRetryNum() + 1);
             producer.sendDelayMsg(taskMsg);
         }
         log.info("contentVendorRobin结束[{}]", requestId);
     }
-*/
+
+
+
 
     @Override
     public void clearErrorTask(TaskMsg taskMsg) throws ContentException {
@@ -1222,214 +681,12 @@ public class ContentServiceImpl implements ContentService {
 
     private void clearVendorTask(String taskId) throws ContentException {
         log.info("清理item任务[{}]的厂商任务开始", taskId);
-        List<VendorContentTask> vlist = vendorTaskRepository.findByRequestId(taskId);
+        List<VendorContentTask> vlist = dateBaseService.getVendorTaskRepository().findByRequestId(taskId);
         for(VendorContentTask vl: vlist  ){
-            vendorTaskRepository.deleteById(vl.getId());
+            dateBaseService.getVendorTaskRepository().deleteById(vl.getId());
         }
         log.info("清理item任务[{}]的厂商任务结束");
     }
-
-/*
-    @Override
-    public void saveContentItem(TaskMsg taskMsg) throws ContentException{
-        String requestId = taskMsg.getTaskId();
-        ContentHistory contentHistory = this.findHisttoryByRequestId(requestId);
-
-        if(contentHistory == null){
-            log.error("用户任务不存在,丢弃消息");
-            return;
-        }
-
-        if(taskMsg.getRetryNum() > limitRetry){
-            contentHistory.setStatus(HisStatus.FAIL);
-            contentHistory.setUpdateTime(new Date());
-            contentHistory.setMessage("拆分任务及其子任务失败超限");
-            contentHistoryRepository.save(contentHistory);
-            log.error("超出重试次数,设置任务失败并丢弃消息");
-            return;
-        }
-
-        List<ContentItem> checkItems = contentItemRepository.findByRequestId(requestId);
-        RefreshType type = contentHistory.getType();
-        List<ContentItem> contentItemList = new ArrayList<>();
-
-        if(checkItems == null || checkItems.size() != contentHistory.getContentNumber()) {
-            log.info("任务:{}入库不全{}，补全数据", requestId, checkItems);
-
-            List<String> urls = JSONArray.parseArray(contentHistory.getContent(), String.class);
-            List<String> lostUrls = new ArrayList<>();
-
-            if(checkItems != null && checkItems.size() != 0){
-                Map<String, ContentItem> existUrlMap = checkItems.stream().collect(Collectors.toMap(i->i.getContent(), i->i));
-                for(String s: urls){
-                    if(!existUrlMap.containsKey(s)){
-                        log.info("添加缺失url:{}",s);
-                        lostUrls.add(s);
-                    }
-                }
-                contentItemList.addAll(checkItems);
-            }else{
-                lostUrls.addAll(urls);
-            }
-
-            Map<String, Set<String>> domainVendorsMap = null;
-
-            log.info("开始查询厂商");
-            try {
-                domainVendorsMap = getDomainVendorsMapNew(lostUrls);
-                if(domainVendorsMap == null){
-                    log.error("获取厂商失败");
-                    taskMsg.setDelay(30000L);
-                    taskMsg.setRetryNum(taskMsg.getRetryNum() + 1);
-                    producer.sendTaskMsg(taskMsg);
-                    return;
-                }
-            } catch (Exception e) {//TODO 缓存线路
-                log.error("获取厂商失败");
-                taskMsg.setDelay(30000L);
-                taskMsg.setRetryNum(taskMsg.getRetryNum() + 1);
-                producer.sendTaskMsg(taskMsg);
-                return;
-            }
-            log.info("获取厂商成功");
-
-            URL domainUrl = null;
-            for (String u : lostUrls) {//
-                String itemId = UUID.randomUUID().toString().replaceAll("-", "");
-                ContentItem item = new ContentItem();
-                item.setRequestId(requestId);
-                item.setItemId(itemId);
-                item.setType(type);
-                item.setContent(u);
-                item.setCreateTime(new Date());
-                item.setStatus(HisStatus.WAIT);
-
-                try {
-                    domainUrl = new URL(u);
-                } catch (Exception e) {
-                    log.error("parse url:{} failed, err:{}", u, e.getMessage());
-                    contentHistory.setStatus(HisStatus.FAIL);
-                    contentHistory.setUpdateTime(new Date());
-                    contentHistory.setMessage("内容url解析失败");
-                    contentHistoryRepository.save(contentHistory);
-                    log.error("内容url解析失败,设置任务失败并丢弃消息");
-                    return;
-                }
-                String host = domainUrl.getHost();
-
-                item.setVendor(JSONObject.toJSONString(domainVendorsMap.get(host)));
-
-                contentItemList.add(item);
-            }
-            log.info("队列成功");
-
-            //校验入库正确
-            checkItems.clear();
-            checkItems = contentItemRepository.saveAll(contentItemList);
-            contentItemRepository.flush();//确保入库
-            log.info("插入成功");
-            if (checkItems == null || checkItems.size() != contentItemList.size()) {
-                //放回MQ
-                log.info("任务:{}, 拆分任务校验不正确", requestId);
-                taskMsg.setDelay(30000L);
-                taskMsg.setRetryNum(taskMsg.getRetryNum() + 1);
-                producer.sendDelayMsg(taskMsg);
-                return;
-            }else{
-                log.info("任务:{}, 拆分任务校验正确", requestId);
-            }
-        }else {
-            log.info("任务:{}, 拆分任务入库已完整", requestId);
-        }
-
-        int totalTaskSize = checkItems.stream().collect(Collectors.summingInt(i -> JSONArray.parseArray(i.getVendor(),String.class).size() ));
-        log.info("需要生成厂商任务数量:[{}]",totalTaskSize);
-
-        List<String> itemIdList = new ArrayList<>();
-
-        List<VendorContentTask> lostVendorContentTask = new ArrayList<>();
-
-        for(ContentItem it : checkItems){
-
-            if(it.getStatus().equals(HisStatus.FAIL)){
-                it.setStatus(HisStatus.WAIT);
-                it.setUpdateTime(new Date());
-                contentItemRepository.saveAndFlush(it);
-            }
-            itemIdList.add(it.getItemId());
-            int vendorNum = JSONArray.parseArray(it.getVendor(), String.class).size();
-            List<String> lostVendors = new ArrayList<>();
-
-            if(vendorNum == 0){
-                log.error("任务厂商列表为空");
-                //TODO
-            }else{
-                List<VendorContentTask> existVendorContentTask = vendorTaskRepository.findByItemId(it.getItemId());
-
-                if(existVendorContentTask.size() == JSONArray.parseArray(it.getVendor(), String.class).size() ){
-                    continue;
-
-                }else if(existVendorContentTask.size() ==0){
-                    lostVendors.addAll(JSONArray.parseArray(it.getVendor(), String.class));
-                }else{
-                    Map<String, VendorContentTask> vendorContentTaskMap = existVendorContentTask.stream().collect(Collectors.toMap(i->i.getVendor(), i->i));
-                    for(String s: JSONArray.parseArray(it.getVendor(), String.class)){
-                        if(!vendorContentTaskMap.containsKey(s)){
-                            lostVendors.add(s);
-                        }
-                    }
-                }
-                log.info("生成任务厂商{}", lostVendors);
-                for(String s:lostVendors){
-                    VendorContentTask vendorTask = new VendorContentTask();
-                    String taskId = UUID.randomUUID().toString().replaceAll("-", "");
-                    vendorTask.setItemId(it.getItemId());
-                    vendorTask.setTaskId(taskId);
-                    vendorTask.setVendor(s);
-                    vendorTask.setType(type);
-                    vendorTask.setContent(it.getContent());
-                    vendorTask.setVersion(0);
-                    vendorTask.setCreateTime(new Date());
-                    vendorTask.setStatus(TaskStatus.WAIT);
-                    lostVendorContentTask.add(vendorTask);
-                }
-            }
-        }
-        if(lostVendorContentTask.size()>0) {
-            vendorTaskRepository.saveAll(lostVendorContentTask);
-            vendorTaskRepository.flush();
-        }
-
-        List<VendorContentTask> allVendorContentTask = vendorTaskRepository.findByItemIdList(itemIdList);
-        int existSize = allVendorContentTask.size();
-        if(existSize != totalTaskSize){
-            log.error("厂商任务已入库数量{}, 需要{}", existSize, totalTaskSize);
-            taskMsg.setDelay(30000L);
-            taskMsg.setRetryNum(taskMsg.getRetryNum() + 1);
-            producer.sendDelayMsg(taskMsg);
-        }else{
-            log.info("厂商任务已入库数量{},并发送消息", existSize);
-
-            for(VendorContentTask it:allVendorContentTask) {
-                if(it.getStatus().equals(TaskStatus.FAIL)) {
-                    it.setStatus(TaskStatus.WAIT);
-                }
-                if(it.getStatus().equals(TaskStatus.WAIT)){
-                    if(it.getVersion() != 0){
-                        it.setVersion(0);
-                        it.setUpdateTime(new Date());
-                        vendorTaskRepository.saveAndFlush(it);
-                    }
-                    TaskMsg vendorTaskMsg = new TaskMsg();
-                    vendorTaskMsg.setTaskId(it.getTaskId());
-                    vendorTaskMsg.setVersion(0);
-                    vendorTaskMsg.setOperation(TaskOperationEnum.getVendorOperation(it.getVendor()));
-                    taskService.pushTaskMsg(vendorTaskMsg);
-                }
-            }
-        }
-    }
-*/
 
     @Override
     public ApiReceipt setUserContentNumber(ContentLimitDTO command) {
@@ -1443,42 +700,6 @@ public class ContentServiceImpl implements ContentService {
 
         return ApiReceipt.ok();
     }
-
-
-    /*
-    @Override
-    public ApiReceipt getUserContentNumber(String spCode) throws IOException {
-        UserLimit userLimit = userLimitRepository.findByUserId(spCode);
-        StringBuilder redisKey = new StringBuilder("contentNumber_").append(spCode);
-
-        JSONObject contentLimit = contentLimitJsonConfig.getDefaultContentLimit();
-        long lastModify = System.currentTimeMillis();
-        if(contentLimit == null){
-            contentLimit = new JSONObject();
-            contentLimit.put("urlRefreshNumber",new Item(0, userLimit != null?userLimit.getDefaultUrlLimit():maxRefresh));
-            contentLimit.put("dirRefreshNumber",new Item(0, userLimit != null?userLimit.getDefaultDirLimit():maxDirRefresh));
-            contentLimit.put("urlPreloadNumber",new Item(0, userLimit != null?userLimit.getDefaultPreloadLimit():maxPreheat));
-
-        }
-        contentLimit.put("lastModify",lastModify);
-
-        List<String> keys = new ArrayList<>();
-        keys.add(redisKey.toString());
-
-        List<String> args  = new ArrayList<>();
-        args.add(String.valueOf(System.currentTimeMillis()));
-        args.add(contentLimit.toJSONString());
-        args.add(String.valueOf(todayTimeStamp()));
-        // null 失败
-        String result = luaScriptService.executeUserLimitScript(keys,args);
-        if(null == result){
-            //anubisNotifyService.emailNotifyApiException(new AnubisNotifyExceptionRequest("anubis-content",type.name(),new StringBuilder("spCode:").append(spCode).toString(),new ApiReceipt().getRequestId(),"超过每日数量上限"));
-            //throw new ContentException("0x004012");
-            return ApiReceipt.error();
-        }
-
-        return ApiReceipt.ok(JSONObject.parse(result));
-    }*/
 
 
     @Override
@@ -1510,7 +731,7 @@ public class ContentServiceImpl implements ContentService {
                 resetFlag = true;
             }
         } else {
-            UserLimit userLimit = userLimitRepository.findByUserId(spCode);
+            UserLimit userLimit = dateBaseService.getUserLimitRepository().findByUserId(spCode);
             limitDTO = new ContentLimitDTO();
             limit.setDirRefreshNumber(new Item(0, userLimit != null?userLimit.getDefaultUrlLimit():maxDirRefresh));
             limit.setUrlPreloadNumber(new Item(0, userLimit != null?userLimit.getDefaultDirLimit():maxPreheat));
@@ -1534,7 +755,7 @@ public class ContentServiceImpl implements ContentService {
     @Override
     public  ContentHistory findHisttoryByRequestId(String id)throws ContentException{
 
-        return contentHistoryRepository.findByRequestId(id);
+        return dateBaseService.getContentHistoryRepository().findByRequestId(id);
     }
 
     
@@ -1556,9 +777,9 @@ public class ContentServiceImpl implements ContentService {
 
         if (adminFlag) {
             //管理员查全部域名
-            domains = domainRepository.findByDomainIn(domainParam);
+            domains = dateBaseService.getDomainRepository().findByDomainIn(domainParam);
         } else {
-            domains = domainRepository.findByUserCodeAndDomainIn(dto.getSpcode(), domainParam);
+            domains = dateBaseService.getDomainRepository().findByUserCodeAndDomainIn(dto.getSpcode(), domainParam);
         }
         if (null == domains || domains.size() == 0) {
             throw new ContentException("0x004008", "该用户无有效域名，禁止操作");
@@ -1586,9 +807,7 @@ public class ContentServiceImpl implements ContentService {
     
     private void checkUserLimit(boolean adminFlag,RefreshType type,String spCode,int size) throws ContentException {
         if(adminFlag) return;
-        //
-
-        UserLimit userLimit = userLimitRepository.findByUserId(spCode);
+        UserLimit userLimit = dateBaseService.getUserLimitRepository().findByUserId(spCode);
         JSONObject contentLimit = contentLimitJsonConfig.getDefaultContentLimit();
         long lastModify = System.currentTimeMillis();
         if(contentLimit == null){
@@ -1646,170 +865,6 @@ public class ContentServiceImpl implements ContentService {
         return false;
     }
 
-    /*
-    public Map<String, Set<String>> getDomainVendorsMap(List<String> contents) throws Exception {
-        Map<String, List<String>> domainUrlsMap = new HashMap<String, List<String>>();
-        URL domainUrl = null;
-
-        for (String url : contents) {
-            try {
-                domainUrl = new URL(url);
-            } catch (Exception e) {
-                log.error("parse url:{} failed, err:{}", url, e.getMessage());
-                throw RestfulException.builder().code(ErrEnum.ErrInternal.getCode()).message(e.getMessage()).build();
-            }
-            String host = domainUrl.getHost();
-            List<String> domainUrls = domainUrlsMap.get(host);
-            if (domainUrls == null) {
-                domainUrls = new ArrayList<String>();
-            }
-            domainUrls.add(url);
-            domainUrlsMap.put(host, domainUrls);
-        }
-
-        // 获取域名信息
-        List<String> domains = new ArrayList<String>(domainUrlsMap.keySet());
-        log.info("domains:{}", domains);
-        List<Domain> domainInfos = this.domainRepository.findAllByDomainInAndStatusNot(domains, "DELETE");
-        if (domainInfos.size() != domains.size()) {
-            log.error("cannot find all domains info from db");
-            //throw RestfulException.ErrNoSuchDomain;
-        }
-        List<DomainVendor> domianVendors = new ArrayList<>();
-        List<DomainVendor> tempDomianVendors = this.domainVendorRepository.findByDomainList(domains);
-        List<Domain> expireDomainInfos = new ArrayList<>();
-        for(DomainVendor d : tempDomianVendors){
-            if( new Date().getTime() -  d.getUpdateTime().getTime() < domianVendorExpire){
-                domianVendors.add(d);//未过期
-            }
-        }
-
-        if(domianVendors.size()>0){
-            Map<String, DomainVendor> mapDV = domianVendors.stream().collect(Collectors.toMap(i->i.getDomain(), i->i));
-            for(Domain d : domainInfos){
-                if(!mapDV.containsKey(d.getDomain())){
-                    expireDomainInfos.add(d);
-                }
-            }
-        }else{
-            expireDomainInfos.addAll(domainInfos);
-        }
-
-        // 获取域名所在的厂商
-        Set<String> lineIds = new HashSet<String>();
-        expireDomainInfos.forEach(d -> {
-            if (!StringUtils.isEmpty(d.getLineId())) {
-                lineIds.add(d.getLineId());
-            } else {//TODO 切覆盖
-                List<String> expectedVendor = getExpectedBaseLine(d.getExpectedVendor());
-                lineIds.addAll(expectedVendor);
-            }
-        });
-
-
-
-        List<LineResponse.LineDetail> lineInfos;
-        if(lineIds.size() > 0) {
-            lineInfos = this.lineService.getLineByIds(new ArrayList<String>(lineIds), true);
-            if (lineInfos.size() != lineIds.size()) {
-                log.error("cannot find all lines info lineIds:{}", lineIds);
-                //throw RestfulException.ErrNoSuchDomain;
-            }
-        }else{
-            lineInfos = new ArrayList<>();
-        }
-        Map<String, List<String>> lineIdVendorMap = new HashMap<String, List<String>>();
-        lineInfos.forEach(l -> {
-            List<String> lineVendors = new ArrayList<String>();
-            if (l.getType().equals(LineResponse.LineType.base.name())) {
-                lineVendors.add(l.getVendor());
-            } else {
-                if (l.getBaseLines() != null) {
-                    for (String baselineId : l.getBaseLines().keySet()) {
-                        lineVendors.add(l.getBaseLines().get(baselineId).getVendor());
-                    }
-                }
-            }
-            lineIdVendorMap.put(l.getId(), lineVendors);
-        });
-
-        // domain: [vendor]
-        tempDomianVendors.clear();
-        Map<String, Set<String>> domainVendorsMap = new HashMap<String, Set<String>>();
-        expireDomainInfos.forEach(d -> {
-            Set<String> domainVendors = domainVendorsMap.get(d);
-            if (domainVendors == null) {
-                domainVendors = new HashSet<String>();
-            }
-            if (!StringUtils.isEmpty(d.getLineId())) {
-                domainVendors.addAll(lineIdVendorMap.get(d.getLineId()));
-            } else {
-                List<String> expectedVendor = getExpectedBaseLine(d.getExpectedVendor());
-                for (String l : expectedVendor) {
-                    domainVendors.addAll(lineIdVendorMap.get(l));
-                }
-            }
-            domainVendorsMap.put(d.getDomain(), domainVendors);
-
-            List<String> vendor = new ArrayList<String>(domainVendors);
-            DomainVendor dv = new DomainVendor();
-            dv.setDomain(d.getDomain());
-            dv.setVendors(JSONObject.toJSONString(vendor));
-            dv.setUpdateTime(new Date());
-            tempDomianVendors.add(dv);
-        });
-        if(tempDomianVendors != null && tempDomianVendors.size() > 0){
-            domainVendorRepository.saveAll(tempDomianVendors);
-        }
-
-        for(DomainVendor d :domianVendors){
-            domainVendorsMap.put(d.getDomain(), new HashSet<String>(JSONArray.parseArray(d.getVendors(),String.class)));
-        }
-
-
-        log.info("domain-vendors:{}", domainVendorsMap);
-
-        return domainVendorsMap;
-
-
-        ContentVendorDTO contentReq = new ContentVendorDTO();
-
-        List<ContentVendorDTO.UrlVendor> urlVendors = new ArrayList<ContentVendorDTO.UrlVendor>();
-        for( String domain : domainUrlsMap.keySet()) {
-            ContentVendorDTO.UrlVendor item = new ContentVendorDTO.UrlVendor();
-            item.setUrls(domainUrlsMap.get(domain));
-            item.setVendors(new ArrayList<String>(domainVendorsMap.get(domain)));
-            urlVendors.add(item);
-        }
-
-        contentReq.setTaskId(contentMessage.getTaskId());
-        contentReq.setType(contentMessage.getType().name());
-        contentReq.setUrlVendors(urlVendors);
-
-        log.info("contentReq->:{}", contentReq );
-
-        return contentReq;
-
-        // vendor: [url]
-        Map<String, List<String>> vendorUrlsMap = new HashMap<String, List<String>>();
-        domains.forEach(d -> {
-            // 域名所在的厂商
-            Set<String> dVendors = domainVendorsMap.get(d);
-            // 域名要刷新/预取的urls
-            List<String> dUrls = domainUrlsMap.get(d);
-            dVendors.forEach(v -> {
-                List<String> vendorUrls = vendorUrlsMap.get(v);
-                if (vendorUrls == null) {
-                    vendorUrls = new ArrayList<String>();
-                }
-                vendorUrls.addAll(dUrls);
-                vendorUrlsMap.put(v, vendorUrls);
-            });
-        });
-
-    }
-    */
-
 
     public Map<String, List<String>> getDomainVendorsMapNew(List<String> contents) throws Exception{
         Map<String, List<String>> domainUrlsMap = new HashMap<String, List<String>>();
@@ -1846,7 +901,7 @@ public class ContentServiceImpl implements ContentService {
         if(lostDomains.size()>0) {
             // 获取域名信息
             log.info("domains:{}", Utils.objectToString(lostDomains));
-            List<Domain> domainInfos = this.domainRepository.findAllByDomainInAndStatusNot(lostDomains, "DELETE");
+            List<Domain> domainInfos = dateBaseService.getDomainRepository().findAllByDomainInAndStatusNot(lostDomains, "DELETE");
             if (domainInfos.size() != lostDomains.size()) {
                 log.error("cannot find all domains info from db");
                 flag = false;
@@ -1863,7 +918,7 @@ public class ContentServiceImpl implements ContentService {
                 }
             });
 
-            List<LineVendor> vendors = this.lineToVendorRepository.findByLineIdList(new ArrayList<String>(lineIds));
+            List<LineVendor> vendors = dateBaseService.getLineToVendorRepository().findByLineIdList(new ArrayList<String>(lineIds));
             Map<String, LineVendor> lineIdLineVendorMap = vendors.stream().collect(Collectors.toMap(i -> i.getLineId(), i -> i));
             Map<String, List<String>> lineIdVendorMap = new HashMap<String, List<String>>();
             for (LineVendor lv : vendors) {
@@ -1899,7 +954,7 @@ public class ContentServiceImpl implements ContentService {
                             LineVendor LineVendorAdd = new LineVendor();
                             LineVendorAdd.setLineId(l.getId());
                             LineVendorAdd.setVendors(JSONObject.toJSONString(lineVendors));
-                            lineToVendorRepository.save(LineVendorAdd);
+                            dateBaseService.getLineToVendorRepository().save(LineVendorAdd);
                         } else {
                             log.error("厂商数量为空");
                             flag = false;
@@ -1976,7 +1031,7 @@ public class ContentServiceImpl implements ContentService {
 
     @Override
     public ApiReceipt setUserDefaultContentNumber(ContentDefaultNumDTO command) {
-        UserLimit userLimit = userLimitRepository.findByUserId(command.getSpCode());
+        UserLimit userLimit = dateBaseService.getUserLimitRepository().findByUserId(command.getSpCode());
         if(userLimit == null){
             userLimit = new UserLimit();
         }
@@ -1984,13 +1039,13 @@ public class ContentServiceImpl implements ContentService {
         userLimit.setDefaultDirLimit(command.getDirRefreshNumber());
         userLimit.setDefaultPreloadLimit(command.getUrlPreloadNumber());
         userLimit.setUpdateTime(new Date());
-        userLimitRepository.save(userLimit);
+        dateBaseService.getUserLimitRepository().save(userLimit);
         return ApiReceipt.ok();
     }
 
     @Override
     public ApiReceipt getUserDefaultContentNumber(String spCode) throws IOException {
-        UserLimit userLimit = userLimitRepository.findByUserId(spCode);
+        UserLimit userLimit = dateBaseService.getUserLimitRepository().findByUserId(spCode);
         if(userLimit == null){
             return ApiReceipt.ok();
         }else{

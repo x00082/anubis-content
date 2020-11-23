@@ -50,6 +50,9 @@ public class RedisLuaScriptService {
     @Resource(name = "expireLuaScript")
     private RedisScript<Long> expireLuaScript;
 
+    @Resource(name = "getIdLuaScript")
+    private RedisScript<String> getIdLuaScript;
+
 
     /**
      * 启动时加载
@@ -139,6 +142,22 @@ public class RedisLuaScriptService {
     public String executeUserLimitScript(List<String> keys, List<String> args) {
         try {
             String scriptValue = redisTemplate.execute(getUserLimitLuaScript,keys,args.toArray());
+            return scriptValue.toString();
+        } catch (Exception e) {
+            log.error("execute script error", e);
+            return null;
+        }
+    }
+
+    /**
+     * 执行脚本
+     * @param keys
+     * @param args
+     * @return
+     */
+    public String executeGetIdScript(List<String> keys, List<String> args) {
+        try {
+            String scriptValue = redisTemplate.execute(getIdLuaScript,keys,args.toArray());
             return scriptValue.toString();
         } catch (Exception e) {
             log.error("execute script error", e);

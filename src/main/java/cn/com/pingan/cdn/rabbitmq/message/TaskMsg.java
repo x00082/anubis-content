@@ -43,5 +43,7 @@ public class TaskMsg {
     private Integer retryNum = 0;
     private Integer roundRobinNum = 0;
     private List<RobinStatus> robinStatusList;
+    private RefreshPreloadTaskStatusDTO robinTaskDto;
+    private List<RobinCallBack> robinCallBackList;
 
 }

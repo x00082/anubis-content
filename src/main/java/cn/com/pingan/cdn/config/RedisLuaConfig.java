@@ -63,4 +63,12 @@ public class RedisLuaConfig {
         redisScript.setResultType(String.class);
         return redisScript;
     }
+
+    @Bean("getIdLuaScript")
+    public RedisScript<String> getIdLuaScript() {
+        DefaultRedisScript<String> redisScript = new DefaultRedisScript<>();
+        redisScript.setLocation(new ClassPathResource("lua/getId.lua"));
+        redisScript.setResultType(String.class);
+        return redisScript;
+    }
 }

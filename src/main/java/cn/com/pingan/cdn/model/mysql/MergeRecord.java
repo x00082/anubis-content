@@ -3,7 +3,6 @@ package cn.com.pingan.cdn.model.mysql;
 import lombok.Data;
 
 import javax.persistence.*;
-import java.util.Date;
 
 /**
  * @Classname MergeTask
@@ -13,18 +12,16 @@ import java.util.Date;
  */
 @Data
 @Entity
-public class MergeTask {
+@Table(name="merge_record",
+        uniqueConstraints = {
+                @UniqueConstraint(columnNames = {"merge_id"})
+        })
+public class MergeRecord {
 
     @Id
     @GeneratedValue(strategy= GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name="vendor_url_ids")
-    private String vendorUrlIds;
-
-    @Column(name="create_time")
-    private Date createTime;
-
-    @Column(name="update_time")
-    private Date updateTime;
+    @Column(name="merge_id", length=128)
+    private String mergeId;
 }

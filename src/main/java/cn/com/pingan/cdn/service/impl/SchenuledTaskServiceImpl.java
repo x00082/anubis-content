@@ -4,8 +4,7 @@ import cn.com.pingan.cdn.config.RedisLuaScriptService;
 import cn.com.pingan.cdn.exception.ContentException;
 import cn.com.pingan.cdn.model.mysql.ContentHistory;
 import cn.com.pingan.cdn.model.mysql.VendorContentTask;
-import cn.com.pingan.cdn.repository.mysql.ContentHistoryRepository;
-import cn.com.pingan.cdn.repository.mysql.VendorTaskRepository;
+import cn.com.pingan.cdn.service.DateBaseService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -35,10 +34,7 @@ public class SchenuledTaskServiceImpl {
     private Integer taskExpire;
 
     @Autowired
-    ContentHistoryRepository contentHistoryRepository;
-
-    @Autowired
-    VendorTaskRepository vendorTaskRepository;
+    DateBaseService dateBaseService;
 
     @Autowired
     RedisLuaScriptService luaScriptService;
@@ -66,13 +62,13 @@ public class SchenuledTaskServiceImpl {
                 return;
             }
 
-            List<ContentHistory> historys = contentHistoryRepository.findByCreateTimeBefore(expire);
+            List<ContentHistory> historys = dateBaseService.getContentHistoryRepository().findByCreateTimeBefore(expire);
             for(ContentHistory ch: historys){
                 clearsubTask(ch.getRequestId());
             }
             expire = preNDay(taskExpire);
             log.info("清理{}之前的厂商任务", formatter.format(expire));
-            vendorTaskRepository.clear(expire);
+            dateBaseService.getVendorTaskRepository().clear(expire);
             log.info("清理数据结束");
         }catch (Exception e){
             log.error("清理任务异常[{}]", e);
@@ -98,9 +94,9 @@ public class SchenuledTaskServiceImpl {
 
     private void clearVendorTask(String taskId) throws ContentException {
         log.info("清理item任务[{}]的厂商任务开始", taskId);
-        List<VendorContentTask> vlist = vendorTaskRepository.findByRequestId(taskId);
+        List<VendorContentTask> vlist = dateBaseService.getVendorTaskRepository().findByRequestId(taskId);
         for(VendorContentTask vl: vlist  ){
-            vendorTaskRepository.deleteById(vl.getId());
+            dateBaseService.getVendorTaskRepository().deleteById(vl.getId());
         }
         log.info("清理item任务[{}]的厂商任务结束");
     }

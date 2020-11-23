@@ -46,10 +46,13 @@ public class Constants {
     public static final String CONTENT_MESSAGE_EXCHANGE="anubisContentExchange";//正常
 
     public static final String CONTENT_MESSAGE_ITEM="content_item";
-    public static final String CONTENT_MESSAGE_ITEM_ROBIN="content_item_robin";
+    //public static final String CONTENT_MESSAGE_ITEM_ROBIN="content_item_robin";
 
-    public static final String CONTENT_MESSAGE_VENDOR="content_vendor";
+    //public static final String CONTENT_MESSAGE_VENDOR="content_vendor";
     public static final String CONTENT_MESSAGE_VENDOR_ROBIN="content_vendor_robin";
+    public static final String CONTENT_MESSAGE_VENDOR_SUCCESS="content_vendor_success";
+    public static final String CONTENT_MESSAGE_VENDOR_FAIL="content_vendor_fail";
+
 
     //厂商队列
     public static final String CONTENT_VENDOR_QINIU_COMMON = "content_qiniu_common";

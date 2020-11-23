@@ -34,10 +34,7 @@ public class DelayConsumer {
             JSONObject msgObj=JSONObject.parseObject(msg);
 
             log.info("receiveDelay rabbit mq receive a delay message{}", msg.toString());
-
             TaskMsg taskMsg = JSONObject.toJavaObject(msgObj, TaskMsg.class);
-            log.info("转换对象{}", taskMsg);
-
             taskMsg.setDelay(0L);
             this.producer.sendTaskMsg(taskMsg);//只做延时，消息交给具体队列处理
 

@@ -70,8 +70,11 @@ public class VendorConsumer {
             taskService.handlerRobinTask(taskMsg);
         }else if( -1 != taskMsg.getOperation().toString().indexOf("_common")){
             taskService.handlerCommonTask(taskMsg);
-        }
-        else {
+        }else if(taskMsg.getOperation().equals(TaskOperationEnum.content_vendor_success)){
+            taskService.handlerSuccess(taskMsg);
+        }else if(taskMsg.getOperation().equals(TaskOperationEnum.content_vendor_fail)){
+            taskService.handlerFail(taskMsg);
+        } else {
             taskService.handlerRequestTask(taskMsg);
         }
     }
@@ -111,10 +114,7 @@ public class VendorConsumer {
             JSONObject msgObj = JSONObject.parseObject(msg);
 
             log.info("ALiYun rabbit mq receive a message{}", msg.toString());
-
             TaskMsg taskMsg = JSONObject.toJavaObject(msgObj, TaskMsg.class);
-            log.info("转换对象{}", taskMsg);
-
             handlerMessage(taskMsg);
 
         } catch (Exception e) {
@@ -137,10 +137,7 @@ public class VendorConsumer {
             JSONObject msgObj = JSONObject.parseObject(msg);
 
             log.info("ALiYunUrl rabbit mq receive a message{}", msg.toString());
-
             TaskMsg taskMsg = JSONObject.toJavaObject(msgObj, TaskMsg.class);
-            log.info("转换对象{}", taskMsg);
-
             handlerMessage(taskMsg);
 
         } catch (Exception e) {
@@ -162,10 +159,7 @@ public class VendorConsumer {
             JSONObject msgObj = JSONObject.parseObject(msg);
 
             log.info("ALiYunDir rabbit mq receive a message{}", msg.toString());
-
             TaskMsg taskMsg = JSONObject.toJavaObject(msgObj, TaskMsg.class);
-            log.info("转换对象{}", taskMsg);
-
             handlerMessage(taskMsg);
 
         } catch (Exception e) {
@@ -187,10 +181,7 @@ public class VendorConsumer {
             JSONObject msgObj = JSONObject.parseObject(msg);
 
             log.info("ALiYunPreheat rabbit mq receive a message{}", msg.toString());
-
             TaskMsg taskMsg = JSONObject.toJavaObject(msgObj, TaskMsg.class);
-            log.info("转换对象{}", taskMsg);
-
             handlerMessage(taskMsg);
 
         } catch (Exception e) {
@@ -213,10 +204,7 @@ public class VendorConsumer {
             JSONObject msgObj = JSONObject.parseObject(msg);
 
             log.info("ALiYunRobin rabbit mq receive a message{}", msg.toString());
-
             TaskMsg taskMsg = JSONObject.toJavaObject(msgObj, TaskMsg.class);
-            log.info("转换对象{}", taskMsg);
-
             handlerMessage(taskMsg);
 
         } catch (Exception e) {
@@ -240,10 +228,7 @@ public class VendorConsumer {
             JSONObject msgObj = JSONObject.parseObject(msg);
 
             log.info("BaiShan rabbit mq receive a message{}", msg.toString());
-
             TaskMsg taskMsg = JSONObject.toJavaObject(msgObj, TaskMsg.class);
-            log.info("转换对象{}", taskMsg);
-
             handlerMessage(taskMsg);
 
         } catch (Exception e) {
@@ -265,10 +250,7 @@ public class VendorConsumer {
             JSONObject msgObj = JSONObject.parseObject(msg);
 
             log.info("BaiShanUrl rabbit mq receive a message{}", msg.toString());
-
             TaskMsg taskMsg = JSONObject.toJavaObject(msgObj, TaskMsg.class);
-            log.info("转换对象{}", taskMsg);
-
             handlerMessage(taskMsg);
 
         } catch (Exception e) {
@@ -290,10 +272,7 @@ public class VendorConsumer {
             JSONObject msgObj = JSONObject.parseObject(msg);
 
             log.info("BaiShanDIR rabbit mq receive a message{}", msg.toString());
-
             TaskMsg taskMsg = JSONObject.toJavaObject(msgObj, TaskMsg.class);
-            log.info("转换对象{}", taskMsg);
-
             handlerMessage(taskMsg);
 
         } catch (Exception e) {
@@ -315,10 +294,7 @@ public class VendorConsumer {
             JSONObject msgObj = JSONObject.parseObject(msg);
 
             log.info("BaiShanPreheat rabbit mq receive a message{}", msg.toString());
-
             TaskMsg taskMsg = JSONObject.toJavaObject(msgObj, TaskMsg.class);
-            log.info("转换对象{}", taskMsg);
-
             handlerMessage(taskMsg);
 
         } catch (Exception e) {
@@ -341,10 +317,7 @@ public class VendorConsumer {
             JSONObject msgObj = JSONObject.parseObject(msg);
 
             log.info("BaiShanRobin rabbit mq receive a message{}", msg.toString());
-
             TaskMsg taskMsg = JSONObject.toJavaObject(msgObj, TaskMsg.class);
-            log.info("转换对象{}", taskMsg);
-
             handlerMessage(taskMsg);
 
         } catch (Exception e) {
@@ -367,10 +340,7 @@ public class VendorConsumer {
             JSONObject msgObj = JSONObject.parseObject(msg);
 
             log.info("ChinaChe rabbit mq receive a message{}", msg.toString());
-
             TaskMsg taskMsg = JSONObject.toJavaObject(msgObj, TaskMsg.class);
-            log.info("转换对象{}", taskMsg);
-
             handlerMessage(taskMsg);
 
         } catch (Exception e) {
@@ -392,10 +362,7 @@ public class VendorConsumer {
             JSONObject msgObj = JSONObject.parseObject(msg);
 
             log.info("ChinaCheUrl rabbit mq receive a message{}", msg.toString());
-
             TaskMsg taskMsg = JSONObject.toJavaObject(msgObj, TaskMsg.class);
-            log.info("转换对象{}", taskMsg);
-
             handlerMessage(taskMsg);
 
         } catch (Exception e) {
@@ -417,10 +384,7 @@ public class VendorConsumer {
             JSONObject msgObj = JSONObject.parseObject(msg);
 
             log.info("ChinaCheDir rabbit mq receive a message{}", msg.toString());
-
             TaskMsg taskMsg = JSONObject.toJavaObject(msgObj, TaskMsg.class);
-            log.info("转换对象{}", taskMsg);
-
             handlerMessage(taskMsg);
 
         } catch (Exception e) {
@@ -442,10 +406,7 @@ public class VendorConsumer {
             JSONObject msgObj = JSONObject.parseObject(msg);
 
             log.info("ChinaChePreheat rabbit mq receive a message{}", msg.toString());
-
             TaskMsg taskMsg = JSONObject.toJavaObject(msgObj, TaskMsg.class);
-            log.info("转换对象{}", taskMsg);
-
             handlerMessage(taskMsg);
 
         } catch (Exception e) {
@@ -468,10 +429,7 @@ public class VendorConsumer {
             JSONObject msgObj = JSONObject.parseObject(msg);
 
             log.info("ChinaCheRobin rabbit mq receive a message{}", msg.toString());
-
             TaskMsg taskMsg = JSONObject.toJavaObject(msgObj, TaskMsg.class);
-            log.info("转换对象{}", taskMsg);
-
             handlerMessage(taskMsg);
 
         } catch (Exception e) {
@@ -494,10 +452,7 @@ public class VendorConsumer {
             JSONObject msgObj = JSONObject.parseObject(msg);
 
             log.info("JDCloud rabbit mq receive a message{}", msg.toString());
-
             TaskMsg taskMsg = JSONObject.toJavaObject(msgObj, TaskMsg.class);
-            log.info("转换对象{}", taskMsg);
-
             handlerMessage(taskMsg);
 
         } catch (Exception e) {
@@ -519,10 +474,7 @@ public class VendorConsumer {
             JSONObject msgObj = JSONObject.parseObject(msg);
 
             log.info("JDCloudUrl rabbit mq receive a message{}", msg.toString());
-
             TaskMsg taskMsg = JSONObject.toJavaObject(msgObj, TaskMsg.class);
-            log.info("转换对象{}", taskMsg);
-
             handlerMessage(taskMsg);
 
         } catch (Exception e) {
@@ -544,10 +496,7 @@ public class VendorConsumer {
             JSONObject msgObj = JSONObject.parseObject(msg);
 
             log.info("JDCloudDir rabbit mq receive a message{}", msg.toString());
-
             TaskMsg taskMsg = JSONObject.toJavaObject(msgObj, TaskMsg.class);
-            log.info("转换对象{}", taskMsg);
-
             handlerMessage(taskMsg);
 
         } catch (Exception e) {
@@ -569,10 +518,7 @@ public class VendorConsumer {
             JSONObject msgObj = JSONObject.parseObject(msg);
 
             log.info("JDCloudPreheat rabbit mq receive a message{}", msg.toString());
-
             TaskMsg taskMsg = JSONObject.toJavaObject(msgObj, TaskMsg.class);
-            log.info("转换对象{}", taskMsg);
-
             handlerMessage(taskMsg);
 
         } catch (Exception e) {
@@ -595,10 +541,7 @@ public class VendorConsumer {
             JSONObject msgObj = JSONObject.parseObject(msg);
 
             log.info("JDCloudRobin rabbit mq receive a message{}", msg.toString());
-
             TaskMsg taskMsg = JSONObject.toJavaObject(msgObj, TaskMsg.class);
-            log.info("转换对象{}", taskMsg);
-
             handlerMessage(taskMsg);
 
         } catch (Exception e) {
@@ -621,10 +564,7 @@ public class VendorConsumer {
             JSONObject msgObj = JSONObject.parseObject(msg);
 
             log.info("KSYun rabbit mq receive a message{}", msg.toString());
-
             TaskMsg taskMsg = JSONObject.toJavaObject(msgObj, TaskMsg.class);
-            log.info("转换对象{}", taskMsg);
-
             handlerMessage(taskMsg);
 
         } catch (Exception e) {
@@ -646,10 +586,7 @@ public class VendorConsumer {
             JSONObject msgObj = JSONObject.parseObject(msg);
 
             log.info("KSYunUrl rabbit mq receive a message{}", msg.toString());
-
             TaskMsg taskMsg = JSONObject.toJavaObject(msgObj, TaskMsg.class);
-            log.info("转换对象{}", taskMsg);
-
             handlerMessage(taskMsg);
 
         } catch (Exception e) {
@@ -671,10 +608,7 @@ public class VendorConsumer {
             JSONObject msgObj = JSONObject.parseObject(msg);
 
             log.info("KSYunDir rabbit mq receive a message{}", msg.toString());
-
             TaskMsg taskMsg = JSONObject.toJavaObject(msgObj, TaskMsg.class);
-            log.info("转换对象{}", taskMsg);
-
             handlerMessage(taskMsg);
 
         } catch (Exception e) {
@@ -696,10 +630,7 @@ public class VendorConsumer {
             JSONObject msgObj = JSONObject.parseObject(msg);
 
             log.info("KSYunPreheat rabbit mq receive a message{}", msg.toString());
-
             TaskMsg taskMsg = JSONObject.toJavaObject(msgObj, TaskMsg.class);
-            log.info("转换对象{}", taskMsg);
-
             handlerMessage(taskMsg);
 
         } catch (Exception e) {
@@ -722,10 +653,7 @@ public class VendorConsumer {
             JSONObject msgObj = JSONObject.parseObject(msg);
 
             log.info("KSYunRobin rabbit mq receive a message{}", msg.toString());
-
             TaskMsg taskMsg = JSONObject.toJavaObject(msgObj, TaskMsg.class);
-            log.info("转换对象{}", taskMsg);
-
             handlerMessage(taskMsg);
 
         } catch (Exception e) {
@@ -748,10 +676,7 @@ public class VendorConsumer {
             JSONObject msgObj = JSONObject.parseObject(msg);
 
             log.info("Net rabbit mq receive a message{}", msg.toString());
-
             TaskMsg taskMsg = JSONObject.toJavaObject(msgObj, TaskMsg.class);
-            log.info("转换对象{}", taskMsg);
-
             handlerMessage(taskMsg);
 
         } catch (Exception e) {
@@ -773,10 +698,7 @@ public class VendorConsumer {
             JSONObject msgObj = JSONObject.parseObject(msg);
 
             log.info("NetUrl rabbit mq receive a message{}", msg.toString());
-
             TaskMsg taskMsg = JSONObject.toJavaObject(msgObj, TaskMsg.class);
-            log.info("转换对象{}", taskMsg);
-
             handlerMessage(taskMsg);
 
         } catch (Exception e) {
@@ -798,10 +720,7 @@ public class VendorConsumer {
             JSONObject msgObj = JSONObject.parseObject(msg);
 
             log.info("NetDir rabbit mq receive a message{}", msg.toString());
-
             TaskMsg taskMsg = JSONObject.toJavaObject(msgObj, TaskMsg.class);
-            log.info("转换对象{}", taskMsg);
-
             handlerMessage(taskMsg);
 
         } catch (Exception e) {
@@ -823,10 +742,7 @@ public class VendorConsumer {
             JSONObject msgObj = JSONObject.parseObject(msg);
 
             log.info("NetPreheat rabbit mq receive a message{}", msg.toString());
-
             TaskMsg taskMsg = JSONObject.toJavaObject(msgObj, TaskMsg.class);
-            log.info("转换对象{}", taskMsg);
-
             handlerMessage(taskMsg);
 
         } catch (Exception e) {
@@ -849,10 +765,7 @@ public class VendorConsumer {
             JSONObject msgObj = JSONObject.parseObject(msg);
 
             log.info("NetRobin rabbit mq receive a message{}", msg.toString());
-
             TaskMsg taskMsg = JSONObject.toJavaObject(msgObj, TaskMsg.class);
-            log.info("转换对象{}", taskMsg);
-
             handlerMessage(taskMsg);
 
         } catch (Exception e) {
@@ -875,10 +788,7 @@ public class VendorConsumer {
             JSONObject msgObj = JSONObject.parseObject(msg);
 
             log.info("QiNiu rabbit mq receive a message{}", msg.toString());
-
             TaskMsg taskMsg = JSONObject.toJavaObject(msgObj, TaskMsg.class);
-            log.info("转换对象{}", taskMsg);
-
             handlerMessage(taskMsg);
 
         } catch (Exception e) {
@@ -900,10 +810,7 @@ public class VendorConsumer {
             JSONObject msgObj = JSONObject.parseObject(msg);
 
             log.info("receiveQiNiuUrl rabbit mq receive a message{}", msg.toString());
-
             TaskMsg taskMsg = JSONObject.toJavaObject(msgObj, TaskMsg.class);
-            log.info("转换对象{}", taskMsg);
-
             handlerMessage(taskMsg);
 
 
@@ -926,10 +833,7 @@ public class VendorConsumer {
             JSONObject msgObj = JSONObject.parseObject(msg);
 
             log.info("receiveQiNiuDir rabbit mq receive a message{}", msg.toString());
-
             TaskMsg taskMsg = JSONObject.toJavaObject(msgObj, TaskMsg.class);
-            log.info("转换对象{}", taskMsg);
-
             handlerMessage(taskMsg);
 
         } catch (Exception e) {
@@ -951,10 +855,7 @@ public class VendorConsumer {
             JSONObject msgObj = JSONObject.parseObject(msg);
 
             log.info("receiveQiNiuPreheat rabbit mq receive a message{}", msg.toString());
-
             TaskMsg taskMsg = JSONObject.toJavaObject(msgObj, TaskMsg.class);
-            log.info("转换对象{}", taskMsg);
-
             handlerMessage(taskMsg);
 
         } catch (Exception e) {
@@ -977,10 +878,7 @@ public class VendorConsumer {
             JSONObject msgObj = JSONObject.parseObject(msg);
 
             log.info("QiNiuRobin rabbit mq receive a message{}", msg.toString());
-
             TaskMsg taskMsg = JSONObject.toJavaObject(msgObj, TaskMsg.class);
-            log.info("转换对象{}", taskMsg);
-
             handlerMessage(taskMsg);
 
         } catch (Exception e) {
@@ -1003,10 +901,7 @@ public class VendorConsumer {
             JSONObject msgObj = JSONObject.parseObject(msg);
 
             log.info("TenCent rabbit mq receive a message{}", msg.toString());
-
             TaskMsg taskMsg = JSONObject.toJavaObject(msgObj, TaskMsg.class);
-            log.info("转换对象{}", taskMsg);
-
             handlerMessage(taskMsg);
 
         } catch (Exception e) {
@@ -1028,10 +923,7 @@ public class VendorConsumer {
             JSONObject msgObj = JSONObject.parseObject(msg);
 
             log.info("TenCent rabbit mq receive a message{}", msg.toString());
-
             TaskMsg taskMsg = JSONObject.toJavaObject(msgObj, TaskMsg.class);
-            log.info("转换对象{}", taskMsg);
-
             handlerMessage(taskMsg);
 
         } catch (Exception e) {
@@ -1053,10 +945,7 @@ public class VendorConsumer {
             JSONObject msgObj = JSONObject.parseObject(msg);
 
             log.info("TenCent rabbit mq receive a message{}", msg.toString());
-
             TaskMsg taskMsg = JSONObject.toJavaObject(msgObj, TaskMsg.class);
-            log.info("转换对象{}", taskMsg);
-
             handlerMessage(taskMsg);
 
         } catch (Exception e) {
@@ -1078,10 +967,7 @@ public class VendorConsumer {
             JSONObject msgObj = JSONObject.parseObject(msg);
 
             log.info("TenCent rabbit mq receive a message{}", msg.toString());
-
             TaskMsg taskMsg = JSONObject.toJavaObject(msgObj, TaskMsg.class);
-            log.info("转换对象{}", taskMsg);
-
             handlerMessage(taskMsg);
 
         } catch (Exception e) {
@@ -1104,10 +990,7 @@ public class VendorConsumer {
             JSONObject msgObj = JSONObject.parseObject(msg);
 
             log.info("TenCentRobin rabbit mq receive a message{}", msg.toString());
-
             TaskMsg taskMsg = JSONObject.toJavaObject(msgObj, TaskMsg.class);
-            log.info("转换对象{}", taskMsg);
-
             handlerMessage(taskMsg);
 
         } catch (Exception e) {
@@ -1131,10 +1014,7 @@ public class VendorConsumer {
             JSONObject msgObj = JSONObject.parseObject(msg);
 
             log.info("Venus rabbit mq receive a message{}", msg.toString());
-
             TaskMsg taskMsg = JSONObject.toJavaObject(msgObj, TaskMsg.class);
-            log.info("转换对象{}", taskMsg);
-
             handlerMessage(taskMsg);
 
         } catch (Exception e) {
@@ -1156,10 +1036,7 @@ public class VendorConsumer {
             JSONObject msgObj = JSONObject.parseObject(msg);
 
             log.info("VenusUrl rabbit mq receive a message{}", msg.toString());
-
             TaskMsg taskMsg = JSONObject.toJavaObject(msgObj, TaskMsg.class);
-            log.info("转换对象{}", taskMsg);
-
             handlerMessage(taskMsg);
 
         } catch (Exception e) {
@@ -1181,10 +1058,7 @@ public class VendorConsumer {
             JSONObject msgObj = JSONObject.parseObject(msg);
 
             log.info("VenusDir rabbit mq receive a message{}", msg.toString());
-
             TaskMsg taskMsg = JSONObject.toJavaObject(msgObj, TaskMsg.class);
-            log.info("转换对象{}", taskMsg);
-
             handlerMessage(taskMsg);
 
         } catch (Exception e) {
@@ -1207,10 +1081,7 @@ public class VendorConsumer {
             JSONObject msgObj = JSONObject.parseObject(msg);
 
             log.info("VenusPrheat rabbit mq receive a message{}", msg.toString());
-
             TaskMsg taskMsg = JSONObject.toJavaObject(msgObj, TaskMsg.class);
-            log.info("转换对象{}", taskMsg);
-
             handlerMessage(taskMsg);
 
         } catch (Exception e) {
@@ -1234,10 +1105,7 @@ public class VendorConsumer {
             JSONObject msgObj = JSONObject.parseObject(msg);
 
             log.info("VenusRobin rabbit mq receive a message{}", msg.toString());
-
             TaskMsg taskMsg = JSONObject.toJavaObject(msgObj, TaskMsg.class);
-            log.info("转换对象{}", taskMsg);
-
             handlerMessage(taskMsg);
 
         } catch (Exception e) {
@@ -1248,6 +1116,57 @@ public class VendorConsumer {
                 channel.basicAck(message.getMessageProperties().getDeliveryTag(), false);
             } catch (IOException e) {
                 log.error("receiveVenusRobin Ack Fail ");
+            }
+        }
+    }
+
+
+
+
+    /******************************************成功******************************************/
+    @RabbitListener(queues = Constants.CONTENT_MESSAGE_VENDOR_SUCCESS, concurrency = "1")
+    public void receiveSuccess(Channel channel, Message message){
+        try {
+
+            String msg=new String(message.getBody());
+            JSONObject msgObj=JSONObject.parseObject(msg);
+
+            log.info("Success rabbit mq receive a message{}", msg.toString());
+            TaskMsg taskMsg = JSONObject.toJavaObject(msgObj, TaskMsg.class);
+            handlerMessage(taskMsg);
+
+        }catch (Exception e){
+            log.info("用户拆分任务失败", e);
+        }finally {
+
+            try {
+                channel.basicAck(message.getMessageProperties().getDeliveryTag(),false);
+            } catch (IOException e) {
+                log.error("receiveSuccess Ack Fail ");
+            }
+        }
+    }
+
+    /******************************************失败******************************************/
+    @RabbitListener(queues = Constants.CONTENT_MESSAGE_VENDOR_FAIL, concurrency = "1")
+    public void receiveFail(Channel channel, Message message){
+        try {
+
+            String msg=new String(message.getBody());
+            JSONObject msgObj=JSONObject.parseObject(msg);
+
+            log.info("Fail rabbit mq receive a message{}", msg.toString());
+            TaskMsg taskMsg = JSONObject.toJavaObject(msgObj, TaskMsg.class);
+            handlerMessage(taskMsg);
+
+        }catch (Exception e){
+            log.info("厂商拆分任务失败", e);
+        }finally {
+
+            try {
+                channel.basicAck(message.getMessageProperties().getDeliveryTag(),false);
+            } catch (IOException e) {
+                log.error("receiveFail Ack Fail ");
             }
         }
     }
