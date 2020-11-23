@@ -543,7 +543,22 @@ public class ContentServiceImpl implements ContentService {
             }
 
             if(toSaveList.size()>0) {//TODO时间长
-                dateBaseService.getVendorTaskRepository().saveAll(toSaveList);
+                JxGaga gg = JxGaga.of(Executors.newCachedThreadPool(), toSaveList.size());
+                List<String> rs = new ArrayList<>();
+                for (VendorContentTask vct : toSaveList) {
+                    gg.work(() -> {
+                        dateBaseService.getVendorTaskRepository().save(vct);
+                        return "save done";
+                    }, j -> rs.add(j), q -> {
+                        q.getMessage();
+                    });
+                }
+                gg.merge((i) -> {
+                    i.forEach(j -> {
+                        log.info(j);
+                    });
+                }, rs).exit();
+                //dateBaseService.getVendorTaskRepository().saveAll(toSaveList);
                 log.info("saveVendorTask入库完成，数量[{}]", toSaveList.size());
             }
             contentHistory.setUpdateTime(new Date());
@@ -580,9 +595,13 @@ public class ContentServiceImpl implements ContentService {
                 dateBaseService.getMergeRecordRepository().saveAll(records);
                 log.info("记录合并[{}]", records.size());
             }
-            log.info("saveVendorTask发送MQ完成");
 
+            HistoryRecord historyRecord = new HistoryRecord();
+            historyRecord.setRequestId(requestId);
+            historyRecord.setVersion(contentHistory.getVersion());
+            dateBaseService.getHistoryRecordRepository().save(historyRecord);
 
+            /*
             log.info("轮询ContentHistory[{}]", requestId);
             TaskMsg robinTaskMsg = new TaskMsg();
             robinTaskMsg.setTaskId(requestId);
@@ -593,6 +612,7 @@ public class ContentServiceImpl implements ContentService {
             robinTaskMsg.setRetryNum(0);
             robinTaskMsg.setDelay(3 * 60 *1000L);//TODO
             producer.sendDelayMsg(robinTaskMsg);
+            */
             log.info("saveVendorTask结束[{}]", requestId);
 
         }catch (Exception e){
@@ -619,42 +639,110 @@ public class ContentServiceImpl implements ContentService {
         log.info("contentVendorRobin开始[{}]", requestId);
         try {
 
-            ContentHistory contentHistory = dateBaseService.getContentHistoryRepository().findByRequestId(requestId);
-            if (contentHistory == null) {
-                log.error("用户任务不存在,丢弃消息");
-                return;
-            }
+            if(!taskMsg.getIsMerge()) {
+                log.info("one task");
+                ContentHistory contentHistory = dateBaseService.getContentHistoryRepository().findByRequestId(requestId);
+                if (contentHistory == null) {
+                    log.error("用户任务不存在,丢弃消息");
+                    return;
+                }
 
-            if(taskMsg.getHisVersion() == null || taskMsg.getHisVersion() != -1 && taskMsg.getHisVersion() != contentHistory.getVersion()){
-                log.error("版本不一致,丢弃消息");
-                return;
-            }
+                if (taskMsg.getHisVersion() == null || taskMsg.getHisVersion() != -1 && taskMsg.getHisVersion() != contentHistory.getVersion()) {
+                    log.error("版本不一致,丢弃消息");
+                    return;
+                }
 
-            if(contentHistory.getStatus().equals(HisStatus.SUCCESS)|| contentHistory.getStatus().equals(HisStatus.FAIL)){
-                log.info("任务[{}]状态[{}]", requestId, contentHistory.getStatus());
-                return;
-            }
+                if (contentHistory.getStatus().equals(HisStatus.SUCCESS) || contentHistory.getStatus().equals(HisStatus.FAIL)) {
+                    log.info("任务[{}]状态[{}]", requestId, contentHistory.getStatus());
+                    return;
+                }
 
-            if (taskMsg.getRetryNum() > limitRetry || taskMsg.getRoundRobinNum() > robinNum || taskMsg.getHisVersion() == -1) {
-                contentHistory.setStatus(HisStatus.FAIL);
-                contentHistory.setUpdateTime(new Date());
-                contentHistory.setMessage("任务超时失败");
-                dateBaseService.getContentHistoryRepository().save(contentHistory);
-                log.error("[{}]contentVendorRobin超出重试次数,设置任务失败并丢弃消息",requestId);
-                return;
-            }
+                if (taskMsg.getRetryNum() > limitRetry || taskMsg.getRoundRobinNum() > robinNum || taskMsg.getHisVersion() == -1) {
+                    contentHistory.setStatus(HisStatus.FAIL);
+                    contentHistory.setUpdateTime(new Date());
+                    contentHistory.setMessage("任务超时失败");
+                    dateBaseService.getContentHistoryRepository().save(contentHistory);
+                    log.error("[{}]contentVendorRobin超出重试次数,设置任务失败并丢弃消息", requestId);
+                    return;
+                }
 
 
-            if(contentHistory.getSuccessTaskNum().equals(contentHistory.getAllTaskNum())){
-                contentHistory.setMessage("任务执行成功");
-                contentHistory.setUpdateTime(new Date());
-                contentHistory.setStatus(HisStatus.SUCCESS);
-                dateBaseService.getContentHistoryRepository().save(contentHistory);
-                return;
+                if (contentHistory.getSuccessTaskNum().equals(contentHistory.getAllTaskNum())) {
+                    contentHistory.setMessage("任务执行成功");
+                    contentHistory.setUpdateTime(new Date());
+                    contentHistory.setStatus(HisStatus.SUCCESS);
+                    dateBaseService.getContentHistoryRepository().save(contentHistory);
+                    return;
+                }
+                taskMsg.setDelay(robinRate);//TODO
+                taskMsg.setRoundRobinNum(taskMsg.getRoundRobinNum() + 1);
+                producer.sendDelayMsg(taskMsg);
+            }else{
+                log.info("merge task");
+                if(taskMsg.getRobinCallBackList() == null && taskMsg.getRobinCallBackList().size() == 0){
+                    log.error("无效的消息，弃之", requestId);
+                    return;
+                }
+                Map<String, RobinCallBack> idsVersionMap = new HashMap<>();
+                for(RobinCallBack rcb: taskMsg.getRobinCallBackList()){
+                    idsVersionMap.put(rcb.getRequestId(), rcb);
+                }
+                List<ContentHistory> contentHistorys = dateBaseService.getContentHistoryRepository().findByRequestIdIn(new ArrayList<>(idsVersionMap.keySet()));
+
+                List<ContentHistory> toSaveList = new ArrayList<>();
+                List<RobinCallBack> toSendList = new ArrayList<>();
+                for(ContentHistory ch: contentHistorys){
+                    if(ch.getStatus().equals(HisStatus.SUCCESS)|| ch.getStatus().equals(HisStatus.FAIL)){
+                        continue;
+                    }
+                    if(ch.getVersion() != idsVersionMap.get(ch.getRequestId()).getVersion()){
+                        continue;
+                    }
+                    if(ch.getSuccessTaskNum().equals(ch.getAllTaskNum())){
+                        ch.setMessage("任务执行成功");
+                        ch.setUpdateTime(new Date());
+                        ch.setStatus(HisStatus.SUCCESS);
+                        toSaveList.add(ch);
+                    }else{
+                        if(taskMsg.getRetryNum() > limitRetry || taskMsg.getRoundRobinNum() > robinNum){
+                            ch.setMessage("任务执行失败");
+                            ch.setUpdateTime(new Date());
+                            ch.setStatus(HisStatus.FAIL);
+                            toSaveList.add(ch);
+                        }else {
+                            toSendList.add(idsVersionMap.get(ch.getRequestId()));
+                        }
+                    }
+                }
+
+                if(toSaveList.size()>0){
+                    JxGaga gg = JxGaga.of(Executors.newCachedThreadPool(), toSaveList.size());
+                    List<String> rs = new ArrayList<>();
+                    log.info("更新用户历史状态->[Success]");
+                    for (ContentHistory tch : toSaveList) {
+                        gg.work(() -> {
+                            dateBaseService.getContentHistoryRepository().save(tch);
+                            return "save done";
+                        }, j -> rs.add(j), q -> {
+                            q.getMessage();
+                        });
+                    }
+                    gg.merge((i) -> {
+                        i.forEach(j -> {
+                            log.info(j);
+                        });
+                    }, rs).exit();
+                    log.info("更新轮询终态数量[{}]", toSaveList.size());
+                }
+
+                if(toSendList.size()>0){
+                    taskMsg.setDelay(robinRate);//TODO
+                    taskMsg.setRoundRobinNum(taskMsg.getRoundRobinNum() + 1);
+                    taskMsg.getRobinCallBackList().clear();
+                    taskMsg.getRobinCallBackList().addAll(toSendList);
+                    producer.sendDelayMsg(taskMsg);
+                }
             }
-            taskMsg.setDelay(robinRate);//TODO
-            taskMsg.setRoundRobinNum(taskMsg.getRoundRobinNum() + 1);
-            producer.sendDelayMsg(taskMsg);
 
         }catch (Exception e){
             log.error("任务轮询异常[{}]", e);

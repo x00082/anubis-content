@@ -3,10 +3,7 @@ package cn.com.pingan.cdn.service.impl;
 import cn.com.pingan.cdn.common.*;
 import cn.com.pingan.cdn.config.RedisLuaScriptService;
 import cn.com.pingan.cdn.current.JxGaga;
-import cn.com.pingan.cdn.model.mysql.MergeRecord;
-import cn.com.pingan.cdn.model.mysql.RobinRecord;
-import cn.com.pingan.cdn.model.mysql.VendorContentTask;
-import cn.com.pingan.cdn.model.mysql.VendorInfo;
+import cn.com.pingan.cdn.model.mysql.*;
 import cn.com.pingan.cdn.rabbitmq.message.FanoutMsg;
 import cn.com.pingan.cdn.rabbitmq.message.TaskMsg;
 import cn.com.pingan.cdn.rabbitmq.producer.Producer;
@@ -71,6 +68,10 @@ public class CheckTaskServiceImpl {
     private String robinKey = "robinTask";
     @Value("${task.robin.fixedRate:5000}")
     private String robinRate;
+
+    private String robinHistoryKey = "robinHistoryTask";
+    @Value("${task.hittory.robin.fixedRate:5000}")
+    private String robinHistoryRate;
 
     @Scheduled(fixedRateString = "${task.check.fixedRate:60000}", initialDelay = 10000)
     public void queryStatus(){
@@ -259,7 +260,7 @@ public class CheckTaskServiceImpl {
 
                 log.info("清理已合并任务");
             }else{
-                log.info("没有有需要合并记录");
+                log.info("没有需要合并记录");
             }
         }catch (Exception e){
             log.info("处理合并异常[{}]", e);
@@ -349,6 +350,66 @@ public class CheckTaskServiceImpl {
         }
         log.info("end robinTask...");
     }
+
+
+    @Scheduled(fixedRateString = "${task.history.robin.fixedRate:5000}", initialDelay = 10000)
+    public void historyRobinTask(){
+        log.info("start historyRobinTask...");
+        try {
+            List<String> keys = new ArrayList<>();
+            keys.add(robinHistoryKey);
+            List<String> args = new ArrayList<>();
+            args.add(String.valueOf(System.currentTimeMillis()));
+            args.add(robinHistoryRate);
+            // 0-成功，-1执行异常，-100超限
+            int re = luaScriptService.executeExpireScript(keys, args);
+            if(re != 0 ){
+                log.error("没有执行权限");
+                return;
+            }
+            List<String> records = new ArrayList<>();
+            List<HistoryRecord> historyRecords = dateBaseService.getHistoryRecordRepository().findByLimit(1000);
+
+
+            Map<String, TaskMsg> reqTaskMap = new HashMap<>();
+            if(historyRecords.size()>0) {
+                log.info("需要轮询记录数量[{}]", historyRecords.size());
+                int i=0;
+                String taskId = UUID.randomUUID().toString().replaceAll("-", "");
+                for (HistoryRecord hr:historyRecords) {
+                    if (i % 50 == 0) {
+                        taskId = UUID.randomUUID().toString().replaceAll("-", "");
+                        TaskMsg msg = new TaskMsg();
+                        msg.setTaskId(taskId);
+                        msg.setOperation(TaskOperationEnum.content_vendor_robin);
+                        List<RobinCallBack> rcbList = new ArrayList<>();
+                        msg.setRobinCallBackList(rcbList);
+                        msg.setIsMerge(true);
+                        reqTaskMap.put(taskId, msg);
+                    }
+                    RobinCallBack rcb = new RobinCallBack();
+                    rcb.setRequestId(hr.getRequestId());
+                    rcb.setVersion(hr.getVersion());
+                    rcb.setNum(0);
+                    reqTaskMap.get(taskId).getRobinCallBackList().add(rcb);
+                }
+
+                if(reqTaskMap.values().size()>0){
+                    sendListMQ(new ArrayList<>(reqTaskMap.values()));
+                    log.info("发送合并后数量[{}]", reqTaskMap.values().size());
+                }
+                dateBaseService.getHistoryRecordRepository().deleteInBatch(historyRecords);
+                log.info("清理已轮询任务");
+
+            }else{
+                log.info("没有需要轮询的历史记录");
+            }
+        }catch (Exception e){
+            log.info("处理用户历史轮询异常[{}]", e);
+        }
+        log.info("end historyRobinTask...");
+    }
+
 
 
     /*

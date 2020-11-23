@@ -41,6 +41,9 @@ public class DateBaseServiceImpl implements DateBaseService {
     @Autowired
     private  RobinRecordRepository robinRecordRepository;
 
+    @Autowired
+    private HistoryRecordRepository historyRecordRepository;
+
     @Override
     public ContentHistoryRepository getContentHistoryRepository() {
         return contentHistoryRepository;
@@ -77,7 +80,8 @@ public class DateBaseServiceImpl implements DateBaseService {
     }
 
     @Override
-    public RobinRecordRepository getRobinRecordRepository() {
-        return robinRecordRepository;
-    }
+    public RobinRecordRepository getRobinRecordRepository() { return robinRecordRepository;}
+
+    @Override
+    public HistoryRecordRepository getHistoryRecordRepository() { return historyRecordRepository; }
 }
