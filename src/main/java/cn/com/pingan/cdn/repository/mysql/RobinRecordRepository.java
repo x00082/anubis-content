@@ -30,6 +30,6 @@ public interface RobinRecordRepository extends JpaRepository<RobinRecord, Long>,
 
     @Modifying
     @Transactional
-    @Query(value = "select * from merge_record limit ?1", nativeQuery = true)
+    @Query(value = "select * from robin_record limit ?1", nativeQuery = true)
     List<RobinRecord> findByLimit(int l);
 }

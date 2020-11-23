@@ -386,7 +386,7 @@ public class ContentServiceImpl implements ContentService {
         boolean force = taskMsg.getForce();
         log.info("saveVendorTask start [{}]", requestId);
         try {
-            ContentHistory contentHistory = dateBaseService.getContentHistoryRepository().findById(taskMsg.getId()).get();
+            ContentHistory contentHistory = dateBaseService.getContentHistoryRepository().findByRequestId(requestId);
             if (contentHistory == null) {
                 log.error("用户任务不存在,丢弃消息");
                 return;
@@ -619,7 +619,7 @@ public class ContentServiceImpl implements ContentService {
         log.info("contentVendorRobin开始[{}]", requestId);
         try {
 
-            ContentHistory contentHistory = dateBaseService.getContentHistoryRepository().findById(taskMsg.getId()).get();
+            ContentHistory contentHistory = dateBaseService.getContentHistoryRepository().findByRequestId(requestId);
             if (contentHistory == null) {
                 log.error("用户任务不存在,丢弃消息");
                 return;
@@ -1065,7 +1065,7 @@ public class ContentServiceImpl implements ContentService {
         }
         gg.merge((i) -> {
  		        i.forEach(j -> {log.info(j);});
- 	        }, rl, 2, TimeUnit.SECONDS).exit();
+ 	        }, rl).exit();
     }
 
 

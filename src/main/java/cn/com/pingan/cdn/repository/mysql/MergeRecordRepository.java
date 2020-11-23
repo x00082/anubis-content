@@ -28,9 +28,8 @@ import java.util.List;
 @Repository
 public interface MergeRecordRepository extends JpaRepository<MergeRecord, Long>, JpaSpecificationExecutor<MergeRecord> {
 
-
     @Modifying
     @Transactional
-    @Query(value = "select merge_id from merge_record limit ?1", nativeQuery = true)
-    List<String> findMeridLimit(int l);
+    @Query(value = "select * from merge_record limit ?1", nativeQuery = true)
+    List<MergeRecord> findByLimit(int l);
 }

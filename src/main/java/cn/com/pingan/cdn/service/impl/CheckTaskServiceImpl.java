@@ -167,7 +167,7 @@ public class CheckTaskServiceImpl {
                 return;
             }
             List<String> records = new ArrayList<>();
-            List<MergeRecord> mergeRecords = dateBaseService.getMergeRecordRepository().findAll();
+            List<MergeRecord> mergeRecords = dateBaseService.getMergeRecordRepository().findByLimit(10000);
             for(MergeRecord r: mergeRecords){
                 records.add(r.getMergeId());
             }
@@ -285,7 +285,7 @@ public class CheckTaskServiceImpl {
                 return;
             }
             List<String> records = new ArrayList<>();
-            List<RobinRecord> robinRecord = dateBaseService.getRobinRecordRepository().findAll();
+            List<RobinRecord> robinRecord = dateBaseService.getRobinRecordRepository().findByLimit(100);
 
 
             Map<String, List<RefreshPreloadTaskStatusDTO>> vendorRobinDtoMap = new HashMap<>();
