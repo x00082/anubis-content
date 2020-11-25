@@ -321,7 +321,7 @@ public class CheckTaskServiceImpl {
                         vendorRobinDtoMap.get(rr.getVendor()).add(rpts);
                     }
                 }
-                log.info("组装轮序请求列表[{}]", vendorRobinDtoMap);
+                log.info("组装轮询请求列表[{}]", vendorRobinDtoMap);
                 List<TaskMsg> toSendMq = new ArrayList<>();
                 for(String s :vendorRobinDtoMap.keySet()){
                     for(RefreshPreloadTaskStatusDTO dto: vendorRobinDtoMap.get(s) ){

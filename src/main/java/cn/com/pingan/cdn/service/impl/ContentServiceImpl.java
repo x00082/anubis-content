@@ -216,6 +216,8 @@ public class ContentServiceImpl implements ContentService {
             if (contentHistory.getStatus().equals(HisStatus.FAIL)) {//任务已失败或未开始
                 contentHistory.setStatus(HisStatus.WAIT);
                 contentHistory.setFlowStatus(FlowEmun.redo);
+                contentHistory.setVersion(contentHistory.getVersion() + 1);
+                contentHistory.setAllTaskNum(-1);
                 dateBaseService.getContentHistoryRepository().save(contentHistory);
                 log.info("[{}]请求任务已失败，设置为wait", requestId);
 
@@ -224,9 +226,14 @@ public class ContentServiceImpl implements ContentService {
                     log.info("[{}]请求任务为wait,强制重试", requestId);
                     contentHistory.setFlowStatus(FlowEmun.redo);
                     contentHistory.setVersion(contentHistory.getVersion() + 1);
+                    contentHistory.setAllTaskNum(-1);
                     dateBaseService.getContentHistoryRepository().save(contentHistory);
                 }else{
                     log.info("[{}]请求任务为wait,不需要重试", requestId);
+                    if(contentHistory.getSuccessTaskNum().equals(contentHistory.getAllTaskNum())){
+                        contentHistory.setStatus(HisStatus.SUCCESS);
+                        dateBaseService.getContentHistoryRepository().save(contentHistory);
+                    }
                     return ApiReceipt.ok();
                 }
             } else {
@@ -415,13 +422,13 @@ public class ContentServiceImpl implements ContentService {
             }
             log.info("获取厂商成功");
 
-            contentHistory.setVersion(contentHistory.getVersion() + 1);
             Map<String, List<VendorContentTask>> toSaveVendorTaskMap = new HashMap<>();
             Map<String, String> vendorTaskId = new HashMap<>();
 
             List<VendorContentTask> toNewSaveList = new ArrayList<>();
             List<VendorContentTask> toUpdateSaveList = new ArrayList<>();
 
+            contentHistory.setVersion(contentHistory.getVersion() + 1);
             if (taskMsg.getVersion() == 0) {//区别新请求与重试
                 log.info("saveVendorTask当前为首次请求，存入全部数据");
                 lostUrlsMap.putAll(vendorUrlMap);
@@ -444,6 +451,7 @@ public class ContentServiceImpl implements ContentService {
                         vendorTask.setVersion(contentHistory.getVersion());
                         vendorTask.setType(taskMsg.getType());
                         vendorTask.setContent(url);
+                        vendorTask.setHistoryCreateTime(contentHistory.getCreateTime());
                         vendorTask.setCreateTime(new Date());
                         vendorTask.setStatus(TaskStatus.WAIT);
                         toSaveVendorTaskMap.get(v).add(vendorTask);
@@ -484,6 +492,7 @@ public class ContentServiceImpl implements ContentService {
                             vendorTask.setVersion(contentHistory.getVersion());
                             vendorTask.setType(taskMsg.getType());
                             vendorTask.setContent(url);
+                            vendorTask.setHistoryCreateTime(contentHistory.getCreateTime());
                             vendorTask.setCreateTime(new Date());
                             vendorTask.setStatus(TaskStatus.WAIT);
                             toSaveVendorTaskMap.get(v).add(vendorTask);
@@ -532,6 +541,7 @@ public class ContentServiceImpl implements ContentService {
                             vendorTask.setVendor(v);
                             vendorTask.setMergeId(vendorTaskId.get(v));
                             vendorTask.setVersion(contentHistory.getVersion());
+                            vendorTask.setHistoryCreateTime(contentHistory.getCreateTime());
                             vendorTask.setType(taskMsg.getType());
                             vendorTask.setContent(url);
                             vendorTask.setCreateTime(new Date());
