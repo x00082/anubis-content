@@ -412,5 +412,36 @@ public class ContentController {
           dto.setToken(request.getHeader("token") != null ? String.valueOf(request.getHeader("token")) : null);
           return dto;
       }
-        
+
+/*
+    @PutMapping("/refresh/test")
+    public ApiReceipt test(@Valid @RequestBody FreshCommand command) throws ContentException, DomainException {
+        log.info("content/fresh/dir start command:{}", JSON.toJSONString(command));
+        GateWayHeaderDTO dto = this.getGateWayInfo(request);
+        if (StringUtils.isEmpty(dto.getUsername()) || StringUtils.isEmpty(dto.getUid()) || StringUtils.isEmpty(dto.getSpcode())) {
+            return ApiReceipt.error(ErrorCode.NOHEADER);
+        }
+
+        //越权校验
+        if (!"true".equals(dto.getIsAdmin())) {
+            if (StringUtils.isEmpty(command.getSpCode()) || !dto.getSpcode().equals(command.getSpCode())) {
+                return ApiReceipt.error(ErrorCode.FORBIDOPT);
+            }
+        }
+
+        if (null == command.getData() || command.getData().size() == 0) {
+
+            return ApiReceipt.error(ErrorCode.PARAMILLEGAL);
+        }
+
+        if (command.getData().size() > StaticValue.SINGLE_DIR_REFRESH_LIMIT) {
+            return ApiReceipt.error(ErrorCode.OUTLIMITSINGLE);
+        }
+
+
+        ApiReceipt result = this.facade.test();
+        log.info("content/fresh/dir end result:{}", JSON.toJSONString(result));
+        return result;
+    }
+*/
 }

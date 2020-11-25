@@ -418,6 +418,10 @@ public class ContentServiceImpl implements ContentService {
             contentHistory.setVersion(contentHistory.getVersion() + 1);
             Map<String, List<VendorContentTask>> toSaveVendorTaskMap = new HashMap<>();
             Map<String, String> vendorTaskId = new HashMap<>();
+
+            List<VendorContentTask> toNewSaveList = new ArrayList<>();
+            List<VendorContentTask> toUpdateSaveList = new ArrayList<>();
+
             if (taskMsg.getVersion() == 0) {//区别新请求与重试
                 log.info("saveVendorTask当前为首次请求，存入全部数据");
                 lostUrlsMap.putAll(vendorUrlMap);
@@ -443,6 +447,7 @@ public class ContentServiceImpl implements ContentService {
                         vendorTask.setCreateTime(new Date());
                         vendorTask.setStatus(TaskStatus.WAIT);
                         toSaveVendorTaskMap.get(v).add(vendorTask);
+                        toNewSaveList.add(vendorTask);
                     }
                 }
                 taskMsg.setVersion(1);
@@ -482,6 +487,7 @@ public class ContentServiceImpl implements ContentService {
                             vendorTask.setCreateTime(new Date());
                             vendorTask.setStatus(TaskStatus.WAIT);
                             toSaveVendorTaskMap.get(v).add(vendorTask);
+                            toNewSaveList.add(vendorTask);
                         }
                     }
 
@@ -502,6 +508,7 @@ public class ContentServiceImpl implements ContentService {
                             vct.setUpdateTime(new Date());
                             vct.setMergeId(vendorTaskId.get(vct.getVendor()));
                             toSaveVendorTaskMap.get(vct.getVendor()).add(vct);
+                            toUpdateSaveList.add(vct);
                         }
                     }
                 }else{
@@ -530,40 +537,32 @@ public class ContentServiceImpl implements ContentService {
                             vendorTask.setCreateTime(new Date());
                             vendorTask.setStatus(TaskStatus.WAIT);
                             toSaveVendorTaskMap.get(v).add(vendorTask);
+                            toNewSaveList.add(vendorTask);
                         }
                     }
                 }
             }
 
-            List<VendorContentTask> toSaveList = new ArrayList<>();
-            for(String v:toSaveVendorTaskMap.keySet()){
-                if(toSaveVendorTaskMap.get(v).size() > 0){
-                    toSaveList.addAll(toSaveVendorTaskMap.get(v));
-                }
+            int allNum = toNewSaveList.size() + toUpdateSaveList.size();
+
+            if(toNewSaveList.size()>0){
+                dateBaseService.getVendorTaskRepository().batchSave(toNewSaveList);
+                log.info("saveVendorTask新增入库完成，数量[{}]", toNewSaveList.size());
+            }
+            if(toUpdateSaveList.size()>0){
+                dateBaseService.getVendorTaskRepository().batchUpdate(toUpdateSaveList);
+                log.info("saveVendorTask更新入库完成，数量[{}]", toUpdateSaveList.size());
             }
 
+            /*
             if(toSaveList.size()>0) {//TODO时间长
-                JxGaga gg = JxGaga.of(Executors.newCachedThreadPool(), toSaveList.size());
-                List<String> rs = new ArrayList<>();
-                for (VendorContentTask vct : toSaveList) {
-                    gg.work(() -> {
-                        dateBaseService.getVendorTaskRepository().save(vct);
-                        return "save done";
-                    }, j -> rs.add(j), q -> {
-                        q.getMessage();
-                    });
-                }
-                gg.merge((i) -> {
-                    i.forEach(j -> {
-                        log.info(j);
-                    });
-                }, rs).exit();
-                //dateBaseService.getVendorTaskRepository().saveAll(toSaveList);
+                dateBaseService.getVendorTaskRepository().saveAll(toSaveList);
                 log.info("saveVendorTask入库完成，数量[{}]", toSaveList.size());
             }
+            */
             contentHistory.setUpdateTime(new Date());
             contentHistory.setFlowStatus(FlowEmun.split_vendor_done);
-            contentHistory.setAllTaskNum(toSaveList.size());
+            contentHistory.setAllTaskNum(allNum);
             contentHistory.setSuccessTaskNum(0);
 
             dateBaseService.getContentHistoryRepository().save(contentHistory);
@@ -634,13 +633,12 @@ public class ContentServiceImpl implements ContentService {
 
 
     @Override
-    public void contentVendorRobin(TaskMsg taskMsg) throws ContentException {
+    public void contentHistoryRobin(TaskMsg taskMsg) throws ContentException {
         String requestId = taskMsg.getTaskId();
         log.info("contentVendorRobin开始[{}]", requestId);
         try {
-
             if(!taskMsg.getIsMerge()) {
-                log.info("one task");
+                log.info("one contentVendorRobin task");
                 ContentHistory contentHistory = dateBaseService.getContentHistoryRepository().findByRequestId(requestId);
                 if (contentHistory == null) {
                     log.error("用户任务不存在,丢弃消息");
@@ -678,7 +676,7 @@ public class ContentServiceImpl implements ContentService {
                 taskMsg.setRoundRobinNum(taskMsg.getRoundRobinNum() + 1);
                 producer.sendDelayMsg(taskMsg);
             }else{
-                log.info("merge task");
+                log.info("merge contentVendorRobin task");
                 if(taskMsg.getRobinCallBackList() == null && taskMsg.getRobinCallBackList().size() == 0){
                     log.error("无效的消息，弃之", requestId);
                     return;
@@ -770,9 +768,7 @@ public class ContentServiceImpl implements ContentService {
     private void clearVendorTask(String taskId) throws ContentException {
         log.info("清理item任务[{}]的厂商任务开始", taskId);
         List<VendorContentTask> vlist = dateBaseService.getVendorTaskRepository().findByRequestId(taskId);
-        for(VendorContentTask vl: vlist  ){
-            dateBaseService.getVendorTaskRepository().deleteById(vl.getId());
-        }
+        dateBaseService.getVendorTaskRepository().deleteInBatch(vlist);
         log.info("清理item任务[{}]的厂商任务结束");
     }
 
@@ -1113,7 +1109,23 @@ public class ContentServiceImpl implements ContentService {
     
     @Override
     public ApiReceipt test() throws ContentException {
-        
+        List<VendorContentTask> toNewSaveList = new ArrayList<>();
+        for(int i=0;i<100;i++){
+            String taskId = UUID.randomUUID().toString().replaceAll("-", "");
+            VendorContentTask vendorTask = new VendorContentTask();
+            vendorTask.setTaskId(taskId);
+            vendorTask.setRequestId(taskId);
+            vendorTask.setVendor("qiniu");
+            vendorTask.setMergeId(taskId);
+            vendorTask.setVersion(-1);
+            vendorTask.setType(RefreshType.url);
+            vendorTask.setContent("test");
+            vendorTask.setCreateTime(new Date());
+            vendorTask.setStatus(TaskStatus.FAIL);
+            toNewSaveList.add(vendorTask);
+        }
+
+        dateBaseService.getVendorTaskRepository().batchSave(toNewSaveList);
         return null;
     }
 

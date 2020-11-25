@@ -8,6 +8,7 @@
  */
 package cn.com.pingan.cdn.config;
 
+import cn.com.pingan.cdn.repository.custom.MyJpaRepositoryImpl;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -38,12 +39,14 @@ import java.util.Map;
 @EnableTransactionManagement
 @EnableJpaRepositories(entityManagerFactoryRef="entityManagerFactoryMysql",
                         transactionManagerRef="transactionManagerMysql",
-                        basePackages= { "cn.com.pingan.cdn.repository.mysql" })
+                        repositoryBaseClass = MyJpaRepositoryImpl.class,
+                        basePackages= { "cn.com.pingan.cdn.repository.mysql", })
 public class MysqlConfig {
     @Autowired @Qualifier("mysqlDataSource")
     private DataSource mysqlDataSource;
 
     @Bean(name = "entityManagerMysql")
+    @Qualifier("mysqlEntityManager")
     public EntityManager entityManager(EntityManagerFactoryBuilder builder) {
         return entityManagerFactoryMysql(builder).getObject().createEntityManager();
     }

@@ -47,7 +47,7 @@ public interface ContentService {
 
     //public void contentItemRobin(TaskMsg taskMsg) throws ContentException;
 
-    public void contentVendorRobin(TaskMsg taskMsg) throws ContentException;
+    public void contentHistoryRobin(TaskMsg taskMsg) throws ContentException;
 
     public void clearErrorTask(TaskMsg taskMsg) throws ContentException;
 

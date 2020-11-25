@@ -49,7 +49,7 @@ public class Constants {
     //public static final String CONTENT_MESSAGE_ITEM_ROBIN="content_item_robin";
 
     //public static final String CONTENT_MESSAGE_VENDOR="content_vendor";
-    public static final String CONTENT_MESSAGE_VENDOR_ROBIN="content_vendor_robin";
+    public static final String CONTENT_MESSAGE_HISTORY_ROBIN="content_history_robin";
     public static final String CONTENT_MESSAGE_VENDOR_SUCCESS="content_vendor_success";
     public static final String CONTENT_MESSAGE_VENDOR_FAIL="content_vendor_fail";
 

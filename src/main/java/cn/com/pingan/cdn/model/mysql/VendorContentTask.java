@@ -32,7 +32,6 @@ import java.util.Date;
         },
         indexes = {
                 @Index(columnList = "request_id"),
-                @Index(columnList = "job_id"),
                 @Index(columnList = "merge_id"),
                 @Index(columnList = "status"),
                 @Index(columnList = "create_time")
@@ -74,6 +73,9 @@ public class VendorContentTask {
 
     @Column(name="message")
     private String message;
+
+    @Column(name="history_create_time", nullable = false)
+    private Date historyCreateTime;
     
     @Column(name="create_time", nullable = false)
     private Date createTime;

@@ -29,7 +29,15 @@ import java.util.Date;
 @Table(name="content_history",
         uniqueConstraints = {
                 @UniqueConstraint(columnNames = {"request_id"})
-        })
+        },
+        indexes = {
+                @Index(columnList = "type"),
+                @Index(columnList = "status"),
+                @Index(columnList = "user_id"),
+                @Index(columnList = "create_time"),
+                @Index(columnList = "version"),
+
+})
 
 /*
 @Table(name="content_history",

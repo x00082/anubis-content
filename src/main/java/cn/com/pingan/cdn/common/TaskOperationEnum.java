@@ -11,11 +11,11 @@ import java.util.List;
  */
 public enum TaskOperationEnum {
 
-    content_item,//拆分原始
+    content_item,//拆任务
     //content_item_robin,
 
     //content_vendor,//拆分厂商
-    content_vendor_robin,
+    content_history_robin,
     content_vendor_success,
     content_vendor_fail,
 

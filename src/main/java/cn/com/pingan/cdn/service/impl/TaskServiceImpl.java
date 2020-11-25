@@ -394,8 +394,8 @@ public class TaskServiceImpl implements TaskService {
             }
             log.info("response:{}", response);
 
-            Map<String, TaskStatus> responseMap = new HashMap<>();
-            List<String> robinTask = new ArrayList<>();
+            Map<String, TaskStatus> responseMap = new HashMap<>();//终态succ or fail
+            List<String> robinTask = new ArrayList<>();//仍需要轮询
             List<RefreshPreloadItem> waitItemList = new ArrayList<>();
 
             JSONArray jsonArray = response.getJSONArray("data");
@@ -464,7 +464,7 @@ public class TaskServiceImpl implements TaskService {
                             v.setStatus(responseMap.get(v.getMergeId()));
                             v.setUpdateTime(new Date());
                         }
-                        dateBaseService.getVendorTaskRepository().saveAll(vendorContentTaskList);
+                        dateBaseService.getVendorTaskRepository().batchUpdate(vendorContentTaskList);
                     }else{
                         log.error("任务记录不存在，丢弃该消息");
                         return false;
@@ -478,7 +478,7 @@ public class TaskServiceImpl implements TaskService {
                         for(VendorContentTask waitV: waitContentTaskList){
                             waitV.setStatus(TaskStatus.ROUND_ROBIN);
                         }
-                        dateBaseService.getVendorTaskRepository().saveAll(waitContentTaskList);
+                        dateBaseService.getVendorTaskRepository().batchUpdate(waitContentTaskList);
                     }
                 }
 

@@ -39,7 +39,7 @@ public class ContentConsumer {
 
 
     /******************************************拆分原始任务******************************************/
-    @RabbitListener(queues = Constants.CONTENT_MESSAGE_ITEM)
+    @RabbitListener(queues = Constants.CONTENT_MESSAGE_ITEM, concurrency= "${mq.split.concurrency:20-50}")
     public void receiveItem(Channel channel, Message message){
         try {
 
@@ -63,7 +63,7 @@ public class ContentConsumer {
     }
 
     /******************************************拆分厂商任务轮询******************************************/
-    @RabbitListener(queues = Constants.CONTENT_MESSAGE_VENDOR_ROBIN)
+    @RabbitListener(queues = Constants.CONTENT_MESSAGE_HISTORY_ROBIN)
     public void receiveVendorRobin(Channel channel, Message message){
         try {
 
@@ -72,7 +72,7 @@ public class ContentConsumer {
 
             log.info("VendorRobin rabbit mq receive a message{}", msg.toString());
             TaskMsg taskMsg = JSONObject.toJavaObject(msgObj, TaskMsg.class);
-            contentService.contentVendorRobin(taskMsg);
+            contentService.contentHistoryRobin(taskMsg);
 
         }catch (Exception e){
             log.info("厂商拆分任务失败", e);

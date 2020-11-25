@@ -112,7 +112,7 @@ public class CheckTaskServiceImpl {
                     TaskMsg robinTaskMsg = new TaskMsg();
                     robinTaskMsg.setTaskId(s);
                     robinTaskMsg.setId(idMap.get(s));
-                    robinTaskMsg.setOperation(TaskOperationEnum.content_vendor_robin);
+                    robinTaskMsg.setOperation(TaskOperationEnum.content_history_robin);
                     robinTaskMsg.setVersion(0);
                     robinTaskMsg.setHisVersion(-1);
                     robinTaskMsg.setRetryNum(0);
@@ -381,7 +381,7 @@ public class CheckTaskServiceImpl {
                         taskId = UUID.randomUUID().toString().replaceAll("-", "");
                         TaskMsg msg = new TaskMsg();
                         msg.setTaskId(taskId);
-                        msg.setOperation(TaskOperationEnum.content_vendor_robin);
+                        msg.setOperation(TaskOperationEnum.content_history_robin);
                         List<RobinCallBack> rcbList = new ArrayList<>();
                         msg.setRobinCallBackList(rcbList);
                         msg.setIsMerge(true);
