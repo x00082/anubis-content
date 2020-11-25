@@ -64,14 +64,24 @@ public class CheckTaskServiceImpl {
     private String mergeKey = "mergeTask";
     @Value("${task.merge.fixedRate:5000}")
     private String mergeRate;
+    @Value("${task.merge.read.limit:10000}")
+    private Integer mergeReadLimit;
 
-    private String robinKey = "robinTask";
-    @Value("${task.robin.fixedRate:5000}")
-    private String robinRate;
+    private String robinVendorKey = "robinVendorTask";
+    @Value("${task.vendor.robin.fixedRate:5000}")
+    private String robinVendorRate;
+    @Value("${task.vendor.robin.read.limit:1000}")
+    private Integer robinVendorReadLimit;
+    @Value("${task.vendor.robin.package.limit:50}")
+    private Integer robinVendorPackageLimit;
 
     private String robinHistoryKey = "robinHistoryTask";
-    @Value("${task.hittory.robin.fixedRate:5000}")
+    @Value("${task.history.robin.fixedRate:5000}")
     private String robinHistoryRate;
+    @Value("${task.history.robin.read.limit:1000}")
+    private Integer robinHistoryReadLimit;
+    @Value("${task.history.robin.package.limit:50}")
+    private Integer robinHistoryPackageLimit;
 
     @Scheduled(fixedRateString = "${task.check.fixedRate:60000}", initialDelay = 10000)
     public void queryStatus(){
@@ -168,7 +178,7 @@ public class CheckTaskServiceImpl {
                 return;
             }
             List<String> records = new ArrayList<>();
-            List<MergeRecord> mergeRecords = dateBaseService.getMergeRecordRepository().findByLimit(10000);
+            List<MergeRecord> mergeRecords = dateBaseService.getMergeRecordRepository().findByLimit(mergeReadLimit);
             for(MergeRecord r: mergeRecords){
                 records.add(r.getMergeId());
             }
@@ -270,15 +280,15 @@ public class CheckTaskServiceImpl {
 
 
 
-    @Scheduled(fixedRateString = "${task.robin.fixedRate:5000}", initialDelay = 10000)
+    @Scheduled(fixedRateString = "${task.vendor.robin.fixedRate:5000}", initialDelay = 10000)
     public void robinTask(){
         log.info("start robinTask...");
         try {
             List<String> keys = new ArrayList<>();
-            keys.add(robinKey);
+            keys.add(robinVendorKey);
             List<String> args = new ArrayList<>();
             args.add(String.valueOf(System.currentTimeMillis()));
-            args.add(robinRate);
+            args.add(robinVendorRate);
             // 0-成功，-1执行异常，-100超限
             int re = luaScriptService.executeExpireScript(keys, args);
             if(re != 0 ){
@@ -286,7 +296,7 @@ public class CheckTaskServiceImpl {
                 return;
             }
             List<String> records = new ArrayList<>();
-            List<RobinRecord> robinRecord = dateBaseService.getRobinRecordRepository().findByLimit(100);
+            List<RobinRecord> robinRecord = dateBaseService.getRobinRecordRepository().findByLimit(robinVendorReadLimit);
 
 
             Map<String, List<RefreshPreloadTaskStatusDTO>> vendorRobinDtoMap = new HashMap<>();
@@ -299,7 +309,7 @@ public class CheckTaskServiceImpl {
                     }
                     boolean toNew =true;
                     for(RefreshPreloadTaskStatusDTO dto: vendorRobinDtoMap.get(rr.getVendor())){
-                        if(dto.getTaskList().size() <= 10){
+                        if(dto.getTaskList().size() <= robinVendorPackageLimit){
                             RefreshPreloadItem item = new RefreshPreloadItem();
                             item.setJobId(rr.getRobinId());
                             item.setJobType(rr.getType().equals(RefreshType.preheat)?"preload":"refresh");
@@ -368,7 +378,7 @@ public class CheckTaskServiceImpl {
                 return;
             }
             List<String> records = new ArrayList<>();
-            List<HistoryRecord> historyRecords = dateBaseService.getHistoryRecordRepository().findByLimit(1000);
+            List<HistoryRecord> historyRecords = dateBaseService.getHistoryRecordRepository().findByLimit(robinHistoryReadLimit);
 
 
             Map<String, TaskMsg> reqTaskMap = new HashMap<>();
@@ -377,7 +387,7 @@ public class CheckTaskServiceImpl {
                 int i=0;
                 String taskId = UUID.randomUUID().toString().replaceAll("-", "");
                 for (HistoryRecord hr:historyRecords) {
-                    if (i % 50 == 0) {
+                    if (i % robinHistoryPackageLimit == 0) {
                         taskId = UUID.randomUUID().toString().replaceAll("-", "");
                         TaskMsg msg = new TaskMsg();
                         msg.setTaskId(taskId);

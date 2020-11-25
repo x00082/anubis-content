@@ -373,7 +373,7 @@ public class TaskServiceImpl implements TaskService {
                 int result = handlerTaskLimit(redisKey, limit);
                 if (-100 == result) {
                     log.warn("redis:{} Limit:{}", redisKey, limit);
-                    //msg.setDelay(1000L);
+                    msg.setDelay(1000L);
                     producer.sendAllMsg(msg);
                     return false;
                 } else if (-1 == result) {
@@ -697,11 +697,13 @@ public class TaskServiceImpl implements TaskService {
             String redisKey = subQpsAndSizePrefix + msg.getVendor();
             // 0-成功，-1执行异常，-100超限
             int result = handlerQpsAndSizeLimit(redisKey,1, msg.getSize(), qps, size);
-            if (-100 == result) {
+            if (-100 == result) {//设置delay为了防止多次接受，导致cpu增高
                 log.warn("redis:{} LimitQps:{}", redisKey, qps);
+                msg.setDelay(1000L);
                 return true;
             }else if(-200 == result) {
                 log.warn("redis:{} LimitSize:{}", redisKey, size);
+                msg.setDelay(1000L);
                 return true;
             } else if (-1 == result) {
                 log.warn("redis:{} Limit: 执行异常", redisKey);
@@ -793,6 +795,7 @@ public class TaskServiceImpl implements TaskService {
                 int result = handlerTaskLimit(redisKey, dataBaseQps);
                 if (-100 == result) {
                     log.warn("redis:{} LimitQps:{}", redisKey, dataBaseQps);
+                    msg.setDelay(1000L);
                     return true;
                 } else if (-1 == result) {
                     log.warn("redis:{} Limit: 执行异常", redisKey);
