@@ -58,6 +58,30 @@ public class Producer {
         }
     }
 
+    public void sendFanoutDelayMsg(TaskMsg msg){
+        //msg.setCurrTime(new Date().getTime());
+        //msg.setCount(msg.getCount() + 1);
+        String dtoStr;
+        try {
+            dtoStr = JSONObject.toJSONString(msg);
+            this.rabbitTemplate.convertAndSend(Constants.CONTENT_DELAY_EXCHANGE,
+                    Constants.CONTENT_FANOUT_DELAY_ROUTINE_KEY,
+                    dtoStr,
+                    new MessagePostProcessor() {
+                        @Override
+                        public Message postProcessMessage(Message message) throws AmqpException {
+                            /* 设置过期时间 */
+                            message.getMessageProperties().setHeader("x-delay", msg.getDelay());
+                            return message;
+                        }
+                    }
+            );
+        }catch (MessagingException e) {
+            log.error("push delay msg to mq failed err:{}", e.getMessage());
+            throw new RestfulException(ErrEnum.ErrMQPushMsg.getCode(), ErrEnum.ErrMQPushMsg.getErrMsg());
+        }
+    }
+
 
     public void sendFanoutMsg(FanoutMsg msg){
         String dtoStr = JSONObject.toJSONString(msg);

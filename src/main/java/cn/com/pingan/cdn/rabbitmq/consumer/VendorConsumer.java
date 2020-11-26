@@ -106,7 +106,7 @@ public class VendorConsumer {
     }
 */
 
-    @RabbitListener(queues = Constants.CONTENT_VENDOR_ALIYUN_COMMON)
+    @RabbitListener(queues = Constants.CONTENT_VENDOR_ALIYUN_COMMON, concurrency= "${mq.vendor.common.concurrency:20-50}")
     public void receiveALiYun(Channel channel, Message message) {
         try {
 
@@ -129,7 +129,7 @@ public class VendorConsumer {
         }
     }
 
-    @RabbitListener(queues = Constants.CONTENT_VENDOR_ALIYUN_URL)
+    @RabbitListener(queues = Constants.CONTENT_VENDOR_ALIYUN_URL, concurrency= "${mq.vendor.request.concurrency:20-50}")
     public void receiveALiYunUrl(Channel channel, Message message) {
         try {
 
@@ -151,7 +151,7 @@ public class VendorConsumer {
             }
         }
     }
-    @RabbitListener(queues = Constants.CONTENT_VENDOR_ALIYUN_DIR)
+    @RabbitListener(queues = Constants.CONTENT_VENDOR_ALIYUN_DIR, concurrency= "${mq.vendor.request.concurrency:20-50}")
     public void receiveALiYunDir(Channel channel, Message message) {
         try {
 
@@ -173,7 +173,7 @@ public class VendorConsumer {
             }
         }
     }
-    @RabbitListener(queues = Constants.CONTENT_VENDOR_ALIYUN_PREHEAT)
+    @RabbitListener(queues = Constants.CONTENT_VENDOR_ALIYUN_PREHEAT, concurrency= "${mq.vendor.request.concurrency:20-50}")
     public void receiveALiYunPreheat(Channel channel, Message message) {
         try {
 
@@ -196,7 +196,7 @@ public class VendorConsumer {
         }
     }
 
-    @RabbitListener(queues = Constants.CONTENT_VENDOR_ALIYUN_ROBIN)
+    @RabbitListener(queues = Constants.CONTENT_VENDOR_ALIYUN_ROBIN, concurrency= "${mq.vendor.robin.concurrency:20-50}")
     public void receiveALiYunRobin(Channel channel, Message message) {
         try {
 
@@ -220,7 +220,7 @@ public class VendorConsumer {
     }
 
 
-    @RabbitListener(queues = Constants.CONTENT_VENDOR_BAISHAN_COMMON)
+    @RabbitListener(queues = Constants.CONTENT_VENDOR_BAISHAN_COMMON, concurrency= "${mq.vendor.common.concurrency:20-50}")
     public void receiveBaiShan(Channel channel, Message message) {
         try {
 
@@ -242,7 +242,7 @@ public class VendorConsumer {
             }
         }
     }
-    @RabbitListener(queues = Constants.CONTENT_VENDOR_BAISHAN_URL)
+    @RabbitListener(queues = Constants.CONTENT_VENDOR_BAISHAN_URL, concurrency= "${mq.vendor.request.concurrency:20-50}")
     public void receiveBaiShanUrl(Channel channel, Message message) {
         try {
 
@@ -264,7 +264,7 @@ public class VendorConsumer {
             }
         }
     }
-    @RabbitListener(queues = Constants.CONTENT_VENDOR_BAISHAN_DIR)
+    @RabbitListener(queues = Constants.CONTENT_VENDOR_BAISHAN_DIR, concurrency= "${mq.vendor.request.concurrency:20-50}")
     public void receiveBaiShanDIR(Channel channel, Message message) {
         try {
 
@@ -286,7 +286,7 @@ public class VendorConsumer {
             }
         }
     }
-    @RabbitListener(queues = Constants.CONTENT_VENDOR_BAISHAN_PREHEAT)
+    @RabbitListener(queues = Constants.CONTENT_VENDOR_BAISHAN_PREHEAT, concurrency= "${mq.vendor.request.concurrency:20-50}")
     public void receiveBaiShanPreheat(Channel channel, Message message) {
         try {
 
@@ -309,7 +309,7 @@ public class VendorConsumer {
         }
     }
 
-    @RabbitListener(queues = Constants.CONTENT_VENDOR_BAISHAN_ROBIN)
+    @RabbitListener(queues = Constants.CONTENT_VENDOR_BAISHAN_ROBIN, concurrency= "${mq.vendor.robin.concurrency:20-50}")
     public void receiveBaiShanRobin(Channel channel, Message message) {
         try {
 
@@ -332,7 +332,7 @@ public class VendorConsumer {
         }
     }
 
-    @RabbitListener(queues = Constants.CONTENT_VENDOR_CHINACHE_COMMON)
+    @RabbitListener(queues = Constants.CONTENT_VENDOR_CHINACHE_COMMON, concurrency= "${mq.vendor.common.concurrency:20-50}")
     public void receiveChinaChe(Channel channel, Message message) {
         try {
 
@@ -354,7 +354,7 @@ public class VendorConsumer {
             }
         }
     }
-    @RabbitListener(queues = Constants.CONTENT_VENDOR_CHINACHE_URL)
+    @RabbitListener(queues = Constants.CONTENT_VENDOR_CHINACHE_URL, concurrency= "${mq.vendor.request.concurrency:20-50}")
     public void receiveChinaCheUrl(Channel channel, Message message) {
         try {
 
@@ -376,7 +376,7 @@ public class VendorConsumer {
             }
         }
     }
-    @RabbitListener(queues = Constants.CONTENT_VENDOR_CHINACHE_DIR)
+    @RabbitListener(queues = Constants.CONTENT_VENDOR_CHINACHE_DIR, concurrency= "${mq.vendor.request.concurrency:20-50}")
     public void receiveChinaCheDir(Channel channel, Message message) {
         try {
 
@@ -398,7 +398,7 @@ public class VendorConsumer {
             }
         }
     }
-    @RabbitListener(queues = Constants.CONTENT_VENDOR_CHINACHE_PREHEAT)
+    @RabbitListener(queues = Constants.CONTENT_VENDOR_CHINACHE_PREHEAT, concurrency= "${mq.vendor.request.concurrency:20-50}")
     public void receiveChinaChePreheat(Channel channel, Message message) {
         try {
 
@@ -421,7 +421,7 @@ public class VendorConsumer {
         }
     }
 
-    @RabbitListener(queues = Constants.CONTENT_VENDOR_CHINACHE_ROBIN)
+    @RabbitListener(queues = Constants.CONTENT_VENDOR_CHINACHE_ROBIN, concurrency= "${mq.vendor.robin.concurrency:20-50}")
     public void receiveChinaCheRobin(Channel channel, Message message) {
         try {
 
@@ -444,7 +444,7 @@ public class VendorConsumer {
         }
     }
 
-    @RabbitListener(queues = Constants.CONTENT_VENDOR_JDCLOUD_COMMON)
+    @RabbitListener(queues = Constants.CONTENT_VENDOR_JDCLOUD_COMMON, concurrency= "${mq.vendor.common.concurrency:20-50}")
     public void receiveJDCloud(Channel channel, Message message) {
         try {
 
@@ -466,7 +466,7 @@ public class VendorConsumer {
             }
         }
     }
-    @RabbitListener(queues = Constants.CONTENT_VENDOR_JDCLOUD_URL)
+    @RabbitListener(queues = Constants.CONTENT_VENDOR_JDCLOUD_URL, concurrency= "${mq.vendor.request.concurrency:20-50}")
     public void receiveJDCloudUrl(Channel channel, Message message) {
         try {
 
@@ -488,7 +488,7 @@ public class VendorConsumer {
             }
         }
     }
-    @RabbitListener(queues = Constants.CONTENT_VENDOR_JDCLOUD_DIR)
+    @RabbitListener(queues = Constants.CONTENT_VENDOR_JDCLOUD_DIR, concurrency= "${mq.vendor.request.concurrency:20-50}")
     public void receiveJDCloudDir(Channel channel, Message message) {
         try {
 
@@ -510,7 +510,7 @@ public class VendorConsumer {
             }
         }
     }
-    @RabbitListener(queues = Constants.CONTENT_VENDOR_JDCLOUD_PREHEAT)
+    @RabbitListener(queues = Constants.CONTENT_VENDOR_JDCLOUD_PREHEAT, concurrency= "${mq.vendor.request.concurrency:20-50}")
     public void receiveJDCloudPreheat(Channel channel, Message message) {
         try {
 
@@ -533,7 +533,7 @@ public class VendorConsumer {
         }
     }
 
-    @RabbitListener(queues = Constants.CONTENT_VENDOR_JDCLOUD_ROBIN)
+    @RabbitListener(queues = Constants.CONTENT_VENDOR_JDCLOUD_ROBIN, concurrency= "${mq.vendor.robin.concurrency:20-50}")
     public void receiveJDCloudRobin(Channel channel, Message message) {
         try {
 
@@ -556,7 +556,7 @@ public class VendorConsumer {
         }
     }
 
-    @RabbitListener(queues = Constants.CONTENT_VENDOR_KSYUN_COMMON)
+    @RabbitListener(queues = Constants.CONTENT_VENDOR_KSYUN_COMMON, concurrency= "${mq.vendor.common.concurrency:20-50}")
     public void receiveKSYun(Channel channel, Message message) {
         try {
 
@@ -578,7 +578,7 @@ public class VendorConsumer {
             }
         }
     }
-    @RabbitListener(queues = Constants.CONTENT_VENDOR_KSYUN_URL)
+    @RabbitListener(queues = Constants.CONTENT_VENDOR_KSYUN_URL, concurrency= "${mq.vendor.request.concurrency:20-50}")
     public void receiveKSYunUrl(Channel channel, Message message) {
         try {
 
@@ -600,7 +600,7 @@ public class VendorConsumer {
             }
         }
     }
-    @RabbitListener(queues = Constants.CONTENT_VENDOR_KSYUN_DIR)
+    @RabbitListener(queues = Constants.CONTENT_VENDOR_KSYUN_DIR, concurrency= "${mq.vendor.request.concurrency:20-50}")
     public void receiveKSYunDir(Channel channel, Message message) {
         try {
 
@@ -622,7 +622,7 @@ public class VendorConsumer {
             }
         }
     }
-    @RabbitListener(queues = Constants.CONTENT_VENDOR_KSYUN_PREHEAT)
+    @RabbitListener(queues = Constants.CONTENT_VENDOR_KSYUN_PREHEAT, concurrency= "${mq.vendor.request.concurrency:20-50}")
     public void receiveKSYunPreheat(Channel channel, Message message) {
         try {
 
@@ -645,7 +645,7 @@ public class VendorConsumer {
         }
     }
 
-    @RabbitListener(queues = Constants.CONTENT_VENDOR_KSYUN_ROBIN)
+    @RabbitListener(queues = Constants.CONTENT_VENDOR_KSYUN_ROBIN, concurrency= "${mq.vendor.robin.concurrency:20-50}")
     public void receiveKSYunRobin(Channel channel, Message message) {
         try {
 
@@ -668,7 +668,7 @@ public class VendorConsumer {
         }
     }
 
-    @RabbitListener(queues = Constants.CONTENT_VENDOR_NET_COMMON)
+    @RabbitListener(queues = Constants.CONTENT_VENDOR_NET_COMMON, concurrency= "${mq.vendor.common.concurrency:20-50}")
     public void receiveNet(Channel channel, Message message) {
         try {
 
@@ -690,7 +690,7 @@ public class VendorConsumer {
             }
         }
     }
-    @RabbitListener(queues = Constants.CONTENT_VENDOR_NET_URL)
+    @RabbitListener(queues = Constants.CONTENT_VENDOR_NET_URL, concurrency= "${mq.vendor.request.concurrency:20-50}")
     public void receiveNetUrl(Channel channel, Message message) {
         try {
 
@@ -712,7 +712,7 @@ public class VendorConsumer {
             }
         }
     }
-    @RabbitListener(queues = Constants.CONTENT_VENDOR_NET_DIR)
+    @RabbitListener(queues = Constants.CONTENT_VENDOR_NET_DIR, concurrency= "${mq.vendor.request.concurrency:20-50}")
     public void receiveNetDir(Channel channel, Message message) {
         try {
 
@@ -734,7 +734,7 @@ public class VendorConsumer {
             }
         }
     }
-    @RabbitListener(queues = Constants.CONTENT_VENDOR_NET_PREHEAT)
+    @RabbitListener(queues = Constants.CONTENT_VENDOR_NET_PREHEAT, concurrency= "${mq.vendor.request.concurrency:20-50}")
     public void receiveNetPreheat(Channel channel, Message message) {
         try {
 
@@ -757,7 +757,7 @@ public class VendorConsumer {
         }
     }
 
-    @RabbitListener(queues = Constants.CONTENT_VENDOR_NET_ROBIN)
+    @RabbitListener(queues = Constants.CONTENT_VENDOR_NET_ROBIN, concurrency= "${mq.vendor.robin.concurrency:20-50}")
     public void receiveNetRobin(Channel channel, Message message) {
         try {
 
@@ -780,7 +780,7 @@ public class VendorConsumer {
         }
     }
 
-    @RabbitListener(queues = Constants.CONTENT_VENDOR_QINIU_COMMON)
+    @RabbitListener(queues = Constants.CONTENT_VENDOR_QINIU_COMMON, concurrency= "${mq.vendor.common.concurrency:20-50}")
     public void receiveQiNiu(Channel channel, Message message) {
         try {
 
@@ -802,7 +802,7 @@ public class VendorConsumer {
             }
         }
     }
-    @RabbitListener(queues = Constants.CONTENT_VENDOR_QINIU_URL)
+    @RabbitListener(queues = Constants.CONTENT_VENDOR_QINIU_URL, concurrency= "${mq.vendor.request.concurrency:20-50}")
     public void receiveQiNiuUrl(Channel channel, Message message) {
         try {
 
@@ -825,7 +825,7 @@ public class VendorConsumer {
             }
         }
     }
-    @RabbitListener(queues = Constants.CONTENT_VENDOR_QINIU_DIR)
+    @RabbitListener(queues = Constants.CONTENT_VENDOR_QINIU_DIR, concurrency= "${mq.vendor.request.concurrency:20-50}")
     public void receiveQiNiuDir(Channel channel, Message message) {
         try {
 
@@ -847,7 +847,7 @@ public class VendorConsumer {
             }
         }
     }
-    @RabbitListener(queues = Constants.CONTENT_VENDOR_QINIU_PREHEAT)
+    @RabbitListener(queues = Constants.CONTENT_VENDOR_QINIU_PREHEAT, concurrency= "${mq.vendor.request.concurrency:20-50}")
     public void receiveQiNiuPreheat(Channel channel, Message message) {
         try {
 
@@ -870,7 +870,7 @@ public class VendorConsumer {
         }
     }
 
-    @RabbitListener(queues = Constants.CONTENT_VENDOR_QINIU_ROBIN)
+    @RabbitListener(queues = Constants.CONTENT_VENDOR_QINIU_ROBIN, concurrency= "${mq.vendor.robin.concurrency:20-50}")
     public void receiveQiNiuRobin(Channel channel, Message message) {
         try {
 
@@ -893,7 +893,7 @@ public class VendorConsumer {
         }
     }
 
-    @RabbitListener(queues = Constants.CONTENT_VENDOR_TENCENT_COMMON)
+    @RabbitListener(queues = Constants.CONTENT_VENDOR_TENCENT_COMMON, concurrency= "${mq.vendor.common.concurrency:20-50}")
     public void receiveTenCent(Channel channel, Message message) {
         try {
 
@@ -915,7 +915,7 @@ public class VendorConsumer {
             }
         }
     }
-    @RabbitListener(queues = Constants.CONTENT_VENDOR_TENCENT_URL)
+    @RabbitListener(queues = Constants.CONTENT_VENDOR_TENCENT_URL, concurrency= "${mq.vendor.request.concurrency:20-50}")
     public void receiveTenCentUrl(Channel channel, Message message) {
         try {
 
@@ -937,7 +937,7 @@ public class VendorConsumer {
             }
         }
     }
-    @RabbitListener(queues = Constants.CONTENT_VENDOR_TENCENT_DIR)
+    @RabbitListener(queues = Constants.CONTENT_VENDOR_TENCENT_DIR, concurrency= "${mq.vendor.request.concurrency:20-50}")
     public void receiveTenCentDir(Channel channel, Message message) {
         try {
 
@@ -959,7 +959,7 @@ public class VendorConsumer {
             }
         }
     }
-    @RabbitListener(queues = Constants.CONTENT_VENDOR_TENCENT_PREHEAT)
+    @RabbitListener(queues = Constants.CONTENT_VENDOR_TENCENT_PREHEAT, concurrency= "${mq.vendor.request.concurrency:20-50}")
     public void receiveTenCentPreheat(Channel channel, Message message) {
         try {
 
@@ -982,7 +982,7 @@ public class VendorConsumer {
         }
     }
 
-    @RabbitListener(queues = Constants.CONTENT_VENDOR_TENCENT_ROBIN)
+    @RabbitListener(queues = Constants.CONTENT_VENDOR_TENCENT_ROBIN, concurrency= "${mq.vendor.robin.concurrency:20-50}")
     public void receiveTenCentRobin(Channel channel, Message message) {
         try {
 
@@ -1006,7 +1006,7 @@ public class VendorConsumer {
     }
 
     /******************************************自建请求******************************************/
-    @RabbitListener(queues = Constants.CONTENT_VENDOR_VENUS_COMMON)
+    @RabbitListener(queues = Constants.CONTENT_VENDOR_VENUS_COMMON, concurrency= "${mq.vendor.common.concurrency:20-50}")
     public void receiveVenus1(Channel channel, Message message) {
         try {
 
@@ -1028,7 +1028,7 @@ public class VendorConsumer {
             }
         }
     }
-    @RabbitListener(queues = Constants.CONTENT_VENDOR_VENUS_URL)
+    @RabbitListener(queues = Constants.CONTENT_VENDOR_VENUS_URL, concurrency= "${mq.vendor.request.concurrency:20-50}")
     public void receiveVenusUrl(Channel channel, Message message) {
         try {
 
@@ -1050,7 +1050,7 @@ public class VendorConsumer {
             }
         }
     }
-    @RabbitListener(queues = Constants.CONTENT_VENDOR_VENUS_DIR)
+    @RabbitListener(queues = Constants.CONTENT_VENDOR_VENUS_DIR, concurrency= "${mq.vendor.request.concurrency:20-50}")
     public void receiveVenusDir(Channel channel, Message message) {
         try {
 
@@ -1073,7 +1073,7 @@ public class VendorConsumer {
         }
     }
 
-    @RabbitListener(queues = Constants.CONTENT_VENDOR_VENUS_PREHEAT)
+    @RabbitListener(queues = Constants.CONTENT_VENDOR_VENUS_PREHEAT, concurrency= "${mq.vendor.request.concurrency:20-50}")
     public void receiveVenusPrheat(Channel channel, Message message) {
         try {
 
@@ -1097,7 +1097,7 @@ public class VendorConsumer {
     }
 
     /******************************************自建轮询******************************************/
-    @RabbitListener(queues = Constants.CONTENT_VENDOR_VENUS_ROBIN)
+    @RabbitListener(queues = Constants.CONTENT_VENDOR_VENUS_ROBIN, concurrency= "${mq.vendor.robin.concurrency:20-50}")
     public void receiveVenusRobin1(Channel channel, Message message) {
         try {
 
@@ -1124,7 +1124,7 @@ public class VendorConsumer {
 
 
     /******************************************成功******************************************/
-    @RabbitListener(queues = Constants.CONTENT_MESSAGE_VENDOR_SUCCESS, concurrency = "1")
+    @RabbitListener(queues = Constants.CONTENT_MESSAGE_VENDOR_SUCCESS, concurrency= "${mq.vendor.success.concurrency:1}")
     public void receiveSuccess(Channel channel, Message message){
         try {
 
@@ -1148,7 +1148,7 @@ public class VendorConsumer {
     }
 
     /******************************************失败******************************************/
-    @RabbitListener(queues = Constants.CONTENT_MESSAGE_VENDOR_FAIL, concurrency = "1")
+    @RabbitListener(queues = Constants.CONTENT_MESSAGE_VENDOR_FAIL, concurrency= "${mq.vendor.fail.concurrency:1}")
     public void receiveFail(Channel channel, Message message){
         try {
 

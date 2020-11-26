@@ -1,10 +1,7 @@
 package cn.com.pingan.cdn.rabbitmq.config;
 
 import cn.com.pingan.cdn.rabbitmq.constants.Constants;
-import org.springframework.amqp.core.Binding;
-import org.springframework.amqp.core.BindingBuilder;
-import org.springframework.amqp.core.CustomExchange;
-import org.springframework.amqp.core.Queue;
+import org.springframework.amqp.core.*;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -37,16 +34,16 @@ public class RabbitMqConfig {
     public Binding messageBinding(){
         return BindingBuilder.bind(delayeQueue()).to(delayDirectExchaneg()).with(Constants.CONTENT_DELAY_ROUTINE_KEY).noargs();
     }
-    
-    /*
-    @Bean("contentQueue")
-    public Queue contentQueue(){
-       return QueueBuilder.durable(Constants.CONTENT_MESSAGE_CONTENT_QUEUE_NAE).build();
+
+
+    @Bean("fanoutDelayQueue")
+    public Queue fanoutDelayQueue(){
+       return new Queue(Constants.CONTENT_FANOUT_DELAY_QUEUE,true);
     }
     
-    @Bean("contentBind")
-    public Binding contentMessageBinding(){
-        return BindingBuilder.bind(contentQueue()).to(messageDirectExchaneg()).with((Constants.CONTENT_MESSAGE_CONTENT_ROUTINE_KEY));
+    @Bean("FanoutDelayBind")
+    public Binding FanoutDelayBind(){
+        return BindingBuilder.bind(fanoutDelayQueue()).to(delayDirectExchaneg()).with(Constants.CONTENT_FANOUT_DELAY_ROUTINE_KEY).noargs();
     }
-    */
+
 }

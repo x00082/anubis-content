@@ -41,6 +41,8 @@ public class Constants {
     public static final String DELAYED_EXCHANGE_TYPE="x-delayed-message";
     public static final String CONTENT_DELAY_QUEUE="anubisContentDelayQueue";
     public static final String CONTENT_DELAY_ROUTINE_KEY="anubisContentDelayRoutineKey";
+    public static final String CONTENT_FANOUT_DELAY_QUEUE="anubisContentFanoutDelayQueue";
+    public static final String CONTENT_FANOUT_DELAY_ROUTINE_KEY="anubisContentFanoutDelayRoutineKey";
 
 
     public static final String CONTENT_MESSAGE_EXCHANGE="anubisContentExchange";//正常

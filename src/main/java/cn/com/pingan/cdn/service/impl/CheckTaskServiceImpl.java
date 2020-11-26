@@ -116,7 +116,7 @@ public class CheckTaskServiceImpl {
                     vt.setStatus(TaskStatus.FAIL);
                     vt.setMessage("任务超时");
                 }
-                dateBaseService.getVendorTaskRepository().saveAll(task);
+                dateBaseService.getVendorTaskRepository().batchUpdate(task);
                 log.info("发送轮询消息数量[{}]", requestIdSet.size());
                 for (String s : requestIdSet) {
                     TaskMsg robinTaskMsg = new TaskMsg();
@@ -309,7 +309,7 @@ public class CheckTaskServiceImpl {
                     }
                     boolean toNew =true;
                     for(RefreshPreloadTaskStatusDTO dto: vendorRobinDtoMap.get(rr.getVendor())){
-                        if(dto.getTaskList().size() <= robinVendorPackageLimit){
+                        if(dto.getTaskList().size() < robinVendorPackageLimit){
                             RefreshPreloadItem item = new RefreshPreloadItem();
                             item.setJobId(rr.getRobinId());
                             item.setJobType(rr.getType().equals(RefreshType.preheat)?"preload":"refresh");

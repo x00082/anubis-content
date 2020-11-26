@@ -9,5 +9,8 @@ package cn.com.pingan.cdn.common;
 public enum FanoutType {
     fflush_vendor,
     fflush_domain_vendor,
+
+    consumer_start,
+    consumer_stop,
     ;
 }

@@ -1,6 +1,7 @@
 package cn.com.pingan.cdn.rabbitmq.consumer;
 
 import cn.com.pingan.cdn.common.FanoutType;
+import cn.com.pingan.cdn.rabbitmq.config.RabbitListenerConfig;
 import cn.com.pingan.cdn.rabbitmq.constants.Constants;
 import cn.com.pingan.cdn.rabbitmq.message.FanoutMsg;
 import cn.com.pingan.cdn.service.ContentService;
@@ -35,6 +36,9 @@ public class FanoutConsumer {
     @Autowired
     private ContentService contentService;
 
+    @Autowired
+    RabbitListenerConfig rabbitListenerConfig;
+
     @RabbitListener(bindings = @QueueBinding(
             value = @Queue(), //注意这里不要定义队列名称,系统会随机产生
             exchange = @Exchange(value = Constants.CONTENT_FANOUT_EXCHANGE,type = ExchangeTypes.FANOUT))
@@ -53,6 +57,10 @@ public class FanoutConsumer {
                 taskService.fflushVendorInfoMap(taskMsg.getKey());
             }else if(taskMsg.getOperation().equals(FanoutType.fflush_domain_vendor)){
                 contentService.fflushDomainVendor(taskMsg);
+            }else if(taskMsg.getOperation().equals(FanoutType.consumer_start)){
+                rabbitListenerConfig.start(taskMsg.getKey());
+            }else if(taskMsg.getOperation().equals(FanoutType.consumer_stop)){
+                rabbitListenerConfig.stop(taskMsg.getKey());
             }
 
         }catch (Exception e){

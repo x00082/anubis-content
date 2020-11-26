@@ -359,12 +359,14 @@ public class TaskServiceImpl implements TaskService {
             } else {
                 vendorStatus = vendorInfo.getStatus().name();
             }
+            /*
             if ("down".equals(vendorStatus)) {
                 msg.setDelay(1 * 60 * 1000L);
                 rabbitListenerConfig.stop(msg.getOperation().name());//关闭监听
                 producer.sendAllMsg(msg);//放回队列
                 return false;
             }
+            */
             if (msg.getIsLimit()) {//
                 //请求QPS限制
                 int limit = vendorInfo!=null?vendorInfo.getRobinQps():robinQps;
@@ -372,9 +374,11 @@ public class TaskServiceImpl implements TaskService {
                 // 0-成功，-1执行异常，-100超限
                 int result = handlerTaskLimit(redisKey, limit);
                 if (-100 == result) {
+                    stopAndSendDelayFanoutMsg(msg);
                     log.warn("redis:{} Limit:{}", redisKey, limit);
-                    msg.setDelay(1000L);
+                    //msg.setDelay(1000L);
                     producer.sendAllMsg(msg);
+                    Thread.sleep(1000L);
                     return false;
                 } else if (-1 == result) {
                     log.warn("redis:{} Limit:{} 执行异常", redisKey, limit);
@@ -684,13 +688,15 @@ public class TaskServiceImpl implements TaskService {
         }else{
             vendorStatus = vendorInfo.getStatus().name();
         }
+        /*
         if ("down".equals(vendorStatus)) {
             msg.setDelay(1 * 60 * 1000L);
             rabbitListenerConfig.stop(msg.getOperation().name());//关闭监听
             producer.sendAllMsg(msg);//放回队列
             return false;
         }
-        if (msg.getIsLimit()) {//
+        */
+        if (msg.getIsLimit()) {
             //请求QPS限制
             int qps = vendorInfo!=null?vendorInfo.getTotalQps():requestQps;
             int size = vendorInfo!=null?vendorInfo.getTotalSize():requestSize;
@@ -699,11 +705,11 @@ public class TaskServiceImpl implements TaskService {
             int result = handlerQpsAndSizeLimit(redisKey,1, msg.getSize(), qps, size);
             if (-100 == result) {//设置delay为了防止多次接受，导致cpu增高
                 log.warn("redis:{} LimitQps:{}", redisKey, qps);
-                msg.setDelay(1000L);
+                Thread.sleep(1000L);
                 return true;
             }else if(-200 == result) {
                 log.warn("redis:{} LimitSize:{}", redisKey, size);
-                msg.setDelay(1000L);
+                Thread.sleep(1000L);
                 return true;
             } else if (-1 == result) {
                 log.warn("redis:{} Limit: 执行异常", redisKey);
@@ -794,8 +800,10 @@ public class TaskServiceImpl implements TaskService {
                 // 0-成功，-1执行异常，-100超限
                 int result = handlerTaskLimit(redisKey, dataBaseQps);
                 if (-100 == result) {
+                    //stopAndSendDelayFanoutMsg(msg);
                     log.warn("redis:{} LimitQps:{}", redisKey, dataBaseQps);
-                    msg.setDelay(1000L);
+                    //msg.setDelay(1000L);
+                    Thread.sleep(1000L);
                     return true;
                 } else if (-1 == result) {
                     log.warn("redis:{} Limit: 执行异常", redisKey);
@@ -812,7 +820,7 @@ public class TaskServiceImpl implements TaskService {
                     vct.setUpdateTime(new Date());
                 }
                 log.info("handlerCommon request update");
-                dateBaseService.getVendorTaskRepository().saveAll(vendorContentTaskList);
+                dateBaseService.getVendorTaskRepository().batchUpdate(vendorContentTaskList);
                 log.info("handlerCommon request update done");
 
                 RobinRecord robinRecord = new RobinRecord();
@@ -904,5 +912,22 @@ public class TaskServiceImpl implements TaskService {
                 log.info("该厂商不存在，请检查[{}]", vendor.getCode());
                 return null;
         }
+    }
+
+
+    private int stopAndSendDelayFanoutMsg(TaskMsg taskMsg){
+        log.info("关闭消费[{}]", taskMsg.getOperation().name());
+        rabbitListenerConfig.stop(taskMsg.getOperation().name());
+        String key = taskMsg.getOperation().name() + FanoutType.consumer_start;
+        int re = handlerTaskLimit(key, 1);
+        if (re == 0) {
+            TaskMsg DelayFanoutMsg = new TaskMsg();
+            DelayFanoutMsg.setIsFanout(true);
+            DelayFanoutMsg.setOperation(taskMsg.getOperation());
+            DelayFanoutMsg.setFanoutOpt(FanoutType.consumer_start);
+            DelayFanoutMsg.setDelay(1000L);
+            producer.sendFanoutDelayMsg(DelayFanoutMsg);
+        }
+        return re;
     }
 }

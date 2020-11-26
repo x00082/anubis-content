@@ -4,7 +4,6 @@ import cn.com.pingan.cdn.common.FanoutType;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
-import lombok.NoArgsConstructor;
 
 /**
  * @Classname FanoutMsg
@@ -14,10 +13,16 @@ import lombok.NoArgsConstructor;
  */
 @Data
 @Builder
-@NoArgsConstructor
 @AllArgsConstructor
 public class FanoutMsg {
     private Long id;
     private String key;
     private FanoutType operation;
+
+    public FanoutMsg(String key, FanoutType operation){
+        this.key = key;
+        this.operation = operation;
+    }
+    public FanoutMsg(){}
+
 }

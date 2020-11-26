@@ -95,9 +95,9 @@ public class SchenuledTaskServiceImpl {
     private void clearVendorTask(String taskId) throws ContentException {
         log.info("清理item任务[{}]的厂商任务开始", taskId);
         List<VendorContentTask> vlist = dateBaseService.getVendorTaskRepository().findByRequestId(taskId);
-        for(VendorContentTask vl: vlist  ){
-            dateBaseService.getVendorTaskRepository().deleteById(vl.getId());
-        }
+
+        dateBaseService.getVendorTaskRepository().deleteInBatch(vlist);
+
         log.info("清理item任务[{}]的厂商任务结束");
     }
 

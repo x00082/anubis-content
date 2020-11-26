@@ -24,8 +24,6 @@ import cn.com.pingan.cdn.rabbitmq.config.RabbitListenerConfig;
 import cn.com.pingan.cdn.rabbitmq.message.FanoutMsg;
 import cn.com.pingan.cdn.rabbitmq.message.TaskMsg;
 import cn.com.pingan.cdn.rabbitmq.producer.Producer;
-import cn.com.pingan.cdn.repository.mysql.*;
-import cn.com.pingan.cdn.repository.pgsql.DomainRepository;
 import cn.com.pingan.cdn.request.openapi.ContentDefaultNumDTO;
 import cn.com.pingan.cdn.response.TaskDetailsResponse;
 import cn.com.pingan.cdn.service.*;
@@ -296,12 +294,16 @@ public class ContentServiceImpl implements ContentService {
                 if (ch.getStatus().equals(HisStatus.FAIL)) {//任务已失败或未开始
                     ch.setStatus(HisStatus.WAIT);
                     ch.setFlowStatus(FlowEmun.redo);
+                    ch.setVersion(ch.getVersion() + 1);
+                    ch.setAllTaskNum(-1);
                     log.info("[{}]请求任务已失败，设置为wait", ch.getRequestId());
                     toSave.add(ch);
                 } else if (ch.getStatus().equals(HisStatus.WAIT)) {
                     if(flag){
                         log.info("[{}]请求任务为wait,强制重试", ch.getRequestId());
                         ch.setFlowStatus(FlowEmun.redo);
+                        ch.setVersion(ch.getVersion() + 1);
+                        ch.setAllTaskNum(-1);
                         toSave.add(ch);
                     }else{
                         log.info("[{}]请求任务为wait,不需要重试", ch.getRequestId());
@@ -503,7 +505,7 @@ public class ContentServiceImpl implements ContentService {
                 }else if(existVendorTaskAll.size() == totalTaskSize) {
                     log.info("子任务不缺失，只重试失败的任务");
                     for (VendorContentTask vct : existVendorTaskAll) {
-                        if (vct.getStatus().equals(TaskStatus.FAIL)) {
+                        if (!vct.getStatus().equals(TaskStatus.SUCCESS)) {
                             if(!vendorTaskId.containsKey(vct.getVendor()) || StringUtils.isBlank(vendorTaskId.get(vct.getVendor()))){
                                 String mergeId = UUID.randomUUID().toString().replaceAll("-", "");
                                 vendorTaskId.put(vct.getVendor(), mergeId);
@@ -645,10 +647,10 @@ public class ContentServiceImpl implements ContentService {
     @Override
     public void contentHistoryRobin(TaskMsg taskMsg) throws ContentException {
         String requestId = taskMsg.getTaskId();
-        log.info("contentVendorRobin开始[{}]", requestId);
+        log.info("contentHistoryRobin开始[{}]", requestId);
         try {
             if(!taskMsg.getIsMerge()) {
-                log.info("one contentVendorRobin task");
+                log.info("one contentHistoryRobin task[{}]", requestId);
                 ContentHistory contentHistory = dateBaseService.getContentHistoryRepository().findByRequestId(requestId);
                 if (contentHistory == null) {
                     log.error("用户任务不存在,丢弃消息");
@@ -686,7 +688,7 @@ public class ContentServiceImpl implements ContentService {
                 taskMsg.setRoundRobinNum(taskMsg.getRoundRobinNum() + 1);
                 producer.sendDelayMsg(taskMsg);
             }else{
-                log.info("merge contentVendorRobin task");
+                log.info("merge contentHistoryRobin task");
                 if(taskMsg.getRobinCallBackList() == null && taskMsg.getRobinCallBackList().size() == 0){
                     log.error("无效的消息，弃之", requestId);
                     return;
@@ -757,12 +759,12 @@ public class ContentServiceImpl implements ContentService {
             taskMsg.setDelay(limitRetryRate);
             taskMsg.setRetryNum(taskMsg.getRetryNum() + 1);
             if (taskMsg.getRetryNum() > limitRetry || taskMsg.getRoundRobinNum() > robinNum || taskMsg.getHisVersion() == -1) {
-                log.error("[{}]contentVendorRobin超出重试次数,设置任务失败并丢弃消息",requestId);
+                log.error("[{}]contentHistoryRobin超出重试次数,设置任务失败并丢弃消息",requestId);
                 return;
             }
             producer.sendDelayMsg(taskMsg);
         }
-        log.info("contentVendorRobin结束[{}]", requestId);
+        log.info("contentHistoryRobin结束[{}]", requestId);
     }
 
 

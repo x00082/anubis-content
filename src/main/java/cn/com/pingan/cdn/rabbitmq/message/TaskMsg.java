@@ -33,6 +33,8 @@ public class TaskMsg {
     private TaskStatus taskStatus;
     private CallBackEnum callBack;
     private Boolean force = false;
+    private Boolean isFanout=false;
+    private FanoutType fanoutOpt;
     private String vendor;
     private Boolean isLimit = true;
     private Boolean isMerge = false;
