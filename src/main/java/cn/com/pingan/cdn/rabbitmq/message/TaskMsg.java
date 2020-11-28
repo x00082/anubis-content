@@ -22,13 +22,13 @@ import java.util.List;
 public class TaskMsg {
 
     //主体字段
-    private Long id;
+    private Long id = 0L;
     private String taskId;
-    private Integer version;
+    private Integer version = 0;
     private TaskOperationEnum operation;
 
     //辅助字段
-    private Integer hisVersion;
+    private Integer hisVersion = 0;
     private String jobId;
     private TaskStatus taskStatus;
     private CallBackEnum callBack;
@@ -39,11 +39,13 @@ public class TaskMsg {
     private Boolean isLimit = true;
     private Boolean isMerge = false;
     private RefreshType type;
-    private Integer size;
+    private Integer size = 0;
     private Long expire = 0L;
     private Long delay = 0L;//ms
     private Integer retryNum = 0;
     private Integer roundRobinNum = 0;
+    private List<String> urlList;
+    private List<String> requestRecordList;
     private List<RobinStatus> robinStatusList;
     private RefreshPreloadTaskStatusDTO robinTaskDto;
     private List<RobinCallBack> robinCallBackList;

@@ -37,6 +37,8 @@ public interface VendorTaskRepository extends MyJpaRepository<VendorContentTask,
 
     List<VendorContentTask> findByRequestId(String requestId);
 
+    List<VendorContentTask> findByRequestIdAndVersion(String requestId, int version);
+
     List<VendorContentTask> findByMergeId(String mergeId);
 
     List<VendorContentTask> findByMergeIdIn(List<String> mergeIds);
@@ -45,6 +47,11 @@ public interface VendorTaskRepository extends MyJpaRepository<VendorContentTask,
     @Transactional
     @Query(value = "delete from vendor_task where create_time <?1", nativeQuery = true)
     void clear(Date time);
+
+    @Modifying
+    @Transactional
+    @Query(value = "delete from vendor_task where historyCreateTime <?1 limit ?2", nativeQuery = true)
+    int clearWithhHistory(Date time, int limit);
 
     @Modifying
     @Transactional

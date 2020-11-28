@@ -58,7 +58,7 @@ public interface ContentService {
 
     public ContentHistory findHisttoryByRequestId(String id)throws ContentException;
     
-    public ApiReceipt test() throws ContentException;
+    public ApiReceipt test(GateWayHeaderDTO dto, List<String> data, RefreshType type) throws ContentException;
 
     public ApiReceipt setUserDefaultContentNumber(ContentDefaultNumDTO command);
 

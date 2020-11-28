@@ -1,9 +1,6 @@
 package cn.com.pingan.cdn.service.impl;
 
 import cn.com.pingan.cdn.config.RedisLuaScriptService;
-import cn.com.pingan.cdn.exception.ContentException;
-import cn.com.pingan.cdn.model.mysql.ContentHistory;
-import cn.com.pingan.cdn.model.mysql.VendorContentTask;
 import cn.com.pingan.cdn.service.DateBaseService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -30,8 +27,14 @@ public class SchenuledTaskServiceImpl {
     @Value("${task.data.contentExpire:30}")
     private Integer contentExpire;
 
-    @Value("${task.data.taskExpire:7}")
+    @Value("${task.data.taskExpire:10}")
     private Integer taskExpire;
+
+    @Value("${task.data.clear.ms:86400000}")
+    private Long clearRate;
+
+    @Value("${task.data.clear.limit:1000}")
+    private Integer clearLimit;
 
     @Autowired
     DateBaseService dateBaseService;
@@ -45,7 +48,7 @@ public class SchenuledTaskServiceImpl {
 
 
     @Scheduled(cron = "${task.expire.content.cron:0 0 1 * * ? }")
-    public void clearData(){//这样删除可能数据不一致，后续修改
+    public void clearData(){
 
         Date expire = preNDay(contentExpire);
         log.info("清理{}之前的用户任务及其子任务", formatter.format(expire));
@@ -54,21 +57,34 @@ public class SchenuledTaskServiceImpl {
             keys.add(key);
             List<String> args = new ArrayList<>();
             args.add(String.valueOf(System.currentTimeMillis()));
-            args.add(String.valueOf(1000 * 60 * 60 * 24));
+            args.add(String.valueOf(clearRate));
             // 0-成功，-1执行异常，-100超限
             int re = luaScriptService.executeExpireScript(keys, args);
             if(re != 0 ){
                 log.error("没有执行权限");
                 return;
             }
+            int count =0;
+            re =0;
+            do{
+                re = dateBaseService.getContentHistoryRepository().clear(expire, clearLimit);
+                log.info("单次修改数[{}]", re);
 
-            List<ContentHistory> historys = dateBaseService.getContentHistoryRepository().findByCreateTimeBefore(expire);
-            for(ContentHistory ch: historys){
-                clearsubTask(ch.getRequestId());
-            }
+            }while (re == clearLimit);
+            log.info("删除历史数量[{}]", count);
+
+
             expire = preNDay(taskExpire);
             log.info("清理{}之前的厂商任务", formatter.format(expire));
-            dateBaseService.getVendorTaskRepository().clear(expire);
+            count =0;
+            re =0;
+            do{
+                re = dateBaseService.getVendorTaskRepository().clearWithhHistory(expire, clearLimit);
+                log.info("单次修删除[{}]", re);
+
+            }while (re == clearLimit);
+            log.info("删除厂商任务数量[{}]", count);
+
             log.info("清理数据结束");
         }catch (Exception e){
             log.error("清理任务异常[{}]", e);
@@ -86,6 +102,7 @@ public class SchenuledTaskServiceImpl {
 
     }
 
+    /*
     private void clearsubTask(String taskId) throws ContentException {
         log.info("清理请求任务[{}]的子任务开始", taskId);
         clearVendorTask(taskId);
@@ -100,5 +117,6 @@ public class SchenuledTaskServiceImpl {
 
         log.info("清理item任务[{}]的厂商任务结束");
     }
+    */
 
 }

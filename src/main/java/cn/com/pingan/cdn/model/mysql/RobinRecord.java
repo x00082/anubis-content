@@ -13,10 +13,7 @@ import javax.persistence.*;
  */
 @Data
 @Entity
-@Table(name="robin_record",
-        uniqueConstraints = {
-                @UniqueConstraint(columnNames = {"robin_id"})
-        })
+@Table(name="robin_record")
 public class RobinRecord {
 
     @Id

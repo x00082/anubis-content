@@ -68,5 +68,5 @@ public interface ContentServiceFacade {
 
     public ApiReceipt setVendorStatus(VendorInfoDTO command);
     
-    ApiReceipt test() throws ContentException;
+    ApiReceipt test(GateWayHeaderDTO dto, FreshCommand command) throws ContentException;
 }

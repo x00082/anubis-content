@@ -38,6 +38,18 @@ public interface ContentHistoryRepository extends JpaRepository<ContentHistory, 
 
     @Modifying
     @Transactional
+    @Query(value = "update content_history h set h.status = 'FAIL', h.message = 'TimeOut', h.update_time=current_timestamp where status not in ?1 and (h.update_time is null or h.update_time < ?2) limit ?3", nativeQuery = true)
+    int updateStatusFailNotINAndUpdateTimeLessThanLimit(List<String> types, Date time, int limit);
+
+
+    @Modifying
+    @Transactional
+    @Query(value = "select content_history h where status not in ?1 and create_time < ?2 limit ?3", nativeQuery = true)
+    List<ContentHistory> findStatusNotINAndUpdateTimeLessThanAndLimit(List<String> types, Date time, int limit);
+
+
+    @Modifying
+    @Transactional
     @Query(value = "update content_history h set h.status = ?2, h.update_time=current_timestamp where h.request_id =?1", nativeQuery = true)
     int updateStatus(String id, String status);
 
@@ -85,8 +97,8 @@ public interface ContentHistoryRepository extends JpaRepository<ContentHistory, 
 
     @Modifying
     @Transactional
-    @Query(value = "delete from content_history  where create_time <?1", nativeQuery = true)
-    void clear(Date time);
+    @Query(value = "delete from content_history  where create_time <?1 limit ?3", nativeQuery = true)
+    int clear(Date time, int limit);
 
 
     @Modifying

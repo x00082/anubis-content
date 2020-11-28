@@ -44,6 +44,9 @@ public class DateBaseServiceImpl implements DateBaseService {
     @Autowired
     private HistoryRecordRepository historyRecordRepository;
 
+    @Autowired
+    private RequestRecordRepository requestRecordRepository;
+
     @Override
     public ContentHistoryRepository getContentHistoryRepository() {
         return contentHistoryRepository;
@@ -84,4 +87,7 @@ public class DateBaseServiceImpl implements DateBaseService {
 
     @Override
     public HistoryRecordRepository getHistoryRecordRepository() { return historyRecordRepository; }
+
+    @Override
+    public RequestRecordRepository getRequestRecordRepository() { return requestRecordRepository; }
 }

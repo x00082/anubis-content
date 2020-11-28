@@ -27,7 +27,9 @@ public interface DateBaseService {
 
     public RobinRecordRepository getRobinRecordRepository();
 
-    public  HistoryRecordRepository getHistoryRecordRepository();
+    public HistoryRecordRepository getHistoryRecordRepository();
+
+    public RequestRecordRepository getRequestRecordRepository();
 
 
 }

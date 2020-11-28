@@ -413,7 +413,7 @@ public class ContentController {
           return dto;
       }
 
-/*
+
     @PutMapping("/refresh/test")
     public ApiReceipt test(@Valid @RequestBody FreshCommand command) throws ContentException, DomainException {
         log.info("content/fresh/dir start command:{}", JSON.toJSONString(command));
@@ -439,9 +439,9 @@ public class ContentController {
         }
 
 
-        ApiReceipt result = this.facade.test();
+        ApiReceipt result = this.facade.test(dto, command);
         log.info("content/fresh/dir end result:{}", JSON.toJSONString(result));
         return result;
     }
-*/
+
 }

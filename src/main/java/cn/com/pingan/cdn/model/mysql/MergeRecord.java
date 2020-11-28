@@ -12,10 +12,7 @@ import javax.persistence.*;
  */
 @Data
 @Entity
-@Table(name="merge_record",
-        uniqueConstraints = {
-                @UniqueConstraint(columnNames = {"merge_id"})
-        })
+@Table(name="merge_record")
 public class MergeRecord {
 
     @Id

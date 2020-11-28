@@ -12,8 +12,8 @@ import javax.persistence.*;
  */
 @Data
 @Entity
-@Table(name="history_record")
-public class HistoryRecord {
+@Table(name="request_record")
+public class RequestRecord {
 
     @Id
     @GeneratedValue(strategy= GenerationType.IDENTITY)
@@ -21,7 +21,4 @@ public class HistoryRecord {
 
     @Column(name="request_id", length=128)
     private String requestId;
-
-    @Column(name="version")
-    private Integer version;
 }

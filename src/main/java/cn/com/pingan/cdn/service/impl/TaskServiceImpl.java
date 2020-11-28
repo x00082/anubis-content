@@ -62,14 +62,18 @@ public class TaskServiceImpl implements TaskService {
     @Value("${task.new.request.size.default:500}")
     private Integer requestSize;
 
-    @Value("${task.robin.qps.default:10}")
+    @Value("${task.robin.qps.default:50}")
     private Integer robinQps;
 
     @Value("${task.vendor.status.default:up}")
     private String defaultVendorStatus;
 
-    @Value("${spring.datasource.mysql.max-total:50}")
+    @Value("${task.database.qps:50}")
     private Integer dataBaseQps;
+
+
+    @Value("${mq.sleep.ms:500}")
+    private Long sleepMs;
 
     public static Map<String, List<String>> mergeHashMap= new ConcurrentHashMap<String,List<String>>();
 
@@ -374,11 +378,11 @@ public class TaskServiceImpl implements TaskService {
                 // 0-成功，-1执行异常，-100超限
                 int result = handlerTaskLimit(redisKey, limit);
                 if (-100 == result) {
-                    stopAndSendDelayFanoutMsg(msg);
+                    //stopAndSendDelayFanoutMsg(msg);
                     log.warn("redis:{} Limit:{}", redisKey, limit);
-                    //msg.setDelay(1000L);
+                    msg.setDelay(1000L);
                     producer.sendAllMsg(msg);
-                    Thread.sleep(1000L);
+                    Thread.currentThread().sleep(sleepMs);
                     return false;
                 } else if (-1 == result) {
                     log.warn("redis:{} Limit:{} 执行异常", redisKey, limit);
@@ -460,7 +464,7 @@ public class TaskServiceImpl implements TaskService {
                             }
 
                             if (responseMap.get(v.getMergeId()).equals(TaskStatus.SUCCESS)) {
-                                successMap.put(v.getRequestId(), successMap.containsKey(v.getRequestId()) ? successMap.get(v.getRequestId()) + 1 : 1);
+                                successMap.put(v.getRequestId(), successMap.containsKey(v.getRequestId()) ? successMap.get(v.getRequestId()) + v.getContentNumber() : v.getContentNumber());
                             } else {
                                 failMap.put(v.getRequestId(), 1);
                             }
@@ -705,20 +709,32 @@ public class TaskServiceImpl implements TaskService {
             int result = handlerQpsAndSizeLimit(redisKey,1, msg.getSize(), qps, size);
             if (-100 == result) {//设置delay为了防止多次接受，导致cpu增高
                 log.warn("redis:{} LimitQps:{}", redisKey, qps);
-                Thread.sleep(1000L);
+                Thread.currentThread().sleep(sleepMs);
                 return true;
             }else if(-200 == result) {
                 log.warn("redis:{} LimitSize:{}", redisKey, size);
-                Thread.sleep(1000L);
+                Thread.currentThread().sleep(sleepMs);
                 return true;
             } else if (-1 == result) {
                 log.warn("redis:{} Limit: 执行异常", redisKey);
                 throw new Exception(taskId + ": redis err");
             }
         }
-        List<VendorContentTask> vendorContentTaskList = null;
-        vendorContentTaskList = dateBaseService.getVendorTaskRepository().findByMergeId(taskId);
-        List<String> urls = vendorContentTaskList.stream().map(i->i.getContent()).collect(Collectors.toList());
+
+        List<String> urls = new ArrayList<>();
+        List<VendorContentTask> vendorContentTaskList = dateBaseService.getVendorTaskRepository().findByMergeId(taskId);
+        if(vendorContentTaskList.size() == 0){
+            return false;
+        }
+        for(VendorContentTask vct:vendorContentTaskList){
+            if(vct.getContent() !=null && vct.getContentNumber()>0){
+                urls.addAll(JSONArray.parseArray(vct.getContent(), String.class));
+            }
+        }
+        if(urls.size() == 0 ){
+            return false;
+        }
+
 
         JSONObject response = null;
         RefreshPreloadData data = new RefreshPreloadData();
@@ -796,6 +812,7 @@ public class TaskServiceImpl implements TaskService {
         try {
             if (msg.getCallBack().equals(CallBackEnum.request)) {//存入请求返回，并合并轮询请求，再次收敛请求数
                 log.info("handlerCommon request");
+                /*
                 String redisKey = msg.getOperation().name()+ "_" + CallBackEnum.request.name();
                 // 0-成功，-1执行异常，-100超限
                 int result = handlerTaskLimit(redisKey, dataBaseQps);
@@ -803,15 +820,18 @@ public class TaskServiceImpl implements TaskService {
                     //stopAndSendDelayFanoutMsg(msg);
                     log.warn("redis:{} LimitQps:{}", redisKey, dataBaseQps);
                     //msg.setDelay(1000L);
-                    Thread.sleep(1000L);
+                    Thread.currentThread().sleep(1000L);
                     return true;
                 } else if (-1 == result) {
                     log.warn("redis:{} Limit: 执行异常", redisKey);
                     throw new Exception( redisKey + ": redis err");
                 }
-
+                */
                 String mergeId = msg.getTaskId();
                 List<VendorContentTask> vendorContentTaskList = dateBaseService.getVendorTaskRepository().findByMergeId(mergeId);
+                if(vendorContentTaskList.size() == 0){
+                    return false;
+                }
                 for (VendorContentTask vct : vendorContentTaskList) {
                     vct.setJobId(msg.getJobId());
                     vct.setMergeId(msg.getJobId());
@@ -820,7 +840,7 @@ public class TaskServiceImpl implements TaskService {
                     vct.setUpdateTime(new Date());
                 }
                 log.info("handlerCommon request update");
-                dateBaseService.getVendorTaskRepository().batchUpdate(vendorContentTaskList);
+                dateBaseService.getVendorTaskRepository().saveAll(vendorContentTaskList);
                 log.info("handlerCommon request update done");
 
                 RobinRecord robinRecord = new RobinRecord();

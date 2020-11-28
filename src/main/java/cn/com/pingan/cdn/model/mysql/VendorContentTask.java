@@ -33,6 +33,7 @@ import java.util.Date;
         indexes = {
                 @Index(columnList = "request_id"),
                 @Index(columnList = "merge_id"),
+                @Index(columnList = "history_create_time")
         })
 
 /*
@@ -63,8 +64,11 @@ public class VendorContentTask {
     @Enumerated(EnumType.STRING)
     private TaskStatus status;
 
-    @Column(length=4096, name="content", nullable = false)
+    @Column(columnDefinition="TEXT", name="content", nullable = false)
     private String content;
+
+    @Column(name="content_number", nullable = false)
+    private Integer contentNumber;
 
     @Column(name="job_id", length=128)
     private String jobId;
@@ -86,11 +90,6 @@ public class VendorContentTask {
     
     @Column(name="version")
     private int version;
-
-    /*
-    @Column(length=128, name="item_id", nullable = false)
-    private String itemId;
-    */
 
     @Column(length=128, name="request_id", nullable = false)
     private String requestId;

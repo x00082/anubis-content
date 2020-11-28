@@ -367,9 +367,8 @@ public class ContentServiceFacadeImpl implements ContentServiceFacade {
 
 
     @Override
-    public ApiReceipt test() throws ContentException {
-        contentService.test();
-        return null;
+    public ApiReceipt test(GateWayHeaderDTO dto, FreshCommand command) throws ContentException {
+        return contentService.test(dto, command.getData(), RefreshType.url);
     }
 
     private void queryUserUuid(GateWayHeaderDTO dto, QueryHisCommand command, List<BaseUser> userList,List<String> uuidList) {
