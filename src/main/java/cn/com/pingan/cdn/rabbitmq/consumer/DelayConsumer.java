@@ -45,7 +45,7 @@ public class DelayConsumer {
             }
 
         }catch (Exception e){
-            log.info("延时任务转发失败", e);
+            log.error("延时任务转发失败", e);
         }finally {
 
             try {
@@ -69,7 +69,7 @@ public class DelayConsumer {
             producer.sendFanoutMsg(fanoutMsg);
 
         }catch (Exception e){
-            log.info("延时任务转发失败", e);
+            log.error("延时任务转发失败", e);
         }finally {
 
             try {

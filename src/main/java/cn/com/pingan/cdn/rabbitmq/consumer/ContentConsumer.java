@@ -51,7 +51,7 @@ public class ContentConsumer {
             contentService.saveVendorTask(taskMsg);
 
         }catch (Exception e){
-            log.info("用户拆分任务失败", e);
+            log.error("用户拆分任务失败", e);
         }finally {
 
             try {
@@ -75,7 +75,7 @@ public class ContentConsumer {
             contentService.contentHistoryRobin(taskMsg);
 
         }catch (Exception e){
-            log.info("厂商拆分任务失败", e);
+            log.error("厂商拆分任务失败", e);
         }finally {
 
             try {
@@ -93,7 +93,7 @@ public class ContentConsumer {
             log.error("DefaultError rabbit mq receive a message{}", msg.toString());
 
         }catch (Exception e){
-            log.info("receiveDefaultError", e);
+            log.error("receiveDefaultError", e);
         }finally {
 
             try {

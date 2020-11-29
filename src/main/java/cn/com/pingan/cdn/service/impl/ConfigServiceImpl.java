@@ -2,7 +2,6 @@ package cn.com.pingan.cdn.service.impl;
 
 import cn.com.pingan.cdn.common.ApiReceipt;
 import cn.com.pingan.cdn.common.FanoutType;
-import cn.com.pingan.cdn.common.VendorStatusEnum;
 import cn.com.pingan.cdn.exception.ErrorCode;
 import cn.com.pingan.cdn.model.mysql.VendorInfo;
 import cn.com.pingan.cdn.rabbitmq.config.RabbitListenerConfig;
@@ -63,20 +62,22 @@ public class ConfigServiceImpl implements ConfigService {
             vendorInfoRepository.save(info);
         }
 
+        /*
         if (VendorStatusEnum.down.equals(infoDTO.getStatus())) {
-            rabbitListenerConfig.stop("content_" + infoDTO.getVendor());
+            //rabbitListenerConfig.stop("content_" + infoDTO.getVendor());
             rabbitListenerConfig.stop("content_" + infoDTO.getVendor() + "_url");
             rabbitListenerConfig.stop("content_" + infoDTO.getVendor() + "_dir");
             rabbitListenerConfig.stop("content_" + infoDTO.getVendor() + "_preheat");
             rabbitListenerConfig.stop("content_" + infoDTO.getVendor() + "_robin");
 
         }else if(VendorStatusEnum.up.equals(infoDTO.getStatus())){
-            rabbitListenerConfig.start("content_" + infoDTO.getVendor());
+            //rabbitListenerConfig.start("content_" + infoDTO.getVendor());
             rabbitListenerConfig.start("content_" + infoDTO.getVendor() + "_url");
             rabbitListenerConfig.start("content_" + infoDTO.getVendor() + "_dir");
             rabbitListenerConfig.start("content_" + infoDTO.getVendor() + "_preheat");
             rabbitListenerConfig.start("content_" + infoDTO.getVendor() + "_robin");
         }
+        */
         FanoutMsg fmsg = new FanoutMsg();
         fmsg.setKey(infoDTO.getVendor());
         fmsg.setOperation(FanoutType.fflush_vendor);
@@ -116,20 +117,22 @@ public class ConfigServiceImpl implements ConfigService {
         info.setStatus(infoDTO.getStatus());
         vendorInfoRepository.save(info);
 
+        /*
         if (VendorStatusEnum.down.equals(infoDTO.getStatus())) {
-            rabbitListenerConfig.stop("content_" + infoDTO.getVendor());
+            //rabbitListenerConfig.stop("content_" + infoDTO.getVendor());
             rabbitListenerConfig.stop("content_" + infoDTO.getVendor() + "_url");
             rabbitListenerConfig.stop("content_" + infoDTO.getVendor() + "_dir");
             rabbitListenerConfig.stop("content_" + infoDTO.getVendor() + "_preheat");
             rabbitListenerConfig.stop("content_" + infoDTO.getVendor() + "_robin");
 
         }else if(VendorStatusEnum.up.equals(infoDTO.getStatus())){
-            rabbitListenerConfig.start("content_" + infoDTO.getVendor());
+            //rabbitListenerConfig.start("content_" + infoDTO.getVendor());
             rabbitListenerConfig.start("content_" + infoDTO.getVendor() + "_url");
             rabbitListenerConfig.start("content_" + infoDTO.getVendor() + "_dir");
             rabbitListenerConfig.start("content_" + infoDTO.getVendor() + "_preheat");
             rabbitListenerConfig.start("content_" + infoDTO.getVendor() + "_robin");
         }
+        */
         FanoutMsg fmsg = new FanoutMsg();
         fmsg.setKey(infoDTO.getVendor());
         fmsg.setOperation(FanoutType.fflush_vendor);

@@ -30,7 +30,7 @@ public class SchenuledTaskServiceImpl {
     @Value("${task.data.taskExpire:10}")
     private Integer taskExpire;
 
-    @Value("${task.data.clear.ms:86400000}")
+    @Value("${task.data.clear.ms:3600000}")
     private Long clearRate;
 
     @Value("${task.data.clear.limit:1000}")
@@ -49,9 +49,6 @@ public class SchenuledTaskServiceImpl {
 
     @Scheduled(cron = "${task.expire.content.cron:0 0 1 * * ? }")
     public void clearData(){
-
-        Date expire = preNDay(contentExpire);
-        log.info("清理{}之前的用户任务及其子任务", formatter.format(expire));
         try {
             List<String> keys = new ArrayList<>();
             keys.add(key);
@@ -64,11 +61,15 @@ public class SchenuledTaskServiceImpl {
                 log.error("没有执行权限");
                 return;
             }
+
+            Date expire = preNDay(contentExpire);
+            log.info("清理{}之前的用户任务及其子任务", formatter.format(expire));
+
             int count =0;
             re =0;
             do{
                 re = dateBaseService.getContentHistoryRepository().clear(expire, clearLimit);
-                log.info("单次修改数[{}]", re);
+                log.info("单次删除[{}]", re);
 
             }while (re == clearLimit);
             log.info("删除历史数量[{}]", count);
@@ -80,7 +81,7 @@ public class SchenuledTaskServiceImpl {
             re =0;
             do{
                 re = dateBaseService.getVendorTaskRepository().clearWithhHistory(expire, clearLimit);
-                log.info("单次修删除[{}]", re);
+                log.info("单次删除[{}]", re);
 
             }while (re == clearLimit);
             log.info("删除厂商任务数量[{}]", count);

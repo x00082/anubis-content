@@ -363,14 +363,15 @@ public class TaskServiceImpl implements TaskService {
             } else {
                 vendorStatus = vendorInfo.getStatus().name();
             }
-            /*
+
             if ("down".equals(vendorStatus)) {
                 msg.setDelay(1 * 60 * 1000L);
-                rabbitListenerConfig.stop(msg.getOperation().name());//关闭监听
+                //rabbitListenerConfig.stop(msg.getOperation().name());//关闭监听
                 producer.sendAllMsg(msg);//放回队列
+                Thread.currentThread().sleep(sleepMs);
                 return false;
             }
-            */
+
             if (msg.getIsLimit()) {//
                 //请求QPS限制
                 int limit = vendorInfo!=null?vendorInfo.getRobinQps():robinQps;
@@ -386,7 +387,7 @@ public class TaskServiceImpl implements TaskService {
                     return false;
                 } else if (-1 == result) {
                     log.warn("redis:{} Limit:{} 执行异常", redisKey, limit);
-                    throw new Exception(": redis err");
+                    throw new Exception("redis err");
                 }
             }
 
@@ -414,37 +415,27 @@ public class TaskServiceImpl implements TaskService {
                     JSONObject json = jsonArray.getJSONObject(i);
                     if (json != null && json.getString("jobId") != null ) {
                         if (Constants.STATUS_SUCCESS.equals(json.getString("status"))) {
-                            ts = TaskStatus.SUCCESS;
-                            //message = StringUtils.isNoneBlank(json.getString("message"))?json.getString("message"):"厂商执行成功";
-                            message = "厂商执行成功";
                             responseMap.put(json.getString("jobId"), TaskStatus.SUCCESS);
                             msg.setRetryNum(0);
-                            log.info("刷新预热任务完成，任务编号[{}]", json.getString("jobId"));
+                            log.debug("刷新预热任务完成，任务编号[{}]", json.getString("jobId"));
                         } else if (Constants.STATUS_FAIL.equals(json.getString("status"))) {
-                            ts = TaskStatus.FAIL;
-                            //message = StringUtils.isNoneBlank(json.getString("message"))?json.getString("message"):"厂商执行失败";
-                            message = "厂商执行失败";
                             responseMap.put(json.getString("jobId"), TaskStatus.FAIL);
                             msg.setRetryNum(0);
-                            log.info("刷新预热任务失败，任务编号[{}]", json.getString("jobId"));
+                            log.debug("刷新预热任务失败，任务编号[{}]", json.getString("jobId"));
                         } else if (Constants.STATUS_WAIT.equals(json.getString("status"))) {
                             //msg.setRoundRobinNum(msg.getRoundRobinNum() + 1);
                             if(msg.getRoundRobinNum() > roundLimit){
-                                ts = TaskStatus.FAIL;
-                                message = "轮询超出重试次数";
                                 responseMap.put(json.getString("jobId"), TaskStatus.FAIL);
                             }else{
                                 msg.setDelay(roundMs);
                                 robinTask.add(json.getString("jobId"));
                             }
-                            log.info("刷新预热任务未完成，任务编号[{}], 等待{}ms后查询", json.getString("jobId"), roundMs);
+                            log.debug("刷新预热任务未完成，任务编号[{}], 等待{}ms后查询", json.getString("jobId"), roundMs);
                             msg.setRetryNum(0);
                         } else {
-                            log.info("返回值状态异常，期望的状态是SUCCESS/FAIL/WAIT,收到的状态是[{}]", json.getString("status"));
+                            log.debug("返回值状态异常，期望的状态是SUCCESS/FAIL/WAIT,收到的状态是[{}]", json.getString("status"));
                             msg.setRetryNum(msg.getRetryNum() + 1);
                             if(msg.getRetryNum() > timeOutLimit){
-                                ts = TaskStatus.FAIL;
-                                message = "超出重试次数";
                             }else{
                                 msg.setDelay(timeOutMs);
                             };
@@ -491,9 +482,10 @@ public class TaskServiceImpl implements TaskService {
                 }
 
                 if(successMap.keySet().size() >0){
+                    log.info("成功任务[{}]", successMap);
                     List<RobinCallBack> succList = new ArrayList<>();
                     for(String id: successMap.keySet()){
-                        log.info("success -> request id[{}], succ[{}], version[{}]", id, successMap.get(id), versionMap.get(id));
+                        log.debug("success -> request id[{}], succ[{}], version[{}]", id, successMap.get(id), versionMap.get(id));
                         RobinCallBack rcb = new RobinCallBack();
                         rcb.setRequestId(id);
                         rcb.setNum(successMap.get(id));
@@ -504,13 +496,14 @@ public class TaskServiceImpl implements TaskService {
                     succMsg.setOperation(TaskOperationEnum.content_vendor_success);
                     succMsg.setRobinCallBackList(succList);
                     producer.sendTaskMsg(succMsg);
-                    log.info("send success msg done");
+                    log.debug("send success msg done");
                 }
 
                 if(failMap.keySet().size()>0) {
+                    log.info("失败任务[{}]", successMap);
                     List<RobinCallBack> failList = new ArrayList<>();
                     for (String id : failMap.keySet()) {
-                        log.info("fail -> request id[{}], version[{}]", id, versionMap.get(id));
+                        log.debug("fail -> request id[{}], version[{}]", id, versionMap.get(id));
                         //dateBaseService.getContentHistoryRepository().updateStatusAndMessageByRequestIdAndVersion(id, HisStatus.FAIL.name(), "任务执行失败", versionMap.get(id));
                         RobinCallBack rcb = new RobinCallBack();
                         rcb.setRequestId(id);
@@ -518,26 +511,12 @@ public class TaskServiceImpl implements TaskService {
                         rcb.setVersion(versionMap.get(id));
                         failList.add(rcb);
                     }
-                    TaskMsg succMsg = new TaskMsg();
-                    succMsg.setOperation(TaskOperationEnum.content_vendor_fail);
-                    succMsg.setRobinCallBackList(failList);
-                    producer.sendTaskMsg(succMsg);
-                    log.info("send fail msg done");
+                    TaskMsg failMsg = new TaskMsg();
+                    failMsg.setOperation(TaskOperationEnum.content_vendor_fail);
+                    failMsg.setRobinCallBackList(failList);
+                    producer.sendTaskMsg(failMsg);
+                    log.debug("send fail msg done");
                 }
-
-                /*
-                if(failMap.keySet().size()>0){
-                    List<ContentHistory> chs = dateBaseService.getContentHistoryRepository().findByRequestIdIn(new ArrayList<String>(failMap.keySet()));
-                    if(chs.size()>0){
-                        for(ContentHistory ch: chs){
-                            ch.setStatus(HisStatus.FAIL);
-                            ch.setMessage(message);
-                            ch.setUpdateTime(new Date());
-                        }
-                        dateBaseService.getContentHistoryRepository().saveAll(chs);
-                    }
-                }
-                */
 
                 for(RefreshPreloadItem it: dto.getTaskList()){
                     log.info("jobId[{}], ", it.getJobId());
@@ -560,7 +539,7 @@ public class TaskServiceImpl implements TaskService {
 
 
             }else{
-                log.info("返回无效数据{}", response);
+                log.error("返回无效数据{}", response);
                 throw new Exception(" response err");
             }
         }catch (Exception e){
@@ -596,7 +575,7 @@ public class TaskServiceImpl implements TaskService {
                 msg.setRoundRobinNum(msg.getRoundRobinNum() +1);
                 JxGaga gg = JxGaga.of(Executors.newCachedThreadPool(), msg.getRobinCallBackList().size());
                 List<String> rs = new ArrayList<>();
-                log.info("更新用户历史状态->[Success]");
+                log.debug("更新用户历史状态->[Success]");
                 for (RobinCallBack rcb : msg.getRobinCallBackList()) {
                     gg.work(() -> {
                         dateBaseService.getContentHistoryRepository().updateSuccessNumByRequestIdAndVersion(rcb.getRequestId(), rcb.getNum(), rcb.getVersion());
@@ -606,13 +585,16 @@ public class TaskServiceImpl implements TaskService {
                     });
                 }
                 gg.merge((i) -> {
+                    log.info("update success [{}]",i.size());
+                    /*
                     i.forEach(j -> {
                         log.info(j);
                     });
+                    */
                     //}, rs, 5, TimeUnit.SECONDS).exit();
                 }, rs).exit();
-                log.info("更新用户历史状态完成");
             }
+            log.info("end handlerSuccess:{}",msg);
             return true;
         }catch (Exception e){
             log.error("更新用户历史状态异常{}", e);
@@ -636,7 +618,7 @@ public class TaskServiceImpl implements TaskService {
                 msg.setRoundRobinNum(msg.getRoundRobinNum() +1);
                 JxGaga gg = JxGaga.of(Executors.newCachedThreadPool(), msg.getRobinCallBackList().size());
                 List<String> rs = new ArrayList<>();
-                log.info("更新用户历史状态->[Fail]");
+                log.debug("更新用户历史状态->[Fail]");
                 for (RobinCallBack rcb : msg.getRobinCallBackList()) {
                     gg.work(() -> {
                         dateBaseService.getContentHistoryRepository().updateStatusAndMessageByRequestIdAndVersion(rcb.getRequestId(), HisStatus.FAIL.name(),"任务执行失败", rcb.getVersion());
@@ -646,13 +628,16 @@ public class TaskServiceImpl implements TaskService {
                     });
                 }
                 gg.merge((i) -> {
+                    log.info("update fail [{}]",i.size());
+                    /*
                     i.forEach(j -> {
                         log.info(j);
                     });
+                    */
                     //}, rs, 5, TimeUnit.SECONDS).exit();
                 }, rs).exit();
-                log.info("更新用户历史状态完成");
             }
+            log.info("end handlerFail:{}",msg);
             return true;
         }catch (Exception e){
             log.error("更新用户历史状态异常{}", e);
@@ -692,14 +677,15 @@ public class TaskServiceImpl implements TaskService {
         }else{
             vendorStatus = vendorInfo.getStatus().name();
         }
-        /*
+
         if ("down".equals(vendorStatus)) {
             msg.setDelay(1 * 60 * 1000L);
-            rabbitListenerConfig.stop(msg.getOperation().name());//关闭监听
+            //rabbitListenerConfig.stop(msg.getOperation().name());//关闭监听
             producer.sendAllMsg(msg);//放回队列
+            Thread.currentThread().sleep(sleepMs);
             return false;
         }
-        */
+
         if (msg.getIsLimit()) {
             //请求QPS限制
             int qps = vendorInfo!=null?vendorInfo.getTotalQps():requestQps;
@@ -812,21 +798,7 @@ public class TaskServiceImpl implements TaskService {
         try {
             if (msg.getCallBack().equals(CallBackEnum.request)) {//存入请求返回，并合并轮询请求，再次收敛请求数
                 log.info("handlerCommon request");
-                /*
-                String redisKey = msg.getOperation().name()+ "_" + CallBackEnum.request.name();
-                // 0-成功，-1执行异常，-100超限
-                int result = handlerTaskLimit(redisKey, dataBaseQps);
-                if (-100 == result) {
-                    //stopAndSendDelayFanoutMsg(msg);
-                    log.warn("redis:{} LimitQps:{}", redisKey, dataBaseQps);
-                    //msg.setDelay(1000L);
-                    Thread.currentThread().sleep(1000L);
-                    return true;
-                } else if (-1 == result) {
-                    log.warn("redis:{} Limit: 执行异常", redisKey);
-                    throw new Exception( redisKey + ": redis err");
-                }
-                */
+
                 String mergeId = msg.getTaskId();
                 List<VendorContentTask> vendorContentTaskList = dateBaseService.getVendorTaskRepository().findByMergeId(mergeId);
                 if(vendorContentTaskList.size() == 0){
@@ -839,9 +811,9 @@ public class TaskServiceImpl implements TaskService {
                     vct.setMessage("任务请求厂商成功");
                     vct.setUpdateTime(new Date());
                 }
-                log.info("handlerCommon request update");
+                log.debug("handlerCommon request update");
                 dateBaseService.getVendorTaskRepository().saveAll(vendorContentTaskList);
-                log.info("handlerCommon request update done");
+                log.debug("handlerCommon request update done");
 
                 RobinRecord robinRecord = new RobinRecord();
                 robinRecord.setRobinId(msg.getJobId());

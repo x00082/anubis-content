@@ -97,7 +97,7 @@ public interface ContentHistoryRepository extends JpaRepository<ContentHistory, 
 
     @Modifying
     @Transactional
-    @Query(value = "delete from content_history  where create_time <?1 limit ?3", nativeQuery = true)
+    @Query(value = "delete from content_history  where create_time <?1 limit ?2", nativeQuery = true)
     int clear(Date time, int limit);
 
 

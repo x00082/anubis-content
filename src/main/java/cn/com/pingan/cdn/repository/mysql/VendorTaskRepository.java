@@ -50,7 +50,7 @@ public interface VendorTaskRepository extends MyJpaRepository<VendorContentTask,
 
     @Modifying
     @Transactional
-    @Query(value = "delete from vendor_task where historyCreateTime <?1 limit ?2", nativeQuery = true)
+    @Query(value = "delete from vendor_task where history_create_time <?1 limit ?2", nativeQuery = true)
     int clearWithhHistory(Date time, int limit);
 
     @Modifying

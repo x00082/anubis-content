@@ -12,7 +12,6 @@ import cn.com.pingan.cdn.service.TaskService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
@@ -20,7 +19,6 @@ import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
 
 /**
  * @Classname CheckTaskServiceImpl
@@ -29,7 +27,7 @@ import java.util.concurrent.TimeUnit;
  * @Created by Luj
  */
 
-@Async
+//@Async
 @Service
 @Slf4j
 public class CheckTaskServiceImpl {
@@ -552,8 +550,9 @@ public class CheckTaskServiceImpl {
             }, j -> rl.add(j),  q -> {q.getMessage();});
         }
         gg.merge((i) -> {
-            i.forEach(j -> {log.info(j);});
-        }, rl, 2, TimeUnit.SECONDS).exit();
+            //i.forEach(j -> {log.debug(j);});
+            log.info("已发送mq[{}]",i.size());
+        }, rl).exit();
     }
 
 
