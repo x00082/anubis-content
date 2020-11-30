@@ -27,9 +27,11 @@ import java.util.Date;
 @Entity
 
 @Table(name="content_history",
+        /*
         uniqueConstraints = {
                 @UniqueConstraint(columnNames = {"request_id"})
         },
+        */
         indexes = {
                 @Index(columnList = "type"),
                 @Index(columnList = "status"),
@@ -47,10 +49,13 @@ import java.util.Date;
         */
 public class ContentHistory {
 
+    /*
     @Id
     @GeneratedValue(strategy=GenerationType.IDENTITY)
     private Long id;
-    
+    */
+
+    @Id
     @Column(length=128, name="request_id", nullable = false)
     private String requestId;
     

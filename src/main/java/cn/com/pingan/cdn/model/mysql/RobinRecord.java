@@ -17,8 +17,8 @@ import javax.persistence.*;
 public class RobinRecord {
 
     @Id
-    @GeneratedValue(strategy= GenerationType.IDENTITY)
-    private Long id;
+    @Column(name="record_id", length=128)
+    private String recordId;
 
     @Column(name="robin_id", length=128)
     private String robinId;

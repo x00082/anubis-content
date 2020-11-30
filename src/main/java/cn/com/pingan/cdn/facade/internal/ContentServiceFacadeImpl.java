@@ -133,7 +133,8 @@ public class ContentServiceFacadeImpl implements ContentServiceFacade {
         int pageSize = command.getPageSize();
         pageIndex = pageIndex > 0 ? pageIndex - 1 : pageIndex;
         pageSize = (pageSize > 0 && pageSize <= 100) ? pageSize : 100;
-        Sort sort = new Sort(Sort.Direction.DESC, "id");
+        //Sort sort = new Sort(Sort.Direction.DESC, "id");
+        Sort sort = new Sort(Sort.Direction.DESC, "createTime");
         //Sort sort = Sort.by(Sort.Direction.DESC, "id");
         PageRequest pageRequest = PageRequest.of(pageIndex, pageSize, sort);
 
@@ -244,7 +245,7 @@ public class ContentServiceFacadeImpl implements ContentServiceFacade {
             List<ContentHisDTO> data = new ArrayList<>();
             for (ContentHistory contentHistory : pager) {
                 ContentHisDTO tmp = new ContentHisDTO();
-                tmp.setId(contentHistory.getId());
+                //tmp.setId(contentHistory.getId());
                 tmp.setOptTime(new Timestamp(contentHistory.getCreateTime() != null ? contentHistory.getCreateTime().getTime() : new Date().getTime()));
                 tmp.setContent(contentHistory.getContent());
                 tmp.setType(contentHistory.getType() != null ? contentHistory.getType().toString() : "");

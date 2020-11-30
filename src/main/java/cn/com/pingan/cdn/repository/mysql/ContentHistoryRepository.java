@@ -34,7 +34,6 @@ public interface ContentHistoryRepository extends JpaRepository<ContentHistory, 
 
     List<ContentHistory> findByRequestIdIn(List<String> requestIds);
 
-    List<ContentHistory> findByIdIn(List<Long> Ids);
 
     @Modifying
     @Transactional
@@ -60,35 +59,8 @@ public interface ContentHistoryRepository extends JpaRepository<ContentHistory, 
 
     @Modifying
     @Transactional
-    @Query(value = "update content_history h set h.status = ?2, h.update_time=current_timestamp, h.message = ?3 where h.id =?1", nativeQuery = true)
-    int updateStatusAndMessageById(Long id, String status, String message);
-
-    @Modifying
-    @Transactional
-    @Query(value = "update content_history h set h.flow_status = ?2, h.update_time=current_timestamp where h.request_id =?1", nativeQuery = true)
-    int updateFlowStatusByRequestId(String id, String status);
-
-    @Modifying
-    @Transactional
-    @Query(value = "update content_history h set h.flow_status = ?2, h.update_time=current_timestamp where h.id =?1", nativeQuery = true)
-    int updateFlowStatusById(Long id, String status);
-
-/*
-    @Modifying
-    @Transactional
-    @Query(value = "update content_history h set h.success_vendor_num = h.success_vendor_num + ?2, h.update_time=current_timestamp where h.id =?1 and h.version = ?2", nativeQuery = true)
-    int updateSuccessNumByIdAndVersion(Long id, Integer version);
-*/
-
-    @Modifying
-    @Transactional
     @Query(value = "update content_history h set h.success_task_num = h.success_task_num + ?2, h.update_time=current_timestamp where h.request_id =?1 and h.version = ?3", nativeQuery = true)
     int updateSuccessNumByRequestIdAndVersion(String id, int num, int version);
-
-    @Modifying
-    @Transactional
-    @Query(value = "update content_history h set h.status = ?3, h.update_time=current_timestamp, h.message = ?4 where h.id =?1 and h.version = ?2", nativeQuery = true)
-    int updateStatusAndMessageByIdAndVersion(Long id, Integer version, String status, String message);
 
     @Modifying
     @Transactional
@@ -107,11 +79,4 @@ public interface ContentHistoryRepository extends JpaRepository<ContentHistory, 
     List<ContentHistory> findByCreateTimeBeforeAndLimit(Date time, int num);
 
     List<ContentHistory> findByCreateTimeBefore(Date time);
-
-    /*
-    @Transactional
-    @Modifying
-    @Query(value = "delete from base.content_history c where c.opt_time < ?1", nativeQuery = true)
-    Integer clearOldHistory(Date date);
-    */
 }

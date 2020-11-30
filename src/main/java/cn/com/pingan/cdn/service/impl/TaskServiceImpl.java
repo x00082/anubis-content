@@ -5,6 +5,7 @@ import cn.com.pingan.cdn.common.*;
 import cn.com.pingan.cdn.config.RedisLuaScriptService;
 import cn.com.pingan.cdn.current.JxGaga;
 import cn.com.pingan.cdn.exception.RestfulException;
+import cn.com.pingan.cdn.model.mysql.ContentHistory;
 import cn.com.pingan.cdn.model.mysql.RobinRecord;
 import cn.com.pingan.cdn.model.mysql.VendorContentTask;
 import cn.com.pingan.cdn.model.mysql.VendorInfo;
@@ -71,9 +72,11 @@ public class TaskServiceImpl implements TaskService {
     @Value("${task.database.qps:50}")
     private Integer dataBaseQps;
 
-
     @Value("${mq.sleep.ms:500}")
     private Long sleepMs;
+
+    @Value("${task.notify.fail:false}")
+    private Boolean notifyFail;
 
     public static Map<String, List<String>> mergeHashMap= new ConcurrentHashMap<String,List<String>>();
 
@@ -500,7 +503,7 @@ public class TaskServiceImpl implements TaskService {
                 }
 
                 if(failMap.keySet().size()>0) {
-                    log.info("失败任务[{}]", successMap);
+                    log.info("失败任务[{}]", failMap);
                     List<RobinCallBack> failList = new ArrayList<>();
                     for (String id : failMap.keySet()) {
                         log.debug("fail -> request id[{}], version[{}]", id, versionMap.get(id));
@@ -519,7 +522,7 @@ public class TaskServiceImpl implements TaskService {
                 }
 
                 for(RefreshPreloadItem it: dto.getTaskList()){
-                    log.info("jobId[{}], ", it.getJobId());
+                    log.debug("jobId[{}], ", it.getJobId());
                     if(responseMap !=null && responseMap.containsKey(it.getJobId()) && ( responseMap.get(it.getJobId()).equals(TaskStatus.SUCCESS) || responseMap.get(it.getJobId()).equals(TaskStatus.FAIL))){
                         continue;
                     }
@@ -622,7 +625,7 @@ public class TaskServiceImpl implements TaskService {
                 for (RobinCallBack rcb : msg.getRobinCallBackList()) {
                     gg.work(() -> {
                         dateBaseService.getContentHistoryRepository().updateStatusAndMessageByRequestIdAndVersion(rcb.getRequestId(), HisStatus.FAIL.name(),"任务执行失败", rcb.getVersion());
-                        return "update done";
+                        return rcb.getRequestId();
                     }, j -> rs.add(j), q -> {
                         q.getMessage();
                     });
@@ -636,6 +639,29 @@ public class TaskServiceImpl implements TaskService {
                     */
                     //}, rs, 5, TimeUnit.SECONDS).exit();
                 }, rs).exit();
+
+                if(msg.getRobinCallBackList().size()>0 && notifyFail){
+                    List<String> requestIds = new ArrayList<>();
+                    for(RobinCallBack rcb : msg.getRobinCallBackList()){
+                        requestIds.add(rcb.getRequestId());
+                    }
+
+                    List<ContentHistory> contentHistorys = dateBaseService.getContentHistoryRepository().findByRequestIdIn(requestIds);
+                    gg = JxGaga.of(Executors.newCachedThreadPool(), contentHistorys.size());
+                    List<Integer> results = new ArrayList<>();
+                    for(ContentHistory his : contentHistorys){
+                        gg.work(() -> {
+                        anubisNotifyService.emailNotifyApiException(new AnubisNotifyExceptionRequest("anubis-content", his.getType().name(), his.getUserId(), his.getRequestId(),"刷新预热任务失败"));
+                            return 0;
+                        }, j -> results.add(j), q -> {
+                            q.getMessage();
+                        });
+                    }
+                    gg.merge((i) -> {
+                        log.info("通知失败消息[{}]",i.size());
+                    }, results).exit();
+                }
+
             }
             log.info("end handlerFail:{}",msg);
             return true;
@@ -816,6 +842,7 @@ public class TaskServiceImpl implements TaskService {
                 log.debug("handlerCommon request update done");
 
                 RobinRecord robinRecord = new RobinRecord();
+                robinRecord.setRecordId(UUID.randomUUID().toString().replaceAll("-", ""));
                 robinRecord.setRobinId(msg.getJobId());
                 robinRecord.setType(msg.getType());
                 robinRecord.setVendor(msg.getVendor());

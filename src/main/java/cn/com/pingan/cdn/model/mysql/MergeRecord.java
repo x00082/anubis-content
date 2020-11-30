@@ -16,8 +16,8 @@ import javax.persistence.*;
 public class MergeRecord {
 
     @Id
-    @GeneratedValue(strategy= GenerationType.IDENTITY)
-    private Long id;
+    @Column(name="record_id", length=128)
+    private String recordId;
 
     @Column(name="merge_id", length=128)
     private String mergeId;

@@ -1,5 +1,6 @@
 package cn.com.pingan.cdn.service.impl;
 
+import cn.com.pingan.cdn.client.AnubisNotifyService;
 import cn.com.pingan.cdn.common.*;
 import cn.com.pingan.cdn.config.RedisLuaScriptService;
 import cn.com.pingan.cdn.current.JxGaga;
@@ -50,6 +51,12 @@ public class CheckTaskServiceImpl {
     @Autowired
     private TaskService taskService;
 
+    @Value("${task.notify.fail:false}")
+    private Boolean notifyFail;
+
+    @Value("${task.notify.batch:50}")
+    private Integer batchSize;
+
     @Autowired
     Producer producer;
 
@@ -96,6 +103,9 @@ public class CheckTaskServiceImpl {
     @Value("${task.history.robin.package.limit:50}")
     private Integer robinHistoryPackageLimit;
 
+    @Autowired
+    private AnubisNotifyService anubisNotifyService;
+
     @Scheduled(fixedDelayString = "${task.check.fixedRate:60000}", initialDelay = 10000)
     public void queryStatus(){
         log.info("start set timeout task...");
@@ -113,34 +123,69 @@ public class CheckTaskServiceImpl {
                     return;
                 }
 
-                Set<String> requestIdSet = new HashSet<String>();
-                Map<String, Long> idMap = new HashMap<>();
                 Date now = new Date();
                 Date expireDate = new Date(now.getTime() - expire);
                 log.info("设置[{}]之前的等待超时厂商任务", formatter.format(expireDate));
                 List<String> ts = new ArrayList<>();
                 ts.add(TaskStatus.SUCCESS.name());
                 ts.add(TaskStatus.FAIL.name());
+                int count = 0;
+                re = 0;
+
                 //re = dateBaseService.getContentHistoryRepository().updateStatusFailNotINAndUpdateTimeLessThanLimit(ts, expireDate, expireLimit);
-                int count =0;
-                re =0;
                 //List<ContentHistory> contentHistories = dateBaseService.getContentHistoryRepository().findStatusNotINAndUpdateTimeLessThanAndLimit(ts, expireDate, expireLimit);
-                do{
-                    re = dateBaseService.getContentHistoryRepository().updateStatusFailNotINAndUpdateTimeLessThanLimit(ts, expireDate, expireLimit);
-                    log.info("本次修改数[{}]", re);
-                    count+=re;
-                    /*
-                    count += contentHistories.size();
-                    for(ContentHistory c : contentHistories){
-                        c.setMessage("任务超时");
-                        c.setUpdateTime(new Date());
-                        c.setStatus(HisStatus.FAIL);
+                do {
+                    if(notifyFail){
+                        List<List<ContentHistory>> notifyList = new ArrayList<>();
+                        List<ContentHistory> contentHistories = dateBaseService.getContentHistoryRepository().findStatusNotINAndUpdateTimeLessThanAndLimit(ts, expireDate, expireLimit);
+                        re = contentHistories.size();
+                        int num =0;
+                        for(ContentHistory his :contentHistories){
+                            his.setStatus(HisStatus.FAIL);
+                            his.setUpdateTime(new Date());
+                            his.setMessage("任务超时");
+                            if( num % batchSize ==0){
+                                List<ContentHistory> cs = new ArrayList<>();
+                                notifyList.add(cs);
+                            }
+                            notifyList.get(num/batchSize).add(his);
+                            num++;
+                        }
+                        dateBaseService.getContentHistoryRepository().saveAll(contentHistories);
+
+                        for(List<ContentHistory> nolist: notifyList){
+                            JxGaga gg = JxGaga.of(Executors.newCachedThreadPool(), nolist.size());
+                            List<Integer> results = new ArrayList<>();
+                            for(ContentHistory his : nolist){
+                                gg.work(() -> {
+                                    anubisNotifyService.emailNotifyApiException(new AnubisNotifyExceptionRequest("anubis-content", his.getType().name(), his.getUserId(), his.getRequestId(),"刷新预热任务失败"));
+                                    return 0;
+                                }, j -> results.add(j), q -> {
+                                    q.getMessage();
+                                });
+                            }
+                            gg.merge((i) -> {
+                                log.info("通知失败消息[{}]",i.size());
+                            }, results).exit();
+                        }
+                    }else {
+                        re = dateBaseService.getContentHistoryRepository().updateStatusFailNotINAndUpdateTimeLessThanLimit(ts, expireDate, expireLimit);
+                        log.info("本次修改数[{}]", re);
                     }
-                    dateBaseService.getContentHistoryRepository().saveAll(contentHistories);
-                    contentHistories = dateBaseService.getContentHistoryRepository().findStatusNotINAndUpdateTimeLessThanAndLimit(ts, expireDate, expireLimit);
+                    count += re;
+                /*
+                count += contentHistories.size();
+                for(ContentHistory c : contentHistories){
+                    c.setMessage("任务超时");
+                    c.setUpdateTime(new Date());
+                    c.setStatus(HisStatus.FAIL);
+                }
+                dateBaseService.getContentHistoryRepository().saveAll(contentHistories);
+                contentHistories = dateBaseService.getContentHistoryRepository().findStatusNotINAndUpdateTimeLessThanAndLimit(ts, expireDate, expireLimit);
                 */
-                }while (re == expireLimit);
+                } while (re == expireLimit);
                 log.info("设置超时任务数[{}]", count);
+
 
             }
         }catch (Exception e){

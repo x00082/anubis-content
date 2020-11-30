@@ -60,6 +60,5 @@ public interface VendorTaskRepository extends MyJpaRepository<VendorContentTask,
 
     List<VendorContentTask> findByCreateTimeBefore(Date time);
 
-    VendorContentTask findByTaskId(String taskId);
 
 }

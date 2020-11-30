@@ -164,6 +164,7 @@ public class ContentServiceImpl implements ContentService {
             log.info("检查用户计数完成");
 
             //原始请求入库
+            Date now = new Date();
             String taskId = UUID.randomUUID().toString().replaceAll("-", "");
             ContentHistory contentHistory = new ContentHistory();
 
@@ -171,23 +172,25 @@ public class ContentServiceImpl implements ContentService {
             contentHistory.setRequestId(taskId);
             contentHistory.setUserId(dto.getUid());
             contentHistory.setContent(JSON.toJSONString(data));
-            contentHistory.setCreateTime(new Date());
+            contentHistory.setCreateTime(now);
+            contentHistory.setUpdateTime(now);
             contentHistory.setStatus(HisStatus.WAIT);
             contentHistory.setContentNumber(data.size());
             contentHistory.setIsAdmin(dto.getIsAdmin());
             contentHistory.setFlowStatus(FlowEmun.init);
 
             dateBaseService.getContentHistoryRepository().save(contentHistory);
-            log.info("用户请求入库完成 id:{}", contentHistory.getId());
+            log.info("用户请求入库完成 request id:{}", contentHistory.getRequestId());
 
             if(requestMerge){
                 RequestRecord rc = new RequestRecord();
+                rc.setRecordId(UUID.randomUUID().toString().replaceAll("-", ""));
                 rc.setRequestId(taskId);
                 dateBaseService.getRequestRecordRepository().save(rc);
                 log.info("请求待合并:[{}]", taskId);
             }else {
                 TaskMsg historyTaskMsg = new TaskMsg();
-                historyTaskMsg.setId(contentHistory.getId());
+                //historyTaskMsg.setId(contentHistory.getId());
                 historyTaskMsg.setTaskId(taskId);
                 historyTaskMsg.setHisVersion(contentHistory.getVersion());
                 historyTaskMsg.setSize(data.size());
@@ -251,7 +254,7 @@ public class ContentServiceImpl implements ContentService {
             TaskMsg historyTaskMsg = new TaskMsg();
             historyTaskMsg.setForce(flag);
             historyTaskMsg.setTaskId(requestId);
-            historyTaskMsg.setId(contentHistory.getId());
+            //historyTaskMsg.setId(contentHistory.getId());
             historyTaskMsg.setVersion(1);
             historyTaskMsg.setHisVersion(contentHistory.getVersion());
             historyTaskMsg.setType(contentHistory.getType());
@@ -325,7 +328,7 @@ public class ContentServiceImpl implements ContentService {
                 }
                 TaskMsg historyTaskMsg = new TaskMsg();
                 historyTaskMsg.setForce(flag);
-                historyTaskMsg.setId(ch.getId());
+                //historyTaskMsg.setId(ch.getId());
                 historyTaskMsg.setTaskId(ch.getRequestId());
                 historyTaskMsg.setVersion(1);
                 historyTaskMsg.setType(ch.getType());
@@ -587,6 +590,7 @@ public class ContentServiceImpl implements ContentService {
                         log.info("saveContentVendor发送Mq[{}]", v);
                     } else {//TODO
                         MergeRecord record = new MergeRecord();
+                        record.setRecordId(UUID.randomUUID().toString().replaceAll("-", ""));
                         record.setMergeId(vendorTaskId.get(v));
                         records.add(record);
                         log.info("saveContentVendor记录合并record:[{}]", vendorTaskId.get(v));
@@ -598,6 +602,7 @@ public class ContentServiceImpl implements ContentService {
                 }
 
                 HistoryRecord historyRecord = new HistoryRecord();
+                historyRecord.setRecordId(UUID.randomUUID().toString().replaceAll("-", ""));
                 historyRecord.setRequestId(requestId);
                 historyRecord.setVersion(contentHistory.getVersion());
                 dateBaseService.getHistoryRecordRepository().save(historyRecord);
@@ -646,6 +651,7 @@ public class ContentServiceImpl implements ContentService {
                             toSaveVendorContentTask.addAll(rsMap.get(ch.getRequestId()));
 
                             HistoryRecord historyRecord = new HistoryRecord();
+                            historyRecord.setRecordId(UUID.randomUUID().toString().replaceAll("-", ""));
                             historyRecord.setRequestId(ch.getRequestId());
                             historyRecord.setVersion(ch.getVersion());
                             historyRecords.add(historyRecord);
@@ -682,6 +688,7 @@ public class ContentServiceImpl implements ContentService {
                                 toSendTaskList.add(vendorTaskMsg);
                             } else {
                                 MergeRecord record = new MergeRecord();
+                                record.setRecordId(UUID.randomUUID().toString().replaceAll("-", ""));
                                 record.setMergeId(vct.getMergeId());
                                 records.add(record);
                                 log.info("record:[{}]", vct.getMergeId());
@@ -1146,6 +1153,7 @@ public class ContentServiceImpl implements ContentService {
                 }
 
                 if(toSaveList.size()>0){
+                    /*
                     JxGaga gg = JxGaga.of(Executors.newCachedThreadPool(), toSaveList.size());
                     List<String> rs = new ArrayList<>();
                     log.info("更新用户历史状态->[Success]");
@@ -1162,7 +1170,10 @@ public class ContentServiceImpl implements ContentService {
                             log.info(j);
                         });
                     }, rs).exit();
-                    log.info("更新轮询终态数量[{}]", toSaveList.size());
+                    */
+
+                    dateBaseService.getContentHistoryRepository().saveAll(toSaveList);
+                    log.info("更新为成功的用户任务数量[{}]", toSaveList.size());
                 }
 
                 if(toSendList.size()>0){

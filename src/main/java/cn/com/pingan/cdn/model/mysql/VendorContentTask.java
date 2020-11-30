@@ -27,9 +27,6 @@ import java.util.Date;
 @Entity
 
 @Table(name="vendor_task",
-        uniqueConstraints = {
-                @UniqueConstraint(columnNames = {"task_id"})
-        },
         indexes = {
                 @Index(columnList = "request_id"),
                 @Index(columnList = "merge_id"),
@@ -49,10 +46,8 @@ import java.util.Date;
         })
         */
 public class VendorContentTask {
+
     @Id
-    @GeneratedValue(strategy=GenerationType.IDENTITY)
-    private Long id;
-    
     @Column(length=128, name="task_id", nullable = false)
     private String taskId;
 

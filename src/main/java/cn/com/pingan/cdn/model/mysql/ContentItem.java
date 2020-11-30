@@ -8,13 +8,7 @@
  */
 package cn.com.pingan.cdn.model.mysql;
 
-import cn.com.pingan.cdn.common.HisStatus;
-import cn.com.pingan.cdn.common.RefreshType;
-
-import javax.persistence.*;
-import java.util.Date;
-
-/** 
+/**
  * @ClassName: ContentDisplay 
  * @Description: TODO() 
  * @author lujun
@@ -41,6 +35,7 @@ import java.util.Date;
                 @Index(columnList = "request_id")
         })
 */
+/*
 public class ContentItem {
     
     @Id
@@ -78,3 +73,4 @@ public class ContentItem {
 
 
 }
+*/

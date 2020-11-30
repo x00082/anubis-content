@@ -12,7 +12,7 @@ import java.sql.Timestamp;
  */
 @Data
 public class ContentHisDTO {
-    private Long id;
+    //private Long id;
     private Timestamp optTime;
     private String content;
     private String type;
