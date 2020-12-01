@@ -33,7 +33,7 @@ import java.util.concurrent.Executors;
 @Slf4j
 public class CheckTaskServiceImpl {
 
-    @Value("${task.check.clear:false}")
+    @Value("${task.timeout.check:false}")
     private Boolean isclear;
 
     @Value("${task.check.expire:3600000}")
@@ -187,6 +187,8 @@ public class CheckTaskServiceImpl {
                 log.info("设置超时任务数[{}]", count);
 
 
+            }else{
+                log.info("未开启超时检测");
             }
         }catch (Exception e){
             log.info("set timeout task 异常[{}]", e);

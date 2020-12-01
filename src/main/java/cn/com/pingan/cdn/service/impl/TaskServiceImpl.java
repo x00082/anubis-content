@@ -458,7 +458,7 @@ public class TaskServiceImpl implements TaskService {
                             }
 
                             if (responseMap.get(v.getMergeId()).equals(TaskStatus.SUCCESS)) {
-                                successMap.put(v.getRequestId(), successMap.containsKey(v.getRequestId()) ? successMap.get(v.getRequestId()) + v.getContentNumber() : v.getContentNumber());
+                                successMap.put(v.getRequestId(), successMap.containsKey(v.getRequestId()) ? successMap.get(v.getRequestId()) + 1 : 1);
                             } else {
                                 failMap.put(v.getRequestId(), 1);
                             }

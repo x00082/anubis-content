@@ -36,6 +36,9 @@ public class SchenuledTaskServiceImpl {
     @Value("${task.data.clear.limit:1000}")
     private Integer clearLimit;
 
+    @Value("${task.data.clear.check:false}")
+    private Boolean isClear;
+
     @Autowired
     DateBaseService dateBaseService;
 
@@ -50,43 +53,48 @@ public class SchenuledTaskServiceImpl {
     @Scheduled(cron = "${task.expire.content.cron:0 0 1 * * ? }")
     public void clearData(){
         try {
-            List<String> keys = new ArrayList<>();
-            keys.add(key);
-            List<String> args = new ArrayList<>();
-            args.add(String.valueOf(System.currentTimeMillis()));
-            args.add(String.valueOf(clearRate));
-            // 0-成功，-1执行异常，-100超限
-            int re = luaScriptService.executeExpireScript(keys, args);
-            if(re != 0 ){
-                log.error("没有执行权限");
-                return;
+            log.info("清理过期数据开始");
+            if(isClear) {
+                List<String> keys = new ArrayList<>();
+                keys.add(key);
+                List<String> args = new ArrayList<>();
+                args.add(String.valueOf(System.currentTimeMillis()));
+                args.add(String.valueOf(clearRate));
+                // 0-成功，-1执行异常，-100超限
+                int re = luaScriptService.executeExpireScript(keys, args);
+                if (re != 0) {
+                    log.error("没有执行权限");
+                    return;
+                }
+
+                Date expire = preNDay(contentExpire);
+                log.info("清理{}之前的用户任务及其子任务", formatter.format(expire));
+
+                int count = 0;
+                re = 0;
+                do {
+                    re = dateBaseService.getContentHistoryRepository().clear(expire, clearLimit);
+                    log.info("单次删除[{}]", re);
+
+                } while (re == clearLimit);
+                log.info("删除历史数量[{}]", count);
+
+
+                expire = preNDay(taskExpire);
+                log.info("清理{}之前的厂商任务", formatter.format(expire));
+                count = 0;
+                re = 0;
+                do {
+                    re = dateBaseService.getVendorTaskRepository().clearWithhHistory(expire, clearLimit);
+                    log.info("单次删除[{}]", re);
+
+                } while (re == clearLimit);
+                log.info("删除厂商任务数量[{}]", count);
+
+                log.info("清理数据结束");
+            }else{
+                log.info("未开启过期删除");
             }
-
-            Date expire = preNDay(contentExpire);
-            log.info("清理{}之前的用户任务及其子任务", formatter.format(expire));
-
-            int count =0;
-            re =0;
-            do{
-                re = dateBaseService.getContentHistoryRepository().clear(expire, clearLimit);
-                log.info("单次删除[{}]", re);
-
-            }while (re == clearLimit);
-            log.info("删除历史数量[{}]", count);
-
-
-            expire = preNDay(taskExpire);
-            log.info("清理{}之前的厂商任务", formatter.format(expire));
-            count =0;
-            re =0;
-            do{
-                re = dateBaseService.getVendorTaskRepository().clearWithhHistory(expire, clearLimit);
-                log.info("单次删除[{}]", re);
-
-            }while (re == clearLimit);
-            log.info("删除厂商任务数量[{}]", count);
-
-            log.info("清理数据结束");
         }catch (Exception e){
             log.error("清理任务异常[{}]", e);
         }

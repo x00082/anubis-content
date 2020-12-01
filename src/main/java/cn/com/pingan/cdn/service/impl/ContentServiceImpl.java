@@ -706,7 +706,7 @@ public class ContentServiceImpl implements ContentService {
 
                     if (historyRecords.size() > 0) {
                         dateBaseService.getHistoryRecordRepository().saveAll(historyRecords);
-                        log.info("记录用户轮询[{}]", records.size());
+                        log.info("记录用户轮询[{}]", historyRecords.size());
                     }
 
                     if (reMap.keySet().size() > 0) {
