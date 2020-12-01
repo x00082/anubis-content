@@ -11,6 +11,8 @@ import java.util.List;
  */
 public enum TaskOperationEnum {
 
+    content_export,
+
     content_item,//拆任务
     //content_item_robin,
 

@@ -43,6 +43,8 @@ public interface ContentService {
 
     public int fflushDomainVendor(FanoutMsg taskMsg);
 
+    public void exportAndImport(TaskMsg taskMsg);
+
     //public void saveContentVendor(TaskMsg taskMsg) throws ContentException;
 
     //public void contentItemRobin(TaskMsg taskMsg) throws ContentException;

@@ -20,10 +20,13 @@ import cn.com.pingan.cdn.exception.RestfulException;
 import cn.com.pingan.cdn.gateWay.GateWayHeaderDTO;
 import cn.com.pingan.cdn.model.mysql.*;
 import cn.com.pingan.cdn.model.pgsql.Domain;
+import cn.com.pingan.cdn.model.pgsql.OldContentHistory;
 import cn.com.pingan.cdn.rabbitmq.config.RabbitListenerConfig;
 import cn.com.pingan.cdn.rabbitmq.message.FanoutMsg;
 import cn.com.pingan.cdn.rabbitmq.message.TaskMsg;
 import cn.com.pingan.cdn.rabbitmq.producer.Producer;
+import cn.com.pingan.cdn.repository.mysql.ExportRecordRepository;
+import cn.com.pingan.cdn.repository.pgsql.OldContentHistoryRepository;
 import cn.com.pingan.cdn.request.openapi.ContentDefaultNumDTO;
 import cn.com.pingan.cdn.response.TaskDetailsResponse;
 import cn.com.pingan.cdn.service.*;
@@ -35,11 +38,21 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 
+import javax.persistence.criteria.CriteriaBuilder;
+import javax.persistence.criteria.CriteriaQuery;
+import javax.persistence.criteria.Predicate;
+import javax.persistence.criteria.Root;
 import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
@@ -72,6 +85,9 @@ public class ContentServiceImpl implements ContentService {
 
     @Autowired
     RedisLuaScriptService luaScriptService;
+
+    @Autowired
+    private OldContentHistoryRepository oldContentHistoryRepository;
     
     @Autowired
     Producer producer;
@@ -101,12 +117,18 @@ public class ContentServiceImpl implements ContentService {
     @Value("${task.history.robinRate:180000}")
     private long robinRate;
 
+    @Value("${task.history.export.limit:1000}")
+    private int exportLimit;
+
 
     @Value("${task.request.merge:false}")
     private Boolean requestMerge;
 
     @Autowired
     ContentLimitJsonConfig contentLimitJsonConfig;
+
+    @Autowired
+    private ExportRecordRepository exportRecordRepository;
 
     //test
     @Autowired
@@ -1068,6 +1090,81 @@ public class ContentServiceImpl implements ContentService {
         log.info("enter fflushDomainVendor[{}]", taskMsg);
         urlVendorMap.clear();
         return 0;
+    }
+
+    @Override
+    public void exportAndImport(TaskMsg taskMsg) {
+        log.info("exportAndImport start[{}]", taskMsg);
+        int pageIndex = 0;
+        int pageSize = exportLimit;
+        String taskId = taskMsg.getTaskId();
+        try {
+            ExportRecord exportRecord = exportRecordRepository.findByExportId(taskId);
+            if (exportRecord == null) {
+                return;
+            }
+            Date startTime = taskMsg.getExportInfo().getStartTime();
+            Date endTime = taskMsg.getExportInfo().getEndTime();
+
+            Sort sort = new Sort(Sort.Direction.ASC, "id");
+            long count = 0L;
+            long allCount = 0L;
+            do {
+
+                PageRequest pageRequest = PageRequest.of(pageIndex, pageSize, sort);
+
+                Page<OldContentHistory> pager = this.oldContentHistoryRepository.findAll(new Specification<OldContentHistory>() {
+                    private static final long serialVersionUID = 1L;
+
+                    public Predicate toPredicate(Root<OldContentHistory> root, CriteriaQuery<?> query,
+                                                 CriteriaBuilder criteriaBuilder) {
+                        List<Predicate> cond = new ArrayList<>();
+
+                        //大于等于
+                        cond.add(criteriaBuilder.greaterThanOrEqualTo(root.get("optTime").as(Date.class), startTime));
+                        //小于等于
+                        cond.add(criteriaBuilder.lessThanOrEqualTo(root.get("optTime").as(Date.class), endTime));
+
+                        return query.where(cond.toArray(new Predicate[0])).getRestriction();
+                    }
+
+                }, pageRequest);
+                if (allCount == 0) {
+                    allCount = pager.getTotalElements();
+                }
+
+                List<ContentHistory> data = new ArrayList<>();
+                for (OldContentHistory old : pager) {
+                    ContentHistory tmp = new ContentHistory();
+                    tmp.setRequestId(old.getTaskId());
+                    tmp.setCreateTime(old.getOptTime());
+                    tmp.setUpdateTime(new Date());
+                    tmp.setStatus(old.getStatus());
+                    tmp.setFlowStatus(FlowEmun.split_vendor_done);
+                    tmp.setContent(old.getContent());
+                    tmp.setContentNumber(old.getContentNumber());
+                    tmp.setIsAdmin(old.getIsAdmin());
+                    tmp.setType(old.getType());
+                    tmp.setUserId(old.getUserId());
+                    data.add(tmp);
+                }
+                dateBaseService.getContentHistoryRepository().saveAll(data);
+
+                count += pager.getNumberOfElements();
+                pageIndex++;
+
+                log.info("导入进度---->已导入[{}], 当前次数[{}], 总数[{}]", count, pageIndex, allCount);
+
+            } while (count < allCount);
+
+            exportRecord.setCount(count);
+            exportRecord.setUpdateTime(new Date());
+            exportRecord.setStatus(HisStatus.SUCCESS);
+            exportRecordRepository.save(exportRecord);
+        }catch (Exception e){
+            log.error("导入数据异常");
+        }
+
     }
 
 

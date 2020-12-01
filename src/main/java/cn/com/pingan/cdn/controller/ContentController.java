@@ -255,6 +255,27 @@ public class ContentController {
         }
 
 
+
+        @PostMapping("/importHis")
+        public ApiReceipt importHis(@Valid @RequestBody QueryHisCommand command) throws ContentException, DomainException {
+
+            log.info("content/importHis start command:{}", JSON.toJSONString(command));
+            // TODO
+            GateWayHeaderDTO dto = this.getGateWayInfo(request);
+            if(StringUtils.isEmpty(dto.getUsername()) || StringUtils.isEmpty(dto.getUid())) {
+                return  ApiReceipt.error(ErrorCode.NOHEADER);
+            }
+            //越权校验
+            if(!"true".equalsIgnoreCase(dto.getIsAdmin())){
+                return  ApiReceipt.error(ErrorCode.FORBIDOPT);
+            }
+
+            ApiReceipt result =this.facade.exportAndImport(dto,command);
+            log.info("content/importHis end result:{}", JSON.toJSONString(result));
+            return result;
+        }
+
+
     /**
      * 设置用户默认用量上限
      * @param command

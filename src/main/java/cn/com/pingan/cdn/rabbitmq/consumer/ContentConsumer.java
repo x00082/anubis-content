@@ -62,29 +62,54 @@ public class ContentConsumer {
         }
     }
 
-    /******************************************拆分厂商任务轮询******************************************/
+    /******************************************原始任务轮询******************************************/
     @RabbitListener(queues = Constants.CONTENT_MESSAGE_HISTORY_ROBIN)
-    public void receiveVendorRobin(Channel channel, Message message){
+    public void receiveHistoryRobin(Channel channel, Message message){
         try {
 
             String msg=new String(message.getBody());
             JSONObject msgObj=JSONObject.parseObject(msg);
 
-            log.info("VendorRobin rabbit mq receive a message{}", msg.toString());
+            log.info("HistoryRobin rabbit mq receive a message{}", msg.toString());
             TaskMsg taskMsg = JSONObject.toJavaObject(msgObj, TaskMsg.class);
             contentService.contentHistoryRobin(taskMsg);
 
         }catch (Exception e){
-            log.error("厂商拆分任务失败", e);
+            log.error("用户任务轮询失败", e);
         }finally {
 
             try {
                 channel.basicAck(message.getMessageProperties().getDeliveryTag(),false);
             } catch (IOException e) {
-                log.error("receiveVendorRobin Ack Fail ");
+                log.error("receiveHistoryRobin Ack Fail ");
             }
         }
     }
+
+    /******************************************原数据导出******************************************/
+    @RabbitListener(queues = Constants.CONTENT_EXPORT)
+    public void receiveExport(Channel channel, Message message){
+        try {
+
+            String msg=new String(message.getBody());
+            JSONObject msgObj=JSONObject.parseObject(msg);
+
+            log.info("Export rabbit mq receive a message{}", msg.toString());
+            TaskMsg taskMsg = JSONObject.toJavaObject(msgObj, TaskMsg.class);
+            contentService.exportAndImport(taskMsg);
+
+        }catch (Exception e){
+            log.error("导出原数据异常", e);
+        }finally {
+
+            try {
+                channel.basicAck(message.getMessageProperties().getDeliveryTag(),false);
+            } catch (IOException e) {
+                log.error("receiveExport Ack Fail ");
+            }
+        }
+    }
+
 
     @RabbitListener(queues = Constants.DEFAULT_ERROR)
     public void receiveDefaultError(Channel channel, Message message){

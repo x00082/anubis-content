@@ -44,6 +44,7 @@ public class TaskMsg {
     private Long delay = 0L;//ms
     private Integer retryNum = 0;
     private Integer roundRobinNum = 0;
+    private ExportOldDate exportInfo;
     private List<String> urlList;
     private List<String> requestRecordList;
     private List<RobinStatus> robinStatusList;

@@ -9,14 +9,16 @@
 package cn.com.pingan.cdn.facade.internal;
 
 import cn.com.pingan.cdn.BaseUser;
-import cn.com.pingan.cdn.common.ApiReceipt;
-import cn.com.pingan.cdn.common.ContentLimitDTO;
-import cn.com.pingan.cdn.common.RefreshType;
+import cn.com.pingan.cdn.common.*;
 import cn.com.pingan.cdn.exception.ContentException;
 import cn.com.pingan.cdn.facade.ContentServiceFacade;
 import cn.com.pingan.cdn.gateWay.GateWayHeaderDTO;
 import cn.com.pingan.cdn.model.mysql.ContentHistory;
+import cn.com.pingan.cdn.model.mysql.ExportRecord;
+import cn.com.pingan.cdn.rabbitmq.message.TaskMsg;
+import cn.com.pingan.cdn.rabbitmq.producer.Producer;
 import cn.com.pingan.cdn.repository.mysql.ContentHistoryRepository;
+import cn.com.pingan.cdn.repository.mysql.ExportRecordRepository;
 import cn.com.pingan.cdn.request.QueryHisDTO;
 import cn.com.pingan.cdn.request.VendorInfoDTO;
 import cn.com.pingan.cdn.request.openapi.ContentDefaultNumDTO;
@@ -63,6 +65,12 @@ public class ContentServiceFacadeImpl implements ContentServiceFacade {
 
     @Autowired
     private ContentHistoryRepository contentHistoryRepository;
+
+    @Autowired
+    private ExportRecordRepository exportRecordRepository;
+
+    @Autowired
+    Producer producer;
 
     private @Autowired
     UserRpcService userRpcService;
@@ -286,6 +294,56 @@ public class ContentServiceFacadeImpl implements ContentServiceFacade {
 
         return queryHisDTO;
     }
+
+
+    @Override
+    public ApiReceipt exportAndImport(GateWayHeaderDTO dto, QueryHisCommand command) {
+
+        Date startDate = null;
+        Date endDate = null;
+        SimpleDateFormat df = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+        try {
+            if (!StringUtils.isEmpty(command.getStartTime())) {
+                startDate = df.parse(command.getStartTime());
+            }else{
+                //默认查10天内的数据
+                startDate = preNDay(10);
+            }
+            if (!StringUtils.isEmpty(command.getEndTime())) {
+                endDate = df.parse(command.getEndTime());
+            }else{
+                endDate = new Date();
+            }
+
+            String recordId = UUID.randomUUID().toString().replaceAll("-", "");
+
+
+            ExportRecord exportRecord = new ExportRecord();
+            exportRecord.setCreateTime(new Date());
+            exportRecord.setUpdateTime(new Date());
+            exportRecord.setExportId(recordId);
+            exportRecord.setCount(0L);
+            exportRecord.setStatus(HisStatus.WAIT);
+            exportRecordRepository.save(exportRecord);
+
+            ExportOldDate dates = new ExportOldDate();
+            dates.setStartTime(startDate);
+            dates.setEndTime(endDate);
+            TaskMsg msg = new TaskMsg();
+            msg.setTaskId(recordId);
+            msg.setOperation(TaskOperationEnum.content_export);
+            msg.setExportInfo(dates);
+            producer.sendTaskMsg(msg);
+
+            return ApiReceipt.ok(exportRecord);
+        } catch (ParseException e) {
+            return ApiReceipt.error();
+
+        }
+    }
+
+
+
 
     /**
      * @Method: openApiRefreshDir
