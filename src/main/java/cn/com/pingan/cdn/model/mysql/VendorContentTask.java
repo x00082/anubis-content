@@ -30,7 +30,8 @@ import java.util.Date;
         indexes = {
                 @Index(columnList = "request_id"),
                 @Index(columnList = "merge_id"),
-                @Index(columnList = "history_create_time")
+                @Index(columnList = "history_create_time"),
+                @Index(columnList = "job_id")
         })
 
 /*

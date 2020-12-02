@@ -120,6 +120,8 @@ public class ContentServiceImpl implements ContentService {
     @Value("${task.history.export.limit:1000}")
     private int exportLimit;
 
+    @Value("${task.notify.fail:false}")
+    private Boolean notifyFail;
 
     @Value("${task.request.merge:false}")
     private Boolean requestMerge;
@@ -387,7 +389,7 @@ public class ContentServiceImpl implements ContentService {
             tdr.setContentStatus(contentHistory.getFlowStatus());
             if(contentHistory.getFlowStatus().equals(FlowEmun.split_vendor_done)){
                 Map<String, List<TaskDetailsResponse.UrlStatus>> taskDetailsMap = new HashMap<>();
-                List<VendorContentTask> vendorContentTaskList = dateBaseService.getVendorTaskRepository().findByRequestIdAndVersion(requestId, contentHistory.getVersion());
+                List<VendorContentTask> vendorContentTaskList = dateBaseService.getVendorTaskRepository().findByRequestId(requestId);
                 for(VendorContentTask vct: vendorContentTaskList){
                     String vendorName = vct.getVendor();
                     String status = "处理中";
@@ -1103,12 +1105,22 @@ public class ContentServiceImpl implements ContentService {
             if (exportRecord == null) {
                 return;
             }
+
+            if(taskMsg.getRetryNum() > 3){
+                log.error("重试次数超过限制，导入任务失败");
+                exportRecord.setUpdateTime(new Date());
+                exportRecord.setStatus(HisStatus.FAIL);
+                exportRecordRepository.save(exportRecord);
+                return;
+            }
+
             Date startTime = taskMsg.getExportInfo().getStartTime();
             Date endTime = taskMsg.getExportInfo().getEndTime();
 
             Sort sort = new Sort(Sort.Direction.ASC, "id");
             long count = 0L;
             long allCount = 0L;
+            long num = 0L;
             do {
 
                 PageRequest pageRequest = PageRequest.of(pageIndex, pageSize, sort);
@@ -1136,6 +1148,11 @@ public class ContentServiceImpl implements ContentService {
                 List<ContentHistory> data = new ArrayList<>();
                 for (OldContentHistory old : pager) {
                     ContentHistory tmp = new ContentHistory();
+                    if(StringUtils.isBlank(old.getTaskId())){
+                        log.info("task id is null, skip");
+                        //old.setTaskId(UUID.randomUUID().toString().replaceAll("-", ""));
+                        continue;
+                    }
                     tmp.setRequestId(old.getTaskId());
                     tmp.setCreateTime(old.getOptTime());
                     tmp.setUpdateTime(new Date());
@@ -1147,22 +1164,29 @@ public class ContentServiceImpl implements ContentService {
                     tmp.setType(old.getType());
                     tmp.setUserId(old.getUserId());
                     data.add(tmp);
+                    num++;
                 }
-                dateBaseService.getContentHistoryRepository().saveAll(data);
+                if(data.size()>0) {
+                    dateBaseService.getContentHistoryRepository().saveAll(data);
+                }
 
                 count += pager.getNumberOfElements();
                 pageIndex++;
 
-                log.info("导入进度---->已导入[{}], 当前次数[{}], 总数[{}]", count, pageIndex, allCount);
+                log.info("导入进度---->已导出[{}], 已导入有效[{}], 当前次数[{}], 总数[{}]", count, num, pageIndex, allCount);
 
             } while (count < allCount);
 
-            exportRecord.setCount(count);
+            exportRecord.setCount(num);
             exportRecord.setUpdateTime(new Date());
             exportRecord.setStatus(HisStatus.SUCCESS);
             exportRecordRepository.save(exportRecord);
+            log.info("exportAndImport done[{}]", taskMsg);
         }catch (Exception e){
-            log.error("导入数据异常");
+            log.error("导入数据异常", e);
+            taskMsg.setDelay(5000L);
+            taskMsg.setRetryNum(taskMsg.getRetryNum()+1);
+            producer.sendDelayMsg(taskMsg);
         }
 
     }
@@ -1197,6 +1221,10 @@ public class ContentServiceImpl implements ContentService {
                     contentHistory.setMessage("任务超时失败");
                     dateBaseService.getContentHistoryRepository().save(contentHistory);
                     log.error("[{}]contentVendorRobin超出重试次数,设置任务失败并丢弃消息", requestId);
+
+                    if(notifyFail) {
+                        anubisNotifyService.emailNotifyApiException(new AnubisNotifyExceptionRequest("anubis-content", contentHistory.getType().name(), contentHistory.getUserId(), contentHistory.getRequestId(), "刷新预热任务失败"));
+                    }
                     return;
                 }
 
@@ -1325,7 +1353,55 @@ public class ContentServiceImpl implements ContentService {
         return ApiReceipt.ok();
     }
 
+    @Override
+    public ApiReceipt getUserContentNumber(String spCode) throws IOException {
+        StringBuilder redisKey = new StringBuilder("contentNumber_").append(spCode);
+        ContentLimitDTO limitDTO = null;
+        //重置用户使用上限标志
+        boolean resetFlag = false;
+        try {
+            limitDTO = redisService.get(redisKey.toString(), ContentLimitDTO.class);
+        } catch (IOException e) {
+            log.error("查询用户[{}]刷新预热用量异常,[{}]", spCode, e == null ? "null exception" : e.getMessage());
+            throw new IOException("查询redis用户刷新预热上限异常");
+        }
+        ContentLimit limit = new ContentLimit();
 
+        if (limitDTO != null) {
+            if (isToday(limitDTO.getLastModify())) {
+                log.info("最后刷新预热是当天，不需要更新用量信息");
+                limit.setUrlRefreshNumber(limitDTO.getUrlRefreshNumber());
+                limit.setDirRefreshNumber(limitDTO.getDirRefreshNumber());
+                limit.setUrlPreloadNumber(limitDTO.getUrlPreloadNumber());
+            } else {
+                log.info("最后刷新预热非当天，需要更新用量信息");
+                limit.setDirRefreshNumber(new Item(0, limitDTO.getDirRefreshNumber().getLimit()));
+                limit.setUrlPreloadNumber(new Item(0, limitDTO.getUrlPreloadNumber().getLimit()));
+                limit.setUrlRefreshNumber(new Item(0, limitDTO.getUrlRefreshNumber().getLimit()));
+                //最后的请求是刷新预热的，所以本地需要更新用量数据
+                resetFlag = true;
+            }
+        } else {
+            limitDTO = new ContentLimitDTO();
+            limit.setDirRefreshNumber(new Item(0, maxDirRefresh));
+            limit.setUrlPreloadNumber(new Item(0, maxPreheat));
+            limit.setUrlRefreshNumber(new Item(0, maxRefresh));
+            resetFlag = true;
+        }
+
+
+        if (resetFlag) {
+            //最后的请求是刷新预热的，所以本地需要更新用量数据
+            limitDTO.setDirRefreshNumber(limit.getDirRefreshNumber());
+            limitDTO.setUrlPreloadNumber(limit.getUrlPreloadNumber());
+            limitDTO.setUrlRefreshNumber(limit.getUrlRefreshNumber());
+            limitDTO.setLastModify(System.currentTimeMillis());
+            redisService.set(redisKey.toString(), JSON.toJSONString(limitDTO), timeout, TimeUnit.DAYS);
+        }
+        return ApiReceipt.ok(limit);
+    }
+
+/*
     @Override
     public ApiReceipt getUserContentNumber(String spCode) throws IOException {
         StringBuilder redisKey = new StringBuilder("contentNumber_").append(spCode);
@@ -1375,6 +1451,7 @@ public class ContentServiceImpl implements ContentService {
             return ApiReceipt.ok(limit);
     }
 
+*/
 
     @Override
     public  ContentHistory findHisttoryByRequestId(String id)throws ContentException{
@@ -1431,7 +1508,8 @@ public class ContentServiceImpl implements ContentService {
     
     private void checkUserLimit(boolean adminFlag,RefreshType type,String spCode,int size) throws ContentException {
         if(adminFlag) return;
-        UserLimit userLimit = dateBaseService.getUserLimitRepository().findByUserId(spCode);
+        //UserLimit userLimit = dateBaseService.getUserLimitRepository().findByUserId(spCode);
+        UserLimit userLimit = null;
         JSONObject contentLimit = contentLimitJsonConfig.getDefaultContentLimit();
         long lastModify = System.currentTimeMillis();
         if(contentLimit == null){

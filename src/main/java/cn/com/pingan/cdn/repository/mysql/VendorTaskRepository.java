@@ -43,6 +43,8 @@ public interface VendorTaskRepository extends MyJpaRepository<VendorContentTask,
 
     List<VendorContentTask> findByMergeIdIn(List<String> mergeIds);
 
+    List<VendorContentTask> findByJobIdIn(List<String> jobIds);
+
     @Modifying
     @Transactional
     @Query(value = "delete from vendor_task where create_time <?1", nativeQuery = true)

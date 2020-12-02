@@ -44,6 +44,8 @@ public interface ContentServiceFacade {
 
     public QueryHisDTO queryHis(GateWayHeaderDTO dto, QueryHisCommand command);
 
+    public ApiReceipt queryImportTask(String exportId);
+
 
     ApiReceipt openApiRefreshDir(GateWayHeaderDTO dto, List<String> data) throws ContentException;
 

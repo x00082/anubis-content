@@ -239,8 +239,6 @@ public class ContentServiceFacadeImpl implements ContentServiceFacade {
                 String dataStatus = contentHistory.getStatus() != null ? contentHistory.getStatus().toString() : "";
                 if ("SUCCESS".equals(dataStatus)) {
                     his.setStatus("成功");
-                } else if ("FAIL".equals(dataStatus)) {
-                    his.setStatus("失败");
                 } else {
                     his.setStatus("处理中");
                 }
@@ -335,10 +333,20 @@ public class ContentServiceFacadeImpl implements ContentServiceFacade {
             msg.setExportInfo(dates);
             producer.sendTaskMsg(msg);
 
-            return ApiReceipt.ok(exportRecord);
+            return ApiReceipt.ok(recordId);
         } catch (ParseException e) {
             return ApiReceipt.error();
 
+        }
+    }
+
+
+    @Override
+    public ApiReceipt queryImportTask(String exportId){
+        try {
+            return ApiReceipt.ok(exportRecordRepository.findByExportId(exportId));
+        }catch (Exception e) {
+            return ApiReceipt.error();
         }
     }
 

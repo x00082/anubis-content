@@ -275,6 +275,25 @@ public class ContentController {
             return result;
         }
 
+        @GetMapping("/queryImportTask")
+        public ApiReceipt queryImportTask(@RequestParam String exportId) throws ContentException, DomainException {
+
+            log.info("content/queryImportTask start command:{}", exportId);
+            // TODO
+            GateWayHeaderDTO dto = this.getGateWayInfo(request);
+            if(StringUtils.isEmpty(dto.getUsername()) || StringUtils.isEmpty(dto.getUid())) {
+                return  ApiReceipt.error(ErrorCode.NOHEADER);
+            }
+            //越权校验
+            if(!"true".equalsIgnoreCase(dto.getIsAdmin())){
+                return  ApiReceipt.error(ErrorCode.FORBIDOPT);
+            }
+
+            ApiReceipt result = this.facade.queryImportTask(exportId);
+            log.info("content/queryImportTask end result:{}", JSON.toJSONString(result));
+            return result;
+        }
+
 
     /**
      * 设置用户默认用量上限

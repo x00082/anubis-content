@@ -2,6 +2,7 @@ package cn.com.pingan.cdn.controller;
 
 
 import cn.com.pingan.cdn.common.ApiReceipt;
+import cn.com.pingan.cdn.common.ContentLimitDTO;
 import cn.com.pingan.cdn.common.StaticValue;
 import cn.com.pingan.cdn.exception.ContentException;
 import cn.com.pingan.cdn.exception.DomainException;
@@ -13,12 +14,10 @@ import com.alibaba.fastjson.JSON;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import javax.servlet.http.HttpServletRequest;
+import java.io.IOException;
 
 /**
  * @Classname OpenApiContentController
@@ -127,6 +126,56 @@ public class OpenApiContentController {
         log.info("api/preheat end result:{}", JSON.toJSONString(result));
         return result;
     }
+
+
+    /**
+     * 设置用户刷新预热每日上限
+     * @param command
+     * @return
+     * @throws ContentException
+     */
+    @PostMapping("/user/content/number")
+    public ApiReceipt setUserContentNumber(@RequestBody ContentLimitDTO command) throws ContentException {
+        log.info("user/content/number start command:{}", JSON.toJSONString(command));
+        GateWayHeaderDTO dto=this.getGateWayInfo(request);
+        if (StringUtils.isEmpty(dto.getUsername()) || StringUtils.isEmpty(dto.getUid()) || StringUtils.isEmpty(dto.getSpcode())) {
+            return ApiReceipt.error(ErrorCode.NOHEADER);
+        }
+
+        //越权校验
+        if(!"true".equalsIgnoreCase(dto.getIsAdmin())){
+            return  ApiReceipt.error(ErrorCode.FORBIDOPT);
+        }
+        ApiReceipt result=this.facade.setUserContentNumber(command);
+        log.info("user/content/number end result:{}", JSON.toJSONString(result));
+        return result;
+    }
+
+    /**
+     * 查询用户刷新预热每日剩余用量
+     * @param spCode
+     * @return
+     * @throws ContentException
+     * @throws IOException
+     */
+    @GetMapping("/user/content/number")
+    public ApiReceipt getUserContentNumber(@RequestParam(required = false) String spCode) throws ContentException, IOException {
+        log.info("查询user/content/number start command:{}", spCode);
+        GateWayHeaderDTO dto=this.getGateWayInfo(request);
+        if (StringUtils.isEmpty(dto.getUsername()) || StringUtils.isEmpty(dto.getUid()) || StringUtils.isEmpty(dto.getSpcode())) {
+            return ApiReceipt.error(ErrorCode.NOHEADER);
+        }
+        //越权校验
+        if("true".equalsIgnoreCase(dto.getIsAdmin())){
+            if(StringUtils.isBlank(spCode)) return ApiReceipt.error(ErrorCode.FORBIDOPT);
+        }else {
+            spCode = dto.getSpcode();
+        }
+        ApiReceipt result=this.facade.getUserContentNumber(spCode);
+        log.info("查询user/content/number end result:{}", JSON.toJSONString(result));
+        return result;
+    }
+
 
 
     private GateWayHeaderDTO getGateWayInfo(HttpServletRequest request) {
