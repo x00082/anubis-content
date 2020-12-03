@@ -908,7 +908,45 @@ public class TaskServiceImpl implements TaskService {
                 }
             }else if(response.getString("status").equals(Constants.STATUS_FAIL)){
                 log.error("[{}]HandlerNewRequest失败", taskId);
-                throw new Exception(taskId + "厂商返回失败");
+                msg.setRetryNum(msg.getRetryNum() + 1);
+                if(msg.getRetryNum() > timeOutLimit){
+                    Map<String, Integer> failMap = new HashMap<>();
+                    Map<String, Integer> versionMap = new HashMap<>();
+                    log.error("[{}]handlerNewRequestUrl超过最大重试限制[{}]", taskId, timeOutLimit);
+                    for(VendorContentTask v :vendorContentTaskList){
+                        if(!failMap.containsKey(v.getRequestId())){
+                            failMap.put(v.getRequestId(), 1);
+                        }
+                        if(!versionMap.containsKey(v.getRequestId())){
+                            versionMap.put(v.getRequestId(), v.getVersion());
+                        }
+                        v.setMessage("厂商执行失败");
+                        v.setStatus(TaskStatus.FAIL);
+                        v.setUpdateTime(new Date());
+                    }
+                    dateBaseService.getVendorTaskRepository().saveAll(vendorContentTaskList);
+
+                    if(failMap.keySet().size()>0) {
+                        log.info("失败任务[{}]", failMap);
+                        List<RobinCallBack> failList = new ArrayList<>();
+                        for (String id : failMap.keySet()) {
+                            log.debug("fail -> request id[{}], version[{}]", id, versionMap.get(id));
+                            RobinCallBack rcb = new RobinCallBack();
+                            rcb.setRequestId(id);
+                            rcb.setNum(1);
+                            rcb.setVersion(versionMap.get(id));
+                            failList.add(rcb);
+                        }
+                        TaskMsg failMsg = new TaskMsg();
+                        failMsg.setOperation(TaskOperationEnum.content_vendor_fail);
+                        failMsg.setRobinCallBackList(failList);
+                        producer.sendTaskMsg(failMsg);
+                        log.debug("send fail msg done");
+                    }
+                    return false;
+                }else{
+                    msg.setDelay(timeOutMs);
+                }
 
             }
         }else {
