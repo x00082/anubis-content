@@ -78,6 +78,9 @@ public class TaskServiceImpl implements TaskService {
     @Value("${task.notify.fail:false}")
     private Boolean notifyFail;
 
+    @Value("${task.response.async:false}")
+    private Boolean responseAsync;
+
     public static Map<String, List<String>> mergeHashMap= new ConcurrentHashMap<String,List<String>>();
 
     public static Map<String,VendorInfo> vendorInfoMap= new ConcurrentHashMap<String,VendorInfo>();
@@ -895,11 +898,32 @@ public class TaskServiceImpl implements TaskService {
                 }else{
                     jobId = response.getJSONObject("data") == null ? null : response.getJSONObject("data").getString("taskId");
                     if(StringUtils.isNoneBlank(jobId)) {
-                        msg.setJobId(jobId);
-                        msg.setTaskStatus(TaskStatus.PROCESSING);
-                        msg.setRetryNum(0);//状态改变，清空计数
-                        msg.setCallBack(CallBackEnum.request);
-                        msg.setOperation(TaskOperationEnum.getVendorOperationCommon(msg.getVendor()));
+                        if(responseAsync){
+                            msg.setJobId(jobId);
+                            msg.setTaskStatus(TaskStatus.PROCESSING);
+                            msg.setRetryNum(0);//状态改变，清空计数
+                            msg.setCallBack(CallBackEnum.request);
+                            msg.setOperation(TaskOperationEnum.getVendorOperationCommon(msg.getVendor()));
+                        }else{
+                            for (VendorContentTask vct : vendorContentTaskList) {
+                                vct.setJobId(jobId);
+                                vct.setStatus(TaskStatus.PROCESSING);
+                                vct.setMessage("任务请求厂商成功");
+                                vct.setUpdateTime(new Date());
+                            }
+                            log.debug("handlerCommon request update");
+                            dateBaseService.getVendorTaskRepository().saveAll(vendorContentTaskList);
+                            log.debug("handlerCommon request update done");
+
+                            RobinRecord robinRecord = new RobinRecord();
+                            robinRecord.setRecordId(UUID.randomUUID().toString().replaceAll("-", ""));
+                            robinRecord.setRobinId(jobId);
+                            robinRecord.setType(type);
+                            robinRecord.setVendor(msg.getVendor());
+                            dateBaseService.getRobinRecordRepository().save(robinRecord);
+                            log.info("记录待轮询[{}]", robinRecord);
+                            return false;
+                        }
 
                     }else{
                         log.error("[{}]无效的jobId", msg.getVendor());
