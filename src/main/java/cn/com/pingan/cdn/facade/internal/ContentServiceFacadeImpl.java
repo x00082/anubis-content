@@ -33,9 +33,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Sort;
+import org.springframework.data.domain.*;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 
@@ -154,79 +152,98 @@ public class ContentServiceFacadeImpl implements ContentServiceFacade {
         List<String> uuidList = new ArrayList<>();
 
         //拼装用户uuid查询条件
-        queryUserUuid(dto, command, userList,uuidList);
+        queryUserUuid(dto, command, userList, uuidList);
 
         List<String> finalUuidList = uuidList;
-        Page<ContentHistory> pager = this.contentHistoryRepository.findAll(new Specification<ContentHistory>() {
-            private static final long serialVersionUID = 1L;
 
-            public Predicate toPredicate(Root<ContentHistory> root, CriteriaQuery<?> query,
-                                         CriteriaBuilder criteriaBuilder) {
-                List<Predicate> cond = new ArrayList<>();
-                SimpleDateFormat df = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+        Page<ContentHistory> pager;
 
-                Date startDate = null;
-                Date endDate = null;
-                try {
-                    if (!StringUtils.isEmpty(command.getStartTime())) {
-                        startDate = df.parse(command.getStartTime());
-                    }else{
-                        //默认查10天内的数据
-                        startDate = preNDay(10);
-                    }
-                    if (!StringUtils.isEmpty(command.getEndTime())) {
-                        endDate = df.parse(command.getEndTime());
-                    }else{
-                        endDate = new Date();
-                    }
-                } catch (ParseException e) {
-                    log.error("", e);
-                }
+        if (StringUtils.isNotBlank(command.getTaskId())) {//ID是唯一的，如果指定ID则不需要大范围查询
 
-//                if (!StringUtils.isEmpty(dto.getUid()) && !"true".equals(dto.getIsAdmin())) {//非管理员加判断
-//                    //非管理员角色  主账号查询包含子账号的刷新记录，子账号只能查询子账号刷新记录
-//                    cond.add(criteriaBuilder.equal(root.get("userId"), dto.getUid()));
-//                }
-//                if (!StringUtils.isEmpty(command.getOperateAccount()) && "true".equals(dto.getIsAdmin()) && null != finalUuidList && finalUuidList.size() > 0) {//管理员新增用户过滤
-//
-//                    Path<Object> path = root.get("userId");//定义查询的字段
-//
-//                    CriteriaBuilder.In<Object> in = criteriaBuilder.in(path);
-//                    for (int i = 0; i < finalUuidList.size(); i++) {
-//                        in.value(finalUuidList.get(i));//存入值
-//                    }
-//                    cond.add(criteriaBuilder.and(criteriaBuilder.and(in)));//存入结果集
-//                }
-                if(null != finalUuidList && finalUuidList.size()>0){
-                    Path<Object> path = root.get("userId");//定义查询的字段
-
-                    CriteriaBuilder.In<Object> in = criteriaBuilder.in(path);
-                    for (int i = 0; i < finalUuidList.size(); i++) {
-                        in.value(finalUuidList.get(i));//存入值
-                    }
-                    cond.add(criteriaBuilder.and(criteriaBuilder.and(in)));//存入结果集
-                }
-                if (command.getType() != null && !StringUtils.isEmpty(command.getType().name())) {
-                    cond.add(criteriaBuilder.equal(root.get("type"), command.getType()));
-                }
-                if (!StringUtils.isEmpty(command.getTaskId())) {
-                    cond.add(criteriaBuilder.equal(root.get("requestId"), command.getTaskId()));
-                }
-                if (command.getStatus() != null && !StringUtils.isEmpty(command.getStatus().name())) {
-                    cond.add(criteriaBuilder.equal(root.get("status"), command.getStatus()));
-                }
-                if (null != startDate) {//大于等于
-                    cond.add(criteriaBuilder.greaterThanOrEqualTo(root.get("createTime").as(Date.class), startDate));
-                }
-                if (null != endDate) {//小于等于
-                    cond.add(criteriaBuilder.lessThanOrEqualTo(root.get("createTime").as(Date.class), endDate));
-                }
-                return query.where(cond.toArray(new Predicate[0])).getRestriction();
+            List<ContentHistory> chList = new ArrayList<>();
+            ContentHistory ch;
+            if (finalUuidList != null && finalUuidList.size() > 0) {
+                ch =this.contentHistoryRepository.findByRequestIdAndUserIdIn(command.getTaskId(), finalUuidList);
+            } else {
+                ch = this.contentHistoryRepository.findByRequestId(command.getTaskId());
             }
+            if(ch !=null) {
+                chList.add(ch);
+            }
+            pager = listConvertToPage(chList, pageRequest);
 
-        }, pageRequest);
+        } else {
 
+            pager = this.contentHistoryRepository.findAll(new Specification<ContentHistory>() {
+                private static final long serialVersionUID = 1L;
 
+                public Predicate toPredicate(Root<ContentHistory> root, CriteriaQuery<?> query,
+                                             CriteriaBuilder criteriaBuilder) {
+                    List<Predicate> cond = new ArrayList<>();
+                    SimpleDateFormat df = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+
+                    Date startDate = null;
+                    Date endDate = null;
+                    try {
+                        if (!StringUtils.isEmpty(command.getStartTime())) {
+                            startDate = df.parse(command.getStartTime());
+                        } else {
+                            //默认查10天内的数据
+                            startDate = preNDay(10);
+                        }
+                        if (!StringUtils.isEmpty(command.getEndTime())) {
+                            endDate = df.parse(command.getEndTime());
+                        } else {
+                            endDate = new Date();
+                        }
+                    } catch (ParseException e) {
+                        log.error("", e);
+                    }
+
+    //                if (!StringUtils.isEmpty(dto.getUid()) && !"true".equals(dto.getIsAdmin())) {//非管理员加判断
+    //                    //非管理员角色  主账号查询包含子账号的刷新记录，子账号只能查询子账号刷新记录
+    //                    cond.add(criteriaBuilder.equal(root.get("userId"), dto.getUid()));
+    //                }
+    //                if (!StringUtils.isEmpty(command.getOperateAccount()) && "true".equals(dto.getIsAdmin()) && null != finalUuidList && finalUuidList.size() > 0) {//管理员新增用户过滤
+    //
+    //                    Path<Object> path = root.get("userId");//定义查询的字段
+    //
+    //                    CriteriaBuilder.In<Object> in = criteriaBuilder.in(path);
+    //                    for (int i = 0; i < finalUuidList.size(); i++) {
+    //                        in.value(finalUuidList.get(i));//存入值
+    //                    }
+    //                    cond.add(criteriaBuilder.and(criteriaBuilder.and(in)));//存入结果集
+    //                }
+                    if (null != finalUuidList && finalUuidList.size() > 0) {
+                        Path<Object> path = root.get("userId");//定义查询的字段
+
+                        CriteriaBuilder.In<Object> in = criteriaBuilder.in(path);
+                        for (int i = 0; i < finalUuidList.size(); i++) {
+                            in.value(finalUuidList.get(i));//存入值
+                        }
+                        cond.add(criteriaBuilder.and(criteriaBuilder.and(in)));//存入结果集
+                    }
+                    if (command.getType() != null && !StringUtils.isEmpty(command.getType().name())) {
+                        cond.add(criteriaBuilder.equal(root.get("type"), command.getType()));
+                    }
+                    if (!StringUtils.isEmpty(command.getTaskId())) {
+                        cond.add(criteriaBuilder.equal(root.get("requestId"), command.getTaskId()));
+                    }
+                    if (command.getStatus() != null && !StringUtils.isEmpty(command.getStatus().name())) {
+                        cond.add(criteriaBuilder.equal(root.get("status"), command.getStatus()));
+                    }
+                    if (null != startDate) {//大于等于
+                        cond.add(criteriaBuilder.greaterThanOrEqualTo(root.get("createTime").as(Date.class), startDate));
+                    }
+                    if (null != endDate) {//小于等于
+                        cond.add(criteriaBuilder.lessThanOrEqualTo(root.get("createTime").as(Date.class), endDate));
+                    }
+                    return query.where(cond.toArray(new Predicate[0])).getRestriction();
+                }
+
+            }, pageRequest);
+
+        }
         //用户端屏蔽部分不必要信息
         if (!StringUtils.endsWithIgnoreCase("true", dto.getIsAdmin())) {
             ArrayList<OpenApiUserContentHisDTO> userData = new ArrayList<>();
@@ -488,6 +505,12 @@ public class ContentServiceFacadeImpl implements ContentServiceFacade {
         calendar.set(Calendar.DAY_OF_YEAR, calendar.get(Calendar.DAY_OF_YEAR) - i);
         return calendar.getTime();
 
+    }
+
+    private <T> Page<T> listConvertToPage(List<T> list, Pageable pageable) {
+        int start = (int) pageable.getOffset();
+        int end = (start + pageable.getPageSize()) > list.size() ? list.size() : (start + pageable.getPageSize());
+        return new PageImpl<T>(list.subList(start, end), pageable, list.size());
     }
 
 }

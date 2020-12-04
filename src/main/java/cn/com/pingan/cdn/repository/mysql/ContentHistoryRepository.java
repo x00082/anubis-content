@@ -34,6 +34,8 @@ public interface ContentHistoryRepository extends JpaRepository<ContentHistory, 
 
     List<ContentHistory> findByRequestIdIn(List<String> requestIds);
 
+    ContentHistory findByRequestIdAndUserIdIn(String requestIds, List<String> userIds);
+
 
     @Modifying
     @Transactional

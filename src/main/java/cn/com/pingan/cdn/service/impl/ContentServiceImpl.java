@@ -343,6 +343,10 @@ public class ContentServiceImpl implements ContentService {
                         toSave.add(ch);
                     }else{
                         log.info("[{}]请求任务为wait,不需要重试", ch.getRequestId());
+                        if(ch.getSuccessTaskNum().equals(ch.getAllTaskNum())){
+                            ch.setStatus(HisStatus.SUCCESS);
+                            toSave.add(ch);
+                        }
                         continue;
                     }
                 } else {
