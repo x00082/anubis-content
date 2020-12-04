@@ -691,26 +691,41 @@ public class TaskServiceImpl implements TaskService {
         try {
             if (msg != null && msg.getRobinCallBackList() != null && msg.getRobinCallBackList().size() > 0) {
                 msg.setRoundRobinNum(msg.getRoundRobinNum() +1);
+                if(msg.getRoundRobinNum() > 10){
+                    log.error("handlerSuccess 处理异常超出 10 次");
+                    return false;
+                }
                 JxGaga gg = JxGaga.of(Executors.newCachedThreadPool(), msg.getRobinCallBackList().size());
-                List<String> rs = new ArrayList<>();
+                Map<String, Integer> rs = new HashMap<>();
                 log.debug("更新用户历史状态->[Success]");
                 for (RobinCallBack rcb : msg.getRobinCallBackList()) {
                     gg.work(() -> {
                         dateBaseService.getContentHistoryRepository().updateSuccessNumByRequestIdAndVersion(rcb.getRequestId(), rcb.getNum(), rcb.getVersion());
-                        return "update done";
-                    }, j -> rs.add(j), q -> {
+                        return rcb.getRequestId();
+                    }, j -> rs.put(j, 1), q -> {
                         q.getMessage();
                     });
                 }
                 gg.merge((i) -> {
-                    log.info("update success [{}]",i.size());
-                    /*
-                    i.forEach(j -> {
-                        log.info(j);
-                    });
-                    */
-                    //}, rs, 5, TimeUnit.SECONDS).exit();
-                }, rs).exit();
+                    log.info("update success [{}], all[{}]",i.size(), msg.getRobinCallBackList().size());
+                }, rs.keySet()).exit();
+
+
+                if(msg.getRobinCallBackList().size() != rs.keySet().size()){
+                    List<RobinCallBack> tmp = new ArrayList<>();
+                    for (RobinCallBack rcb : msg.getRobinCallBackList()) {
+                        if(!rs.containsKey(rcb.getRequestId())){
+                            tmp.add(rcb);
+                        }
+                    }
+                    if(tmp.size()>0) {
+                        msg.getRobinCallBackList().clear();
+                        msg.getRobinCallBackList().addAll(tmp);
+                        msg.setDelay(3000L);
+                        producer.sendAllMsg(msg);
+                    }
+                }
+
             }
             log.info("end handlerSuccess:{}",msg);
             return true;
@@ -734,34 +749,49 @@ public class TaskServiceImpl implements TaskService {
         try {
             if (msg != null && msg.getRobinCallBackList() != null && msg.getRobinCallBackList().size() > 0) {
                 msg.setRoundRobinNum(msg.getRoundRobinNum() +1);
+                if(msg.getRoundRobinNum() > 10){
+                    log.error("handlerFail 处理异常超出 10 次");
+                    return false;
+                }
                 JxGaga gg = JxGaga.of(Executors.newCachedThreadPool(), msg.getRobinCallBackList().size());
-                List<String> rs = new ArrayList<>();
+                Map<String, Integer> rs = new HashMap<>();
                 log.debug("更新用户历史状态->[Fail]");
                 for (RobinCallBack rcb : msg.getRobinCallBackList()) {
                     gg.work(() -> {
                         dateBaseService.getContentHistoryRepository().updateStatusAndMessageByRequestIdAndVersion(rcb.getRequestId(), HisStatus.FAIL.name(),"任务执行失败", rcb.getVersion());
                         return rcb.getRequestId();
-                    }, j -> rs.add(j), q -> {
+                    }, j -> rs.put(j, 1), q -> {
                         q.getMessage();
                     });
                 }
                 gg.merge((i) -> {
-                    log.info("update fail [{}]",i.size());
+                    log.info("update fail [{}], all[{}]",i.size(), msg.getRobinCallBackList().size());
                     /*
                     i.forEach(j -> {
                         log.info(j);
                     });
                     */
                     //}, rs, 5, TimeUnit.SECONDS).exit();
-                }, rs).exit();
+                }, rs.keySet()).exit();
 
-                if(msg.getRobinCallBackList().size()>0 && notifyFail){
-                    List<String> requestIds = new ArrayList<>();
-                    for(RobinCallBack rcb : msg.getRobinCallBackList()){
-                        requestIds.add(rcb.getRequestId());
+                if(msg.getRobinCallBackList().size() != rs.keySet().size()){
+                    List<RobinCallBack> tmp = new ArrayList<>();
+                    for (RobinCallBack rcb : msg.getRobinCallBackList()) {
+                        if(!rs.containsKey(rcb.getRequestId())){
+                            tmp.add(rcb);
+                        }
                     }
+                    if(tmp.size()>0) {
+                        msg.getRobinCallBackList().clear();
+                        msg.getRobinCallBackList().addAll(tmp);
+                        msg.setDelay(3000L);
+                        producer.sendAllMsg(msg);
+                    }
+                }
 
-                    List<ContentHistory> contentHistorys = dateBaseService.getContentHistoryRepository().findByRequestIdIn(requestIds);
+                if(rs.keySet().size()>0 && notifyFail){
+
+                    List<ContentHistory> contentHistorys = dateBaseService.getContentHistoryRepository().findByRequestIdIn(new ArrayList<>(rs.keySet()));
                     gg = JxGaga.of(Executors.newCachedThreadPool(), contentHistorys.size());
                     List<Integer> results = new ArrayList<>();
                     for(ContentHistory his : contentHistorys){
