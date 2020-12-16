@@ -227,6 +227,7 @@ public class ContentServiceImpl implements ContentService {
 
             return ApiReceipt.ok().data(taskId);
         }catch (Exception e){
+            log.error("saveContent异常:{}", e);
             if(e instanceof ContentException){
                 String code = ((ContentException) e).getCode();
                 return ApiReceipt.error(code, e.getMessage());
@@ -1190,6 +1191,7 @@ public class ContentServiceImpl implements ContentService {
         } else {
             domains = dateBaseService.getDomainRepository().findByUserCodeAndDomainIn(dto.getSpcode(), domainParam);
         }
+        log.info("domains:{}",domains);
         if (null == domains || domains.size() == 0) {
             throw new ContentException("0x004008", "该用户无有效域名，禁止操作");
         }

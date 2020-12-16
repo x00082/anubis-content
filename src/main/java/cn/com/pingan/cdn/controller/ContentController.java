@@ -223,7 +223,7 @@ public class ContentController {
             }
             //越权校验
             if(!"true".equals(dto.getIsAdmin())) {
-                if (StringUtils.isEmpty(command.getSpCode()) || !dto.getSpcode().equals(command.getSpCode())) {
+                if (StringUtils.isEmpty(dto.getSpcode())) {
                     return  ApiReceipt.error(ErrorCode.FORBIDOPT);
                 }
             }

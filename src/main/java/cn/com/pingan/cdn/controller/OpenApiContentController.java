@@ -63,7 +63,7 @@ public class OpenApiContentController {
 
 
         ApiReceipt result=this.facade.openApiRefreshUrl(dto,command.getData());
-        log.info("content/fresh/url end result:{}", JSON.toJSONString(result));
+        log.info("api/fresh/url end result:{}", JSON.toJSONString(result));
         return result;
     }
 
