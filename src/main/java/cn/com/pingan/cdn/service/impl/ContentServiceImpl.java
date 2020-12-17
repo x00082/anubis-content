@@ -391,18 +391,21 @@ public class ContentServiceImpl implements ContentService {
                 return ApiReceipt.error("0x004008", "用户任务不存在");
             }
             TaskDetailsResponse tdr = new TaskDetailsResponse();
+            tdr.setRequestId(requestId);
             tdr.setContentStatus(contentHistory.getFlowStatus());
             if(contentHistory.getFlowStatus().equals(FlowEmun.split_vendor_done)){
-                Map<String, List<TaskDetailsResponse.UrlStatus>> taskDetailsMap = new HashMap<>();
+                Map<String, TaskDetailsResponse.UrlStatus> taskDetailsMap = new HashMap<>();
                 List<VendorContentTask> vendorContentTaskList = dateBaseService.getVendorTaskRepository().findByRequestId(requestId);
                 for(VendorContentTask vct: vendorContentTaskList){
                     String vendorName = vct.getVendor();
                     String status = "处理中";
+                    String msg = "";
                     List<String> urls = JSONArray.parseArray(vct.getContent(), String.class);
                     if(vct.getStatus().equals(TaskStatus.SUCCESS)){
                         status = "成功";
                     }else if(vct.getStatus().equals(TaskStatus.FAIL)){
                         status = "失败";
+                        msg = vct.getMessage();
                     }else if(vct.getStatus().equals(TaskStatus.ROUND_ROBIN)){
                         status = "轮询中";
                     }else if(vct.getStatus().equals(TaskStatus.PROCESSING)){
@@ -411,15 +414,13 @@ public class ContentServiceImpl implements ContentService {
                         status = "等待下发";
                     }
 
-                    List<TaskDetailsResponse.UrlStatus> taskDetailsList = new ArrayList<>();
+                    TaskDetailsResponse.UrlStatus taskDetails = new TaskDetailsResponse.UrlStatus();
+                    taskDetails.setStatus(status);
+                    taskDetails.setUrls(urls);
+                    taskDetails.setMessage(msg);
 
-                    for(String u:urls){
-                        TaskDetailsResponse.UrlStatus urlStatus = new TaskDetailsResponse.UrlStatus();
-                        urlStatus.setStatus(status);
-                        urlStatus.setUrl(u);
-                        taskDetailsList.add(urlStatus);
-                    }
-                    taskDetailsMap.put(vendorName, taskDetailsList);
+
+                    taskDetailsMap.put(vendorName, taskDetails);
                 }
                 tdr.setTaskDetails(taskDetailsMap);
             }
@@ -428,9 +429,6 @@ public class ContentServiceImpl implements ContentService {
             log.error("getContentTaskDetails异常[{}]",e );
             return ApiReceipt.error(ErrorCode.INTERERR);
         }
-
-
-
     }
 
     @Override

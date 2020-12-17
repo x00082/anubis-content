@@ -15,14 +15,17 @@ import java.util.Map;
 @Data
 public class TaskDetailsResponse {
 
+    private String requestId;
+
     private FlowEmun contentStatus;
 
-    Map<String, List<UrlStatus>> taskDetails;
+    Map<String, UrlStatus> taskDetails;
 
     @Data
     public static class UrlStatus{
-        private String url;
+        private List<String> urls;
         private String status;
+        private String message;
     }
 
 }
