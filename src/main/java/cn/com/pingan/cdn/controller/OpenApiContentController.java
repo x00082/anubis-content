@@ -57,7 +57,7 @@ public class OpenApiContentController {
             return ApiReceipt.error(ErrorCode.PARAMILLEGAL);
         }
 
-        if (command.getData().size() > StaticValue.SINGLE_DIR_REFRESH_LIMIT) {
+        if (command.getData().size() > StaticValue.SINGLE_URL_REFRESH_LIMIT) {
             return ApiReceipt.error(ErrorCode.OUTLIMITSINGLE);
         }
 
@@ -88,7 +88,7 @@ public class OpenApiContentController {
             return ApiReceipt.error(ErrorCode.PARAMILLEGAL);
         }
 
-        if (command.getData().size() > StaticValue.SINGLE_URL_REFRESH_LIMIT) {
+        if (command.getData().size() > StaticValue.SINGLE_DIR_REFRESH_LIMIT) {
             return ApiReceipt.error(ErrorCode.OUTLIMITSINGLE);
         }
 
