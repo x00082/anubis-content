@@ -11,10 +11,6 @@ public enum VendorEnum {
     tencent("tencent"),//腾讯
     ksyun("ksyun"),//金山云
     venus("venus"),//自建CDN
-    chinacache("chinacache"),// 蓝汛
-    net("net"), //网宿
-    jdcloud("jdcloud"),//京东CDN
-    aliyun("aliyun"), //阿里云CDN
     baishan("baishan"), //白山CDN
     ;
 

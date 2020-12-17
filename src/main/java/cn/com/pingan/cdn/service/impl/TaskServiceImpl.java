@@ -100,18 +100,6 @@ public class TaskServiceImpl implements TaskService {
     private KsyunClientService ksyunClientService;
 
     @Autowired
-    private NetClientService netClientService;
-
-    @Autowired
-    private ChinaCacheClientService chinaCacheClientService;
-
-    @Autowired
-    private JdcloudClientService jdcloudClientService;
-
-    @Autowired
-    private AliyunClientService aliyunClientService;
-
-    @Autowired
     private BaishanClientService baishanClientService;
 
     @Autowired
@@ -1108,14 +1096,6 @@ public class TaskServiceImpl implements TaskService {
                 return qiniuClientService;
             case ksyun:
                 return ksyunClientService;
-            case net:
-                return netClientService;
-            case jdcloud:
-                return jdcloudClientService;
-            case chinacache:
-                return chinaCacheClientService;
-            case aliyun:
-                return aliyunClientService;
             case baishan:
                 return baishanClientService;
             default:

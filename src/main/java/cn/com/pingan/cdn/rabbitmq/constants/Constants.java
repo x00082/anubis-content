@@ -93,34 +93,6 @@ public class Constants {
     public static final String CONTENT_VENDOR_BAISHAN_PREHEAT = "content_baishan_preheat";
     public static final String CONTENT_VENDOR_BAISHAN_ROBIN = "content_baishan_robin";
 
-
-    public static final String CONTENT_VENDOR_CHINACHE_COMMON = "content_chinacache_common";
-    public static final String CONTENT_VENDOR_CHINACHE_URL = "content_chinacache_url";
-    public static final String CONTENT_VENDOR_CHINACHE_DIR = "content_chinacache_dir";
-    public static final String CONTENT_VENDOR_CHINACHE_PREHEAT = "content_chinacache_preheat";
-    public static final String CONTENT_VENDOR_CHINACHE_ROBIN = "content_chinacache_robin";
-
-
-    public static final String CONTENT_VENDOR_NET_COMMON = "content_net_common";
-    public static final String CONTENT_VENDOR_NET_URL = "content_net_url";
-    public static final String CONTENT_VENDOR_NET_DIR = "content_net_dir";
-    public static final String CONTENT_VENDOR_NET_PREHEAT = "content_net_preheat";
-    public static final String CONTENT_VENDOR_NET_ROBIN = "content_net_robin";
-
-
-    public static final String CONTENT_VENDOR_JDCLOUD_COMMON = "content_jdcloud_common";
-    public static final String CONTENT_VENDOR_JDCLOUD_URL = "content_jdcloud_url";
-    public static final String CONTENT_VENDOR_JDCLOUD_DIR = "content_jdcloud_dir";
-    public static final String CONTENT_VENDOR_JDCLOUD_PREHEAT = "content_jdcloud_preheat";
-    public static final String CONTENT_VENDOR_JDCLOUD_ROBIN = "content_jdcloud_robin";
-
-
-    public static final String CONTENT_VENDOR_ALIYUN_COMMON = "content_aliyun_common";
-    public static final String CONTENT_VENDOR_ALIYUN_URL = "content_aliyun_url";
-    public static final String CONTENT_VENDOR_ALIYUN_DIR = "content_aliyun_dir";
-    public static final String CONTENT_VENDOR_ALIYUN_PREHEAT = "content_aliyun_preheat";
-    public static final String CONTENT_VENDOR_ALIYUN_ROBIN = "content_aliyun_robin";
-
     public static final String DEFAULT_ERROR = "default_error";
 
 

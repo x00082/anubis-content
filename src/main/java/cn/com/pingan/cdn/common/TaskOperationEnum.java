@@ -53,30 +53,6 @@ public enum TaskOperationEnum {
     content_baishan_preheat,
     content_baishan_robin,
 
-    content_chinacache_common,
-    content_chinacache_url,
-    content_chinacache_dir,
-    content_chinacache_preheat,
-    content_chinacache_robin,
-
-    content_net_common,
-    content_net_url,
-    content_net_dir,
-    content_net_preheat,
-    content_net_robin,
-
-    content_jdcloud_common,
-    content_jdcloud_url,
-    content_jdcloud_dir,
-    content_jdcloud_preheat,
-    content_jdcloud_robin,
-
-    content_aliyun_common,
-    content_aliyun_url,
-    content_aliyun_dir,
-    content_aliyun_preheat,
-    content_aliyun_robin,
-
     default_error,
 
     ;
@@ -158,34 +134,6 @@ public enum TaskOperationEnum {
             case content_tencent_preheat:
             case content_tencent_robin:
                 return "tencent";
-
-            case content_chinacache_common:
-            case content_chinacache_url:
-            case content_chinacache_dir:
-            case content_chinacache_preheat:
-            case content_chinacache_robin:
-                return "chinacache";
-
-            case content_net_common:
-            case content_net_url:
-            case content_net_dir:
-            case content_net_preheat:
-            case content_net_robin:
-                return "net";
-
-            case content_jdcloud_common:
-            case content_jdcloud_url:
-            case content_jdcloud_dir:
-            case content_jdcloud_preheat:
-            case content_jdcloud_robin:
-                return "jdcloud";
-
-            case content_aliyun_common:
-            case content_aliyun_url:
-            case content_aliyun_dir:
-            case content_aliyun_preheat:
-            case content_aliyun_robin:
-                return "aliyun";
 
             default:
                 return "venus";
