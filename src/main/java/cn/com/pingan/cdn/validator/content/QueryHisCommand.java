@@ -4,6 +4,7 @@ import cn.com.pingan.cdn.common.HisStatus;
 import cn.com.pingan.cdn.common.RefreshType;
 import cn.com.pingan.cdn.validator.Command;
 import lombok.Data;
+import org.apache.commons.lang3.StringUtils;
 
 import javax.persistence.EnumType;
 import javax.persistence.Enumerated;
@@ -32,4 +33,25 @@ public class QueryHisCommand implements Command {
 
     private String spCode;
     private String operateAccount;//管理端按操作用户去查询
+
+
+    public void setWithQueryHisCommandDTO(QueryHisCommandDTO dto){
+        this.startTime = dto.getStartTime();
+        this.endTime = dto.getEndTime();
+        if(StringUtils.isNotEmpty(dto.getType())) {
+            this.type = RefreshType.of(dto.getType());
+        }
+        this.pageIndex = dto.getPageIndex();
+        this.pageSize = dto.getPageSize();
+        this.taskId = dto.getTaskId();
+        this.channel = dto.getChannel();
+        this.account = dto.getAccount();
+        this.subAccount = dto.getSubAccount();
+        this.uid = dto.getUid();
+        if(StringUtils.isNotEmpty(dto.getStatus())) {
+            this.status = HisStatus.of(dto.getStatus());
+        }
+        this.spCode = dto.getSpCode();
+        this.operateAccount = dto.getOperateAccount();
+    }
 }

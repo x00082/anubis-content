@@ -256,6 +256,8 @@ public class ContentServiceFacadeImpl implements ContentServiceFacade {
                 String dataStatus = contentHistory.getStatus() != null ? contentHistory.getStatus().toString() : "";
                 if ("SUCCESS".equals(dataStatus)) {
                     his.setStatus("成功");
+                } else if ("FAIL".equals(dataStatus)) {
+                    his.setStatus("失败");
                 } else {
                     his.setStatus("处理中");
                 }

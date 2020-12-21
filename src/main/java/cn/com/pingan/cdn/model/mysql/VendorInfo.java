@@ -38,6 +38,10 @@ public class VendorInfo {
     @Column(name = "robin_qps", nullable = false)
     private int robinQps;
 
+    //单位秒
+    @Column(name="grad", nullable = false)
+    private int grad;
+
     @Column(name = "total_size")
     private int totalSize;
 
@@ -57,6 +61,7 @@ public class VendorInfo {
     public void setVendorInfo(VendorInfoDTO infoDTO){
 
         this.vendor = infoDTO.getVendor();
+        this.grad = infoDTO.getGrad();
         this.totalQps = infoDTO.getTotalQps();
         this.totalSize = infoDTO.getTotalSize();
         this.robinQps = infoDTO.getRobinQps();
@@ -69,6 +74,7 @@ public class VendorInfo {
     public VendorInfoDTO getVendorInfo(){
         VendorInfoDTO infoDTO = new VendorInfoDTO();
         infoDTO.setVendor(vendor);
+        infoDTO.setGrad(grad);
         infoDTO.setTotalQps(totalQps);
         infoDTO.setTotalSize(totalSize);
         infoDTO.setRobinQps(robinQps);

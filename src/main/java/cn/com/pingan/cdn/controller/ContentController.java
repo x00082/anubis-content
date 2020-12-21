@@ -8,9 +8,7 @@
  */
 package cn.com.pingan.cdn.controller;
 
-import cn.com.pingan.cdn.common.ApiReceipt;
-import cn.com.pingan.cdn.common.RedoDTO;
-import cn.com.pingan.cdn.common.StaticValue;
+import cn.com.pingan.cdn.common.*;
 import cn.com.pingan.cdn.exception.ContentException;
 import cn.com.pingan.cdn.exception.DomainException;
 import cn.com.pingan.cdn.exception.ErrorCode;
@@ -20,6 +18,7 @@ import cn.com.pingan.cdn.request.VendorInfoDTO;
 import cn.com.pingan.cdn.request.openapi.ContentDefaultNumDTO;
 import cn.com.pingan.cdn.validator.content.FreshCommand;
 import cn.com.pingan.cdn.validator.content.QueryHisCommand;
+import cn.com.pingan.cdn.validator.content.QueryHisCommandDTO;
 import com.alibaba.fastjson.JSON;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
@@ -213,7 +212,7 @@ public class ContentController {
         */
         //TODOs
         @PostMapping("/queryHis")
-        public ApiReceipt queryHis(@Valid @RequestBody QueryHisCommand command) throws ContentException, DomainException {
+        public ApiReceipt queryHis(@Valid @RequestBody QueryHisCommandDTO command) throws ContentException, DomainException {
 
             log.info("content/queryHis start command:{}", JSON.toJSONString(command));
             // TODO
@@ -228,7 +227,18 @@ public class ContentController {
                 }
             }
 
-            ApiReceipt result =ApiReceipt.ok().data(this.facade.queryHis(dto,command));
+            if(StringUtils.isNotEmpty(command.getType()) && !RefreshType.is(command.getType())){
+                return  ApiReceipt.error(ErrorCode.PARAMILLEGAL);
+            }
+
+            if(StringUtils.isNotEmpty(command.getStatus()) && !HisStatus.is(command.getStatus())){
+                return  ApiReceipt.error(ErrorCode.PARAMILLEGAL);
+            }
+
+            QueryHisCommand hisCmd = new QueryHisCommand();
+            hisCmd.setWithQueryHisCommandDTO(command);
+
+            ApiReceipt result =ApiReceipt.ok().data(this.facade.queryHis(dto,hisCmd));
             log.info("content/queryHis end result:{}", JSON.toJSONString(result));
             return result;
         }
@@ -437,11 +447,6 @@ public class ContentController {
 
         
         private GateWayHeaderDTO getGateWayInfo(HttpServletRequest request) {
-//          Enumeration<String> names=request.getHeaderNames();
-//          while (names.hasMoreElements()){
-//              String name=(String)names.nextElement();
-//              log.info(name+":"+request.getHeader(name));
-//          }
           GateWayHeaderDTO dto = new GateWayHeaderDTO();
           dto.setUid(request.getHeader("uid") != null ? String.valueOf(request.getHeader("uid")) : null);
           dto.setIsAdmin(request.getHeader("isAdmin") != null ? String.valueOf(request.getHeader("isAdmin")) : null);

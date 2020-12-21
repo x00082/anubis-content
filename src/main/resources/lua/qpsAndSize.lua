@@ -4,6 +4,7 @@ local limitAdd = tonumber(ARGV[1])
 local totalAdd = tonumber(ARGV[2])
 local limit = tonumber(ARGV[3])
 local total = tonumber(ARGV[4])
+local expire = tonumber(ARGV[5] or "1")
 local json
 
 local tmp = [[{"limit":0, "total":0}]];
@@ -34,9 +35,10 @@ else
     json = cjson.decode(tmp);
     json['limit'] = limitAdd
     json['total'] = totalAdd
+
 end
 
 local string = cjson.encode(json);
 redis.call('set',key,string);
-redis.call("EXPIRE", key, 1)
+redis.call("EXPIRE", key, expire)
 return 0

@@ -36,4 +36,12 @@ public enum RefreshType {
         }
         return RefreshType.url;
     }
+
+
+    public static boolean is(String value) {
+        for(RefreshType ut : RefreshType.values()) {
+            if(ut.name().equals(value)) return true;
+        }
+        return false;
+    }
 }

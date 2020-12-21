@@ -35,4 +35,11 @@ public enum HisStatus {
         }
         return HisStatus.SUCCESS;
     }
+
+    public static boolean is(String value) {
+        for(HisStatus ut : HisStatus.values()) {
+            if(ut.name().equals(value)) return true;
+        }
+        return false;
+    }
 }

@@ -28,7 +28,6 @@ import org.springframework.stereotype.Service;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
-import java.util.stream.Collectors;
 
 /**
  * @Classname TaskServiceImpl
@@ -62,6 +61,9 @@ public class TaskServiceImpl implements TaskService {
 
     @Value("${task.new.request.size.default:500}")
     private Integer requestSize;
+
+    @Value("${task.vendor.grad.default:1}")
+    private Integer defGrad;
 
     @Value("${task.robin.qps.default:50}")
     private Integer robinQps;
@@ -849,9 +851,10 @@ public class TaskServiceImpl implements TaskService {
             //请求QPS限制
             int qps = vendorInfo!=null?vendorInfo.getTotalQps():requestQps;
             int size = vendorInfo!=null?vendorInfo.getTotalSize():requestSize;
+            int grad = vendorInfo!=null?vendorInfo.getGrad():defGrad;
             String redisKey = subQpsAndSizePrefix + msg.getVendor();
             // 0-成功，-1执行异常，-100超限
-            int result = handlerQpsAndSizeLimit(redisKey,1, msg.getSize(), qps, size);
+            int result = handlerQpsAndSizeLimit(redisKey,1, msg.getSize(), qps, size, grad);
             if (-100 == result) {//设置delay为了防止多次接受，导致cpu增高
                 log.warn("redis:{} LimitQps:{}", redisKey, qps);
                 Thread.currentThread().sleep(sleepMs);
@@ -1063,7 +1066,7 @@ public class TaskServiceImpl implements TaskService {
         return luaScriptService.executeQpsScript(keys, args);
     }
 
-    private int handlerQpsAndSizeLimit(String key, int curentLimit, int curentSize, int limit, int size){
+    private int handlerQpsAndSizeLimit(String key, int curentLimit, int curentSize, int limit, int size, int grad){
         List<String> keys = new ArrayList<>();
         keys.add(key);
         List<String> args = new ArrayList<>();
@@ -1071,6 +1074,7 @@ public class TaskServiceImpl implements TaskService {
         args.add(String.valueOf(curentSize));
         args.add(String.valueOf(limit));
         args.add(String.valueOf(size));
+        args.add(String.valueOf(grad));
         // 0-成功，-1执行异常，-100超限
         return luaScriptService.executeQpsAndTotalScript(keys, args);
     }

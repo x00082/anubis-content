@@ -126,6 +126,9 @@ public class ContentServiceImpl implements ContentService {
     @Value("${task.request.merge:false}")
     private Boolean requestMerge;
 
+    @Value("${task.vendor.request.merge:false}")
+    private Boolean vendorRequestMerge;
+
     @Autowired
     ContentLimitJsonConfig contentLimitJsonConfig;
 
@@ -184,7 +187,7 @@ public class ContentServiceImpl implements ContentService {
             log.info("检查域名状态完成");
 
             //计数
-            checkUserLimit(adminFlag, type, dto.getSpcode(), data.size());
+            checkUserLimit(adminFlag, type, dto.getSpcode(),dto.getUsername(), data.size());
             log.info("检查用户计数完成");
 
             //原始请求入库
@@ -614,7 +617,7 @@ public class ContentServiceImpl implements ContentService {
 
                 List<MergeRecord> records = new ArrayList<>();
                 for (String v : vendorTaskId.keySet()) {
-                    if (toSaveVendorTaskMap.get(v).getContentNumber() >= 20 && toSaveVendorTaskMap.get(v).getContentNumber() <= 50) {
+                    if ( !vendorRequestMerge || (toSaveVendorTaskMap.get(v).getContentNumber() >= 20 && toSaveVendorTaskMap.get(v).getContentNumber() <= 50)) {
                         TaskMsg vendorTaskMsg = new TaskMsg();
                         vendorTaskMsg.setTaskId(vendorTaskId.get(v));
                         vendorTaskMsg.setOperation(TaskOperationEnum.getVendorOperation(v, contentHistory.getType()));
@@ -705,7 +708,7 @@ public class ContentServiceImpl implements ContentService {
                     List<MergeRecord> records = new ArrayList<>();
                     if (toSaveVendorContentTask.size() > 0) {
                         for (VendorContentTask vct : toSaveVendorContentTask) {
-                            if (vct.getContentNumber() >= 20 && vct.getContentNumber() <= 50) {
+                            if (!vendorRequestMerge || (vct.getContentNumber() >= 20 && vct.getContentNumber() <= 50)) {
                                 TaskMsg vendorTaskMsg = new TaskMsg();
                                 vendorTaskMsg.setTaskId(vct.getMergeId());
                                 vendorTaskMsg.setOperation(TaskOperationEnum.getVendorOperation(vct.getVendor(), vct.getType()));
@@ -1214,7 +1217,7 @@ public class ContentServiceImpl implements ContentService {
         }
     }
     
-    private void checkUserLimit(boolean adminFlag,RefreshType type,String spCode,int size) throws ContentException {
+    private void checkUserLimit(boolean adminFlag,RefreshType type,String spCode, String userName, int size) throws ContentException {
         if(adminFlag) return;
         //UserLimit userLimit = dateBaseService.getUserLimitRepository().findByUserId(spCode);
         UserLimit userLimit = null;
@@ -1242,10 +1245,10 @@ public class ContentServiceImpl implements ContentService {
         // 0-成功，-1执行异常，-100超限
         int result = luaScriptService.executeCountScript(keys,args);
         if(-100 == result){
-            anubisNotifyService.emailNotifyApiException(new AnubisNotifyExceptionRequest("anubis-content",type.name(),new StringBuilder("spCode:").append(spCode).toString(),new ApiReceipt().getRequestId(),"超过每日数量上限"));
+            anubisNotifyService.emailNotifyApiException(new AnubisNotifyExceptionRequest("anubis-content",type.name(),new StringBuilder("spCode:").append(spCode).append(", userName:").append(userName).toString(),new ApiReceipt().getRequestId(),"超过每日数量上限"));
             throw new ContentException("0x004012");
         }else if(-1 == result){
-            anubisNotifyService.emailNotifyApiException(new AnubisNotifyExceptionRequest("anubis-content",type.name(),new StringBuilder("spCode:").append(spCode).toString(),new ApiReceipt().getRequestId(),"刷新预热lua计数脚本执行异常"));
+            anubisNotifyService.emailNotifyApiException(new AnubisNotifyExceptionRequest("anubis-content",type.name(),new StringBuilder("spCode:").append(spCode).append(", userName:").append(userName).toString(),new ApiReceipt().getRequestId(),"刷新预热lua计数脚本执行异常"));
             throw new ContentException("0x0002");
         }
     }

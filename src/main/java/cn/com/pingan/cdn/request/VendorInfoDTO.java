@@ -13,6 +13,8 @@ import lombok.Data;
 public class VendorInfoDTO {
     private String vendor;
 
+    private int grad;
+
     private int totalQps;
 
     private int totalSize;
