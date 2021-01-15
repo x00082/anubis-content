@@ -68,6 +68,7 @@ public class PgsqlConfig {
             Map<String, Object> ret = jpaProperties.getHibernateProperties(new HibernateSettings());
             //Map<String, String> ret = jpaProperties.getProperties();
             ret.put("hibernate.dialect", "org.hibernate.dialect.PostgreSQLDialect");
+            ret.remove("hibernate.hbm2ddl.auto");
             return ret;
         }
     

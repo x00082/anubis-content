@@ -686,7 +686,7 @@ public class TaskServiceImpl implements TaskService {
                     return false;
                 }
                 JxGaga gg = JxGaga.of(Executors.newCachedThreadPool(), msg.getRobinCallBackList().size());
-                Map<String, Integer> rs = new HashMap<>();
+                Map<String, Integer> rs = new ConcurrentHashMap<>();
                 log.debug("更新用户历史状态->[Success]");
                 for (RobinCallBack rcb : msg.getRobinCallBackList()) {
                     gg.work(() -> {
@@ -744,7 +744,7 @@ public class TaskServiceImpl implements TaskService {
                     return false;
                 }
                 JxGaga gg = JxGaga.of(Executors.newCachedThreadPool(), msg.getRobinCallBackList().size());
-                Map<String, Integer> rs = new HashMap<>();
+                Map<String, Integer> rs = new ConcurrentHashMap<>();
                 log.debug("更新用户历史状态->[Fail]");
                 for (RobinCallBack rcb : msg.getRobinCallBackList()) {
                     gg.work(() -> {

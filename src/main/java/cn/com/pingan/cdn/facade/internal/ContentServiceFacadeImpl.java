@@ -26,6 +26,7 @@ import cn.com.pingan.cdn.response.ContentHisDTO;
 import cn.com.pingan.cdn.response.openapi.OpenApiUserContentHisDTO;
 import cn.com.pingan.cdn.service.ConfigService;
 import cn.com.pingan.cdn.service.ContentService;
+import cn.com.pingan.cdn.service.DateBaseService;
 import cn.com.pingan.cdn.service.UserRpcService;
 import cn.com.pingan.cdn.validator.content.FreshCommand;
 import cn.com.pingan.cdn.validator.content.QueryHisCommand;
@@ -66,6 +67,9 @@ public class ContentServiceFacadeImpl implements ContentServiceFacade {
 
     @Autowired
     private ExportRecordRepository exportRecordRepository;
+
+    @Autowired
+    DateBaseService dateBaseService;
 
     @Autowired
     Producer producer;
@@ -159,7 +163,6 @@ public class ContentServiceFacadeImpl implements ContentServiceFacade {
         Page<ContentHistory> pager;
 
         if (StringUtils.isNotBlank(command.getTaskId())) {//ID是唯一的，如果指定ID则不需要大范围查询
-
             List<ContentHistory> chList = new ArrayList<>();
             ContentHistory ch;
             if (finalUuidList != null && finalUuidList.size() > 0) {
@@ -168,6 +171,27 @@ public class ContentServiceFacadeImpl implements ContentServiceFacade {
                 ch = this.contentHistoryRepository.findByRequestId(command.getTaskId());
             }
             if(ch !=null) {
+
+                /*
+                if(ch.getStatus().equals(HisStatus.WAIT) && ch.getSuccessTaskNum() >= ch.getAllTaskNum()){
+                    List<VendorContentTask> vcts = dateBaseService.getVendorTaskRepository().findByRequestId(command.getTaskId());
+                    if(vcts.size()>0){
+                        boolean flag = true;
+                        for(VendorContentTask vct :vcts){
+                            if(!vct.getStatus().equals(TaskStatus.SUCCESS)){
+                                flag = false;
+                                break;
+                            }
+                        }
+                        if(flag){
+                            this.contentHistoryRepository.updateStatusAndMessageByRequestId(command.getTaskId(), HisStatus.SUCCESS.name(), "任务执行成功");
+                            ch.setStatus(HisStatus.SUCCESS);
+                        }
+                    }
+                }
+                */
+
+
                 chList.add(ch);
             }
             pager = listConvertToPage(chList, pageRequest);

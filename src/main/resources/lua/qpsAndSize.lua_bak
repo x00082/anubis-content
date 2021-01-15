@@ -10,16 +10,12 @@ local json
 local tmp = [[{"limit":0, "total":0}]];
 --json = cjson.decode(tmp);
 
-local allLimit = redis.call('hget',key, "qpsAndSize");
+local allLimit = redis.call('get',key);
 if(allLimit) then
     json = cjson.decode(allLimit);
     if limit ~= 0 then
         local curentLimit = tonumber(json['limit']) + limitAdd
         if curentLimit > limit then
-            local ttl = redis.call('ttl',key);
-            if ttl > expire or ttl == -1 then
-                redis.call("EXPIRE", key, expire)
-            end
             return -100;
         else
             json['limit'] = curentLimit
@@ -29,9 +25,6 @@ if(allLimit) then
     if total ~= 0 then
         local curentTotal = tonumber(json['total']) + totalAdd
         if curentTotal > total then
-            if ttl > expire or ttl == -1 then
-                redis.call("EXPIRE", key, expire)
-            end
             return -200;
         else
             json['total'] = curentTotal
@@ -43,16 +36,9 @@ else
     json['limit'] = limitAdd
     json['total'] = totalAdd
 
-    local string = cjson.encode(json);
-    redis.call('hset', key, "qpsAndSize", string);
-    redis.call("EXPIRE", key, expire)
-    return 0
 end
 
 local string = cjson.encode(json);
-redis.call('hset', key, "qpsAndSize", string);
-local ttl = redis.call('ttl',key);
-if ttl > expire or ttl == -1 then
-    redis.call("EXPIRE", key, expire)
-end
+redis.call('set',key,string);
+redis.call("EXPIRE", key, expire)
 return 0

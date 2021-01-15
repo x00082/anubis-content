@@ -30,7 +30,6 @@ import java.io.IOException;
 @RequestMapping("/content/api")
 public class OpenApiContentController {
 
-
     private @Autowired
     HttpServletRequest request;
 

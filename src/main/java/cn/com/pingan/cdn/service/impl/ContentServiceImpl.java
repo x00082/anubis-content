@@ -158,9 +158,8 @@ public class ContentServiceImpl implements ContentService {
             HashSet h = new HashSet();
 
             for (String url :data) {
-                if(h.add(url.toLowerCase())){
-                    tmpData.add(url);
-                }
+                String subUrl;
+                boolean addFlag = false;
                 if(url.toLowerCase().startsWith("http://") ||url.toLowerCase().startsWith("https://")){
 
                     if (RefreshType.url == type && url.toLowerCase().endsWith("/")) {
@@ -172,8 +171,25 @@ public class ContentServiceImpl implements ContentService {
                     if (RefreshType.dir == type && !url.toLowerCase().endsWith("/")) {
                         return ApiReceipt.error(ErrorCode.ENDDIR);
                     }
+
+                    if(RefreshType.url == type){
+                        subUrl = url.toLowerCase().substring(url.toLowerCase().indexOf("://") + 3);
+                        if( -1 == subUrl.indexOf('/')){
+                            addFlag = true;
+                        }
+                    }
+
+
                 }else {
                     return ApiReceipt.error(ErrorCode.STARTURL);
+                }
+
+                if(h.add(url.toLowerCase())){
+                    if(addFlag) {
+                        tmpData.add(url + "/");
+                    }else{
+                        tmpData.add(url);
+                    }
                 }
             }
 
@@ -256,6 +272,7 @@ public class ContentServiceImpl implements ContentService {
                 contentHistory.setFlowStatus(FlowEmun.redo);
                 contentHistory.setVersion(contentHistory.getVersion() + 1);
                 contentHistory.setAllTaskNum(-1);
+                contentHistory.setSuccessTaskNum(-100);
                 dateBaseService.getContentHistoryRepository().save(contentHistory);
                 log.info("[{}]请求任务已失败，设置为wait", requestId);
 
@@ -265,6 +282,7 @@ public class ContentServiceImpl implements ContentService {
                     contentHistory.setFlowStatus(FlowEmun.redo);
                     contentHistory.setVersion(contentHistory.getVersion() + 1);
                     contentHistory.setAllTaskNum(-1);
+                    contentHistory.setSuccessTaskNum(-100);
                     dateBaseService.getContentHistoryRepository().save(contentHistory);
                 }else{
                     log.info("[{}]请求任务为wait,不需要重试", requestId);
@@ -336,6 +354,7 @@ public class ContentServiceImpl implements ContentService {
                     ch.setFlowStatus(FlowEmun.redo);
                     ch.setVersion(ch.getVersion() + 1);
                     ch.setAllTaskNum(-1);
+                    ch.setSuccessTaskNum(-100);
                     log.info("[{}]请求任务已失败，设置为wait", ch.getRequestId());
                     toSave.add(ch);
                 } else if (ch.getStatus().equals(HisStatus.WAIT)) {
@@ -344,6 +363,7 @@ public class ContentServiceImpl implements ContentService {
                         ch.setFlowStatus(FlowEmun.redo);
                         ch.setVersion(ch.getVersion() + 1);
                         ch.setAllTaskNum(-1);
+                        ch.setSuccessTaskNum(-100);
                         toSave.add(ch);
                     }else{
                         log.info("[{}]请求任务为wait,不需要重试", ch.getRequestId());
@@ -363,6 +383,7 @@ public class ContentServiceImpl implements ContentService {
                 //historyTaskMsg.setId(ch.getId());
                 historyTaskMsg.setTaskId(ch.getRequestId());
                 historyTaskMsg.setVersion(1);
+                historyTaskMsg.setHisVersion(ch.getVersion());
                 historyTaskMsg.setType(ch.getType());
                 historyTaskMsg.setSize(ch.getContentNumber());
                 historyTaskMsg.setOperation(TaskOperationEnum.content_item);
@@ -653,7 +674,7 @@ public class ContentServiceImpl implements ContentService {
             }else{
 
                 List<ContentHistory> contentHistories =  dateBaseService.getContentHistoryRepository().findByRequestIdIn(taskMsg.getRequestRecordList());
-                Map<String, List<VendorContentTask>> rsMap =  new HashMap<>();
+                Map<String, List<VendorContentTask>> rsMap =  new ConcurrentHashMap<>();
                 Map<String, ContentHistory> reMap = new HashMap<>();
                 Map<String, ContentHistory> allMap = new HashMap<>();
                 if(contentHistories.size()>0) {
@@ -897,7 +918,7 @@ public class ContentServiceImpl implements ContentService {
                     return;
                 }
 
-                if (taskMsg.getHisVersion() == null || taskMsg.getHisVersion() != -1 && taskMsg.getHisVersion() != contentHistory.getVersion()) {
+                if (taskMsg.getHisVersion() == null || (taskMsg.getHisVersion() != -1 && taskMsg.getHisVersion() != contentHistory.getVersion())) {
                     log.error("版本不一致,丢弃消息");
                     return;
                 }
@@ -939,14 +960,27 @@ public class ContentServiceImpl implements ContentService {
                     return;
                 }
 
-
-                if (contentHistory.getSuccessTaskNum().equals(contentHistory.getAllTaskNum())) {
-                    contentHistory.setMessage("任务执行成功");
-                    contentHistory.setUpdateTime(new Date());
-                    contentHistory.setStatus(HisStatus.SUCCESS);
-                    dateBaseService.getContentHistoryRepository().save(contentHistory);
-                    return;
+                if(contentHistory.getSuccessTaskNum() >= contentHistory.getAllTaskNum()){
+                    List<VendorContentTask> vcts = dateBaseService.getVendorTaskRepository().findByRequestId(requestId);
+                    if(vcts.size()>0){
+                        boolean flag = true;
+                        for(VendorContentTask vct :vcts){
+                            if(!vct.getStatus().equals(TaskStatus.SUCCESS)){
+                                flag = false;
+                                break;
+                            }
+                        }
+                        if(flag){
+                            contentHistory.setMessage("任务执行成功");
+                            contentHistory.setUpdateTime(new Date());
+                            contentHistory.setStatus(HisStatus.SUCCESS);
+                            dateBaseService.getContentHistoryRepository().save(contentHistory);
+                            return;
+                        }
+                    }
                 }
+
+
                 taskMsg.setDelay(robinRate);//TODO
                 taskMsg.setRoundRobinNum(taskMsg.getRoundRobinNum() + 1);
                 producer.sendDelayMsg(taskMsg);
@@ -971,38 +1005,56 @@ public class ContentServiceImpl implements ContentService {
                     if(ch.getVersion() != idsVersionMap.get(ch.getRequestId()).getVersion()){
                         continue;
                     }
-                    if(ch.getSuccessTaskNum().equals(ch.getAllTaskNum())){
-                        ch.setMessage("任务执行成功");
-                        ch.setUpdateTime(new Date());
-                        ch.setStatus(HisStatus.SUCCESS);
-                        toSaveList.add(ch);
-                    }else{
-                        if(taskMsg.getRetryNum() > limitRetry || taskMsg.getRoundRobinNum() > robinNum){//最后一次遍历所有厂商任务，确保的确失败了
-                            List<VendorContentTask> vcts = dateBaseService.getVendorTaskRepository().findByRequestId(ch.getRequestId());
-                            if(vcts.size()>0){
-                                boolean flag = true;
-                                for(VendorContentTask vct :vcts){
-                                    if(!vct.getStatus().equals(TaskStatus.SUCCESS)){
-                                        flag = false;
-                                        break;
-                                    }
-                                }
-                                if(flag){
-                                    ch.setMessage("任务执行成功");
-                                    ch.setUpdateTime(new Date());
-                                    ch.setStatus(HisStatus.SUCCESS);
-                                    toSaveList.add(ch);
-                                    continue;
+
+                    log.debug("SuccessTaskNum:[{}], AllTaskNum:[{}]",ch.getSuccessTaskNum(), ch.getAllTaskNum());
+                    if(ch.getSuccessTaskNum() >= ch.getAllTaskNum()){
+                        List<VendorContentTask> vcts = dateBaseService.getVendorTaskRepository().findByRequestId(ch.getRequestId());
+                        log.info("vcts:[{}]",vcts.size());
+                        if(vcts.size()>0){
+                            boolean flag = true;
+                            for(VendorContentTask vct :vcts){
+                                if(!vct.getStatus().equals(TaskStatus.SUCCESS)){
+                                    flag = false;
+                                    break;
                                 }
                             }
-                            ch.setMessage("任务执行失败");
-                            ch.setUpdateTime(new Date());
-                            ch.setStatus(HisStatus.FAIL);
-                            toSaveList.add(ch);
-                        }else {
-                            toSendList.add(idsVersionMap.get(ch.getRequestId()));
+
+                            if(flag){
+                                ch.setMessage("任务执行成功");
+                                ch.setUpdateTime(new Date());
+                                ch.setStatus(HisStatus.SUCCESS);
+                                toSaveList.add(ch);
+                                continue;
+                            }
                         }
                     }
+
+                    if(taskMsg.getRetryNum() > limitRetry || taskMsg.getRoundRobinNum() > robinNum  ){//最后一次遍历所有厂商任务，确保的确失败了
+                        List<VendorContentTask> vcts = dateBaseService.getVendorTaskRepository().findByRequestId(ch.getRequestId());
+                        if(vcts.size()>0){
+                            boolean flag = true;
+                            for(VendorContentTask vct :vcts){
+                                if(!vct.getStatus().equals(TaskStatus.SUCCESS)){
+                                    flag = false;
+                                    break;
+                                }
+                            }
+                            if(flag){
+                                ch.setMessage("任务执行成功");
+                                ch.setUpdateTime(new Date());
+                                ch.setStatus(HisStatus.SUCCESS);
+                                toSaveList.add(ch);
+                                continue;
+                            }
+                        }
+                        ch.setMessage("任务执行失败");
+                        ch.setUpdateTime(new Date());
+                        ch.setStatus(HisStatus.FAIL);
+                        toSaveList.add(ch);
+                    }else {
+                        toSendList.add(idsVersionMap.get(ch.getRequestId()));
+                    }
+
                 }
 
                 if(toSaveList.size()>0){

@@ -15,7 +15,7 @@ import java.util.Date;
 @Data
 @Entity
 
-@Table(name="uesr_limit", uniqueConstraints = {
+@Table(name="user_limit", uniqueConstraints = {
         @UniqueConstraint(columnNames = {"user_id"})
 })
 /*
