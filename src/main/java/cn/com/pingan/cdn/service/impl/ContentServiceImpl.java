@@ -199,7 +199,7 @@ public class ContentServiceImpl implements ContentService {
             boolean adminFlag = "true".equals(dto.getIsAdmin());
 
             //检查域名状态
-            checkDomainStatus(data, adminFlag, dto);
+            Map<String, String> urlDomainMap = checkDomainStatus(data, adminFlag, dto);
             log.info("检查域名状态完成");
 
             //计数
@@ -224,6 +224,27 @@ public class ContentServiceImpl implements ContentService {
 
             dateBaseService.getContentHistoryRepository().save(contentHistory);
             log.info("用户请求入库完成 request id:{}", contentHistory.getRequestId());
+
+            List<SplitHistory> toSaveSplit = new ArrayList<>();
+            log.info("urlDomainMap:[{}]", urlDomainMap);
+            for(String dm: urlDomainMap.keySet()){
+                String recordId = UUID.randomUUID().toString().replaceAll("-", "");
+                SplitHistory splitHistory = new SplitHistory();
+                splitHistory.setTaskId(recordId);
+                splitHistory.setRequestId(taskId);
+                splitHistory.setContent(dm);
+                splitHistory.setDomainName(urlDomainMap.get(dm));
+                splitHistory.setCreateTime(now);
+                splitHistory.setStatus(HisStatus.WAIT);
+                splitHistory.setType(type);
+                splitHistory.setUserId(dto.getUid());
+                splitHistory.setIsAdmin(dto.getIsAdmin());
+                toSaveSplit.add(splitHistory);
+            }
+
+            dateBaseService.getSplitHistoryRepository().saveAll(toSaveSplit);
+            log.info("拆分任务数据入库完成[{}]", toSaveSplit);
+
 
             if(requestMerge){
                 RequestRecord rc = new RequestRecord();
@@ -944,6 +965,16 @@ public class ContentServiceImpl implements ContentService {
                             contentHistory.setUpdateTime(new Date());
                             contentHistory.setStatus(HisStatus.SUCCESS);
                             dateBaseService.getContentHistoryRepository().save(contentHistory);
+
+                            List<SplitHistory> splitHistorys = dateBaseService.getSplitHistoryRepository().findByRequestId(contentHistory.getRequestId());
+                            if(splitHistorys.size()>0) {
+                                for (SplitHistory sh : splitHistorys) {
+                                    sh.setStatus(HisStatus.SUCCESS);
+                                }
+                                dateBaseService.getSplitHistoryRepository().saveAll(splitHistorys);
+                                log.info("变更拆分任务数[{}]",splitHistorys.size());
+                            }
+
                             return;
                         }
                     }
@@ -953,6 +984,15 @@ public class ContentServiceImpl implements ContentService {
                     contentHistory.setMessage("任务超时失败");
                     dateBaseService.getContentHistoryRepository().save(contentHistory);
                     log.error("[{}]contentVendorRobin超出重试次数,设置任务失败并丢弃消息", requestId);
+
+                    List<SplitHistory> splitHistorys = dateBaseService.getSplitHistoryRepository().findByRequestId(contentHistory.getRequestId());
+                    if(splitHistorys.size()>0) {
+                        for (SplitHistory sh : splitHistorys) {
+                            sh.setStatus(HisStatus.FAIL);
+                        }
+                        dateBaseService.getSplitHistoryRepository().saveAll(splitHistorys);
+                        log.info("变更拆分任务数[{}]",splitHistorys.size());
+                    }
 
                     if(notifyFail) {
                         anubisNotifyService.emailNotifyApiException(new AnubisNotifyExceptionRequest("anubis-content", contentHistory.getType().name(), contentHistory.getUserId(), contentHistory.getRequestId(), "刷新预热任务失败"));
@@ -975,6 +1015,14 @@ public class ContentServiceImpl implements ContentService {
                             contentHistory.setUpdateTime(new Date());
                             contentHistory.setStatus(HisStatus.SUCCESS);
                             dateBaseService.getContentHistoryRepository().save(contentHistory);
+                            List<SplitHistory> splitHistorys = dateBaseService.getSplitHistoryRepository().findByRequestId(contentHistory.getRequestId());
+                            if(splitHistorys.size()>0) {
+                                for (SplitHistory sh : splitHistorys) {
+                                    sh.setStatus(HisStatus.SUCCESS);
+                                }
+                                dateBaseService.getSplitHistoryRepository().saveAll(splitHistorys);
+                                log.info("变更拆分任务数[{}]",splitHistorys.size());
+                            }
                             return;
                         }
                     }
@@ -1061,6 +1109,20 @@ public class ContentServiceImpl implements ContentService {
 
                     dateBaseService.getContentHistoryRepository().saveAll(toSaveList);
                     log.info("更新用户任务数量[{}]", toSaveList.size());
+
+
+                    Map<String, HisStatus> reIdMap = new HashMap<>();
+                    for(ContentHistory ch: toSaveList){
+                        reIdMap.put(ch.getRequestId(), ch.getStatus());
+                    }
+                    List<SplitHistory> splitHistories = dateBaseService.getSplitHistoryRepository().findByRequestIdIn(new ArrayList<>(reIdMap.keySet()));
+                    for(SplitHistory sh:splitHistories){
+                        if(reIdMap.containsKey(sh.getRequestId())){
+                            sh.setStatus(reIdMap.get(sh.getRequestId()));
+                        }
+                    }
+                    dateBaseService.getSplitHistoryRepository().saveAll(splitHistories);
+                    log.info("变更拆分任务数[{}]",splitHistories.size());
                 }
 
                 if(toSendList.size()>0){
@@ -1222,11 +1284,14 @@ public class ContentServiceImpl implements ContentService {
     }
 
     
-    private void checkDomainStatus(List<String> data, boolean adminFlag, GateWayHeaderDTO dto) throws ContentException {
+    private Map<String, String> checkDomainStatus(List<String> data, boolean adminFlag, GateWayHeaderDTO dto) throws ContentException {
         //判断当前域名状态，查当前用户的所有域名
         List<Domain> domains = new ArrayList<>();
         //根据domain来过滤
         List<String> domainParam = new ArrayList<>();
+
+        Map<String, String> urlDomainMap = new HashMap<>();
+
         for (String url : data) {
             String host = null;
             try {
@@ -1236,6 +1301,7 @@ public class ContentServiceImpl implements ContentService {
                 throw new ContentException("0x004008", String.format("无效的URL:[%s]，禁止操作", url));
             }
             domainParam.add(host);
+            urlDomainMap.put(url, host);
         }
 
         if (adminFlag) {
@@ -1267,6 +1333,8 @@ public class ContentServiceImpl implements ContentService {
                 throw new ContentException("0x004008", String.format("域名:[%s]不可用，禁止操作", host));
             }
         }
+
+        return urlDomainMap;
     }
     
     private void checkUserLimit(boolean adminFlag,RefreshType type,String spCode, String userName, int size) throws ContentException {
