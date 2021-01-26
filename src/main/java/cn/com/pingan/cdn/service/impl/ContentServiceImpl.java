@@ -199,7 +199,7 @@ public class ContentServiceImpl implements ContentService {
             boolean adminFlag = "true".equals(dto.getIsAdmin());
 
             //检查域名状态
-            Map<String, String> urlDomainMap = checkDomainStatus(data, adminFlag, dto);
+            Map<String, HostSpCodeData> urlDomainSpMap = checkDomainStatus(data, adminFlag, dto);
             log.info("检查域名状态完成");
 
             //计数
@@ -226,24 +226,27 @@ public class ContentServiceImpl implements ContentService {
             log.info("用户请求入库完成 request id:{}", contentHistory.getRequestId());
 
             List<SplitHistory> toSaveSplit = new ArrayList<>();
-            log.info("urlDomainMap:[{}]", urlDomainMap);
-            for(String dm: urlDomainMap.keySet()){
+            List<ContentItem> toSaveItem = new ArrayList<>();
+            log.info("urlDomainMap:[{}]", urlDomainSpMap);
+            for(String dm: urlDomainSpMap.keySet()){
                 String recordId = UUID.randomUUID().toString().replaceAll("-", "");
                 SplitHistory splitHistory = new SplitHistory();
                 splitHistory.setTaskId(recordId);
                 splitHistory.setRequestId(taskId);
                 splitHistory.setContent(dm);
-                splitHistory.setDomainName(urlDomainMap.get(dm));
+                splitHistory.setDomainName(urlDomainSpMap.get(dm).getHost());
                 splitHistory.setCreateTime(now);
                 splitHistory.setStatus(HisStatus.WAIT);
                 splitHistory.setType(type);
                 splitHistory.setUserId(dto.getUid());
                 splitHistory.setIsAdmin(dto.getIsAdmin());
                 toSaveSplit.add(splitHistory);
+
             }
 
             dateBaseService.getSplitHistoryRepository().saveAll(toSaveSplit);
-            log.info("拆分任务数据入库完成[{}]", toSaveSplit);
+            log.info("splitHistory数据入库完成[{}]", toSaveSplit);
+
 
 
             if(requestMerge){
@@ -1284,7 +1287,7 @@ public class ContentServiceImpl implements ContentService {
     }
 
     
-    private Map<String, String> checkDomainStatus(List<String> data, boolean adminFlag, GateWayHeaderDTO dto) throws ContentException {
+    private Map<String, HostSpCodeData> checkDomainStatus(List<String> data, boolean adminFlag, GateWayHeaderDTO dto) throws ContentException {
         //判断当前域名状态，查当前用户的所有域名
         List<Domain> domains = new ArrayList<>();
         //根据domain来过滤
@@ -1334,7 +1337,14 @@ public class ContentServiceImpl implements ContentService {
             }
         }
 
-        return urlDomainMap;
+        Map<String, HostSpCodeData> urlDomainSpMap = new HashMap<>();
+
+        for(String url:urlDomainMap.keySet()){
+            String h = urlDomainMap.get(url);
+            String sp = domainMap.get(h).getUserCode();
+            urlDomainSpMap.put(url, new HostSpCodeData(h, sp));
+        }
+        return urlDomainSpMap;
     }
     
     private void checkUserLimit(boolean adminFlag,RefreshType type,String spCode, String userName, int size) throws ContentException {

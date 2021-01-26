@@ -50,11 +50,17 @@ public class DateBaseServiceImpl implements DateBaseService {
     @Autowired
     private SplitHistoryRepository splitHistoryRepository;
 
+    @Autowired
+    private ContentItemRepository contentItemRepository;
+
 
     @Override
     public ContentHistoryRepository getContentHistoryRepository() {
         return contentHistoryRepository;
     }
+
+    @Override
+    public ContentItemRepository getContentItemRepository(){ return contentItemRepository; }
 
     @Override
     public VendorTaskRepository getVendorTaskRepository() {

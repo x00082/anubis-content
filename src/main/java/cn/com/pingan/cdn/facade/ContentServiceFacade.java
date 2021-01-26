@@ -12,11 +12,13 @@ import cn.com.pingan.cdn.common.ApiReceipt;
 import cn.com.pingan.cdn.common.ContentLimitDTO;
 import cn.com.pingan.cdn.exception.ContentException;
 import cn.com.pingan.cdn.gateWay.GateWayHeaderDTO;
+import cn.com.pingan.cdn.request.QueryHisCountDTO;
 import cn.com.pingan.cdn.request.QueryHisDTO;
 import cn.com.pingan.cdn.request.VendorInfoDTO;
 import cn.com.pingan.cdn.request.openapi.ContentDefaultNumDTO;
 import cn.com.pingan.cdn.validator.content.FreshCommand;
 import cn.com.pingan.cdn.validator.content.QueryHisCommand;
+import cn.com.pingan.cdn.validator.content.QueryHisCountCommandDTO;
 
 import java.io.IOException;
 import java.util.List;
@@ -43,6 +45,8 @@ public interface ContentServiceFacade {
     public ApiReceipt batchRedo(List<String> requestIds, boolean flag)throws ContentException;
 
     public QueryHisDTO queryHis(GateWayHeaderDTO dto, QueryHisCommand command);
+
+    public QueryHisCountDTO queryHisCount(QueryHisCountCommandDTO command);
 
     public ApiReceipt queryImportTask(String exportId);
 

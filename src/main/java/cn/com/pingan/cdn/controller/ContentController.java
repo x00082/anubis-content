@@ -19,6 +19,7 @@ import cn.com.pingan.cdn.request.openapi.ContentDefaultNumDTO;
 import cn.com.pingan.cdn.validator.content.FreshCommand;
 import cn.com.pingan.cdn.validator.content.QueryHisCommand;
 import cn.com.pingan.cdn.validator.content.QueryHisCommandDTO;
+import cn.com.pingan.cdn.validator.content.QueryHisCountCommandDTO;
 import com.alibaba.fastjson.JSON;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
@@ -304,6 +305,38 @@ public class ContentController {
             return result;
         }
 
+
+
+    @PostMapping("/queryHisCount")
+    public ApiReceipt queryHisCount(@Valid @RequestBody QueryHisCountCommandDTO command) throws ContentException, DomainException {
+
+        log.info("content/queryHisCount start command:{}", JSON.toJSONString(command));
+        // TODO
+        /*
+        GateWayHeaderDTO dto = this.getGateWayInfo(request);
+        if(StringUtils.isEmpty(dto.getUsername()) || StringUtils.isEmpty(dto.getUid())) {
+            return  ApiReceipt.error(ErrorCode.NOHEADER);
+        }
+        //越权校验
+        if(!"true".equals(dto.getIsAdmin())) {
+            if (StringUtils.isEmpty(dto.getSpcode())) {
+                return  ApiReceipt.error(ErrorCode.FORBIDOPT);
+            }
+        }
+        */
+
+        if(StringUtils.isNotEmpty(command.getType()) && !RefreshType.is(command.getType())){
+            return  ApiReceipt.error(ErrorCode.PARAMILLEGAL);
+        }
+
+        if(StringUtils.isNotEmpty(command.getStatus()) && !HisStatus.is(command.getStatus())){
+            return  ApiReceipt.error(ErrorCode.PARAMILLEGAL);
+        }
+
+        ApiReceipt result =ApiReceipt.ok().data(this.facade.queryHisCount(command));
+        log.info("content/queryHisCount end result:{}", JSON.toJSONString(result));
+        return result;
+    }
 
     /**
      * 设置用户默认用量上限

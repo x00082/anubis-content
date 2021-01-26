@@ -16,61 +16,70 @@ package cn.com.pingan.cdn.model.mysql;
  *  
  */
 
-/*
+
+import cn.com.pingan.cdn.common.HisStatus;
+import cn.com.pingan.cdn.common.RefreshType;
+import lombok.Data;
+
+import javax.persistence.*;
+import java.util.Date;
+
 @Data
 @Entity
 
 @Table(name="content_item",
-        uniqueConstraints = {
-                @UniqueConstraint(columnNames = {"item_id"})
-        },
+
         indexes = {
-                @Index(columnList = "request_id")
+                @Index(columnList = "request_id"),
+                @Index(columnList = "type"),
+                @Index(columnList = "status"),
+                @Index(columnList = "user_id"),
+                @Index(columnList = "sp_code"),
+                @Index(columnList = "url"),
+                @Index(columnList = "create_time"),
         })
-        */
-/*
-@Table(name="content_item",
-        indexes = {
-                @Index(columnList = "item_id"),
-                @Index(columnList = "request_id")
-        })
-*/
-/*
+
 public class ContentItem {
     
     @Id
-    @GeneratedValue(strategy=GenerationType.IDENTITY)
-    private Long id;
-
     @Column(length=128, name="item_id", nullable = false)
     private String itemId;
-    
-    @Column(name = "type", length=32, nullable = false)
-    @Enumerated(EnumType.STRING)
-    private RefreshType type;
-    
-    @Column(name = "status", length=32, nullable = false)
-    @Enumerated(EnumType.STRING)
-    private HisStatus status;
-
-    @Column(length=4096, name="content", nullable = false)
-    private String content;
-    
-    @Column(name="message")
-    private String message;
-    
-    @Column(name="create_time", nullable = false)
-    private Date createTime;
-    
-    @Column(name="update_time")
-    private Date updateTime;
-
-    @Column(name="vendor", nullable = false)
-    private String vendor;
 
     @Column(length=128, name="request_id", nullable = false)
     private String requestId;
 
+    @Column(name = "type", length=32, nullable = false)
+    @Enumerated(EnumType.STRING)
+    private RefreshType type;
+
+    @Column(name = "status", length=32, nullable = false)
+    @Enumerated(EnumType.STRING)
+    private HisStatus status;
+
+    @Column(name="message")
+    private String message;
+
+    @Column(name="user_id", length=128, nullable = false)
+    private String userId;
+
+    @Column(name="sp_code", length=128, nullable = false)
+    private String spCode;
+
+    @Column(name="url", nullable = false)
+    private String url;
+
+    @Column(name="create_time", nullable = false)
+    private Date createTime;
+
+    @Column(name="update_time")
+    private Date updateTime;
+
+    @Column(name="domain_name", length=128, nullable = false)
+    private String domainName;
+
+    @Column(name="is_admin", length=16, nullable = false)
+    private String isAdmin;
+
 
 }
-*/
+

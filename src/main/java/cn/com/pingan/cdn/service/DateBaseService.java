@@ -13,6 +13,8 @@ public interface DateBaseService {
 
     public ContentHistoryRepository getContentHistoryRepository();
 
+    public ContentItemRepository getContentItemRepository();
+
     public VendorTaskRepository getVendorTaskRepository();
 
     public MergeRecordRepository getMergeRecordRepository();

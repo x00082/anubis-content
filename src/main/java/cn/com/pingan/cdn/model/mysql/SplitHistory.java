@@ -63,7 +63,7 @@ public class SplitHistory {
     @Column(name="create_time", nullable = false)
     private Date createTime;
 
-    @Column(columnDefinition="TEXT", name="domain_name", nullable = false)
+    @Column(name="domain_name", length=128, nullable = false)
     private String domainName;
 
     @Column(name="is_admin", length=16, nullable = false)

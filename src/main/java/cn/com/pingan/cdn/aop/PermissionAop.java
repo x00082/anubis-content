@@ -44,7 +44,7 @@ import java.util.Enumeration;
 @Slf4j
 @Component
 public class PermissionAop {
-    @Pointcut("execution(* cn.com.pingan.cdn.controller .*.*(..))")
+    @Pointcut("execution(* cn.com.pingan.cdn.controller .*.*(..))  && !execution(* cn.com.pingan.cdn.controller.ContentController.queryHisCount(..))")
     private void anyMethod(){ }
 
 

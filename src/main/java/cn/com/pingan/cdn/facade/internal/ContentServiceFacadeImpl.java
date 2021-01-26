@@ -19,6 +19,7 @@ import cn.com.pingan.cdn.rabbitmq.message.TaskMsg;
 import cn.com.pingan.cdn.rabbitmq.producer.Producer;
 import cn.com.pingan.cdn.repository.mysql.ContentHistoryRepository;
 import cn.com.pingan.cdn.repository.mysql.ExportRecordRepository;
+import cn.com.pingan.cdn.request.QueryHisCountDTO;
 import cn.com.pingan.cdn.request.QueryHisDTO;
 import cn.com.pingan.cdn.request.VendorInfoDTO;
 import cn.com.pingan.cdn.request.openapi.ContentDefaultNumDTO;
@@ -30,6 +31,7 @@ import cn.com.pingan.cdn.service.DateBaseService;
 import cn.com.pingan.cdn.service.UserRpcService;
 import cn.com.pingan.cdn.validator.content.FreshCommand;
 import cn.com.pingan.cdn.validator.content.QueryHisCommand;
+import cn.com.pingan.cdn.validator.content.QueryHisCountCommandDTO;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
@@ -338,6 +340,87 @@ public class ContentServiceFacadeImpl implements ContentServiceFacade {
 
 
     @Override
+    public QueryHisCountDTO queryHisCount(QueryHisCountCommandDTO command){
+
+        QueryHisCountDTO queryHisCountDTO = new QueryHisCountDTO();
+
+        String startTime = command.getStartTime();
+        String endTime = command.getEndTime();
+
+        List<String> spCodes = command.getSpCodes();
+        List<String> domains = command.getDomains();
+        if(domains == null){
+            domains = new ArrayList<>();
+        }
+
+        List<String> uuidList = new ArrayList<>();
+
+        //拼装用户uuid查询条件
+        if(spCodes != null && spCodes.size()>0) {
+            List<BaseUser> userList = userRpcService.queryAllAccount();//查所有用户的信息
+            queryUserUuidForSpcode(spCodes, userList, uuidList);
+        }
+
+        List<String> finalUuidList = uuidList;
+
+        SimpleDateFormat df = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+
+        Date startDate = null;
+        Date endDate = null;
+        try {
+            if (!StringUtils.isEmpty(startTime)) {
+                startDate = df.parse(startTime);
+            } else {
+                //默认查10天内的数据
+                startDate = preNDay(1);
+            }
+            if (!StringUtils.isEmpty(endTime)) {
+                endDate = df.parse(endTime);
+            } else {
+                endDate = new Date();
+            }
+        } catch (ParseException e) {
+            log.error("", e);
+        }
+
+        List<QueryHisCountDTO.HisCountResult> results;
+        if(finalUuidList.size()>0 && domains.size()>0){
+            results = dateBaseService.getSplitHistoryRepository().findByCreateTimeBetweenAndUserIdInOrDomainNameIn(startDate, endDate, finalUuidList, domains);
+        }else if(finalUuidList.size()>0 && domains.size() == 0){
+            results = dateBaseService.getSplitHistoryRepository().findByCreateTimeBetweenAndUserIdIn(startDate, endDate, finalUuidList);
+        }else if(finalUuidList.size() == 0 && domains.size() > 0){
+            results = dateBaseService.getSplitHistoryRepository().findByCreateTimeBetweenAndDomainNameIn(startDate, endDate, domains);
+        }else{
+            results = dateBaseService.getSplitHistoryRepository().findByCreateTimeBetween(startDate, endDate);
+        }
+
+        Map<String, QueryHisCountDTO.HisCount> reMap = new HashMap<>();
+        reMap.put(RefreshType.url.name(), new QueryHisCountDTO.HisCount(RefreshType.url));
+        reMap.put(RefreshType.dir.name(), new QueryHisCountDTO.HisCount(RefreshType.dir));
+        reMap.put(RefreshType.preheat.name(), new QueryHisCountDTO.HisCount(RefreshType.preheat));
+        for(QueryHisCountDTO.HisCountResult res: results){
+            if(res.getStatus().equals(HisStatus.SUCCESS)){
+                reMap.get(res.getType().name()).setSuccessCount(res.getCount());
+            }else if(res.getStatus().equals(HisStatus.FAIL)){
+                reMap.get(res.getType().name()).setFailCount(res.getCount());
+            }else{
+                reMap.get(res.getType().name()).setWaitCount(res.getCount());
+            }
+        }
+
+        List<QueryHisCountDTO.HisCount> hisCountList = new ArrayList<>();
+
+        for(String hc: reMap.keySet()){
+            hisCountList.add(reMap.get(hc));
+        }
+
+        queryHisCountDTO.setDetailsCount(hisCountList);
+
+        return  queryHisCountDTO;
+    }
+
+
+    @Override
     public ApiReceipt exportAndImport(GateWayHeaderDTO dto, QueryHisCommand command) {
 
         Date startDate = null;
@@ -522,6 +605,32 @@ public class ContentServiceFacadeImpl implements ContentServiceFacade {
 
             }
         }
+        uuidList.addAll(h);
+    }
+
+    private void queryUserUuidForSpcode(List<String> spCodes, List<BaseUser> userList,List<String> uuidList) {
+        HashSet h = new HashSet();
+        //查询的用户
+
+        Map<String, List<String>> userMap = new HashMap<>();
+        if (null != userList) {
+            for (BaseUser baseUser : userList){
+                if(!userMap.containsKey(baseUser.getUserCode())){
+                    List<String> uuids = new ArrayList<>();
+                    userMap.put(baseUser.getUserCode(), uuids);
+                }
+                if(StringUtils.isNotBlank(baseUser.getUuid())) {
+                    userMap.get(baseUser.getUserCode()).add(baseUser.getUuid());
+                }
+            }
+        }
+
+        for(String spcode: spCodes){
+            if(userMap.get(spcode).size()>0) {
+                h.addAll(userMap.get(spcode));
+            }
+        }
+
         uuidList.addAll(h);
     }
 
