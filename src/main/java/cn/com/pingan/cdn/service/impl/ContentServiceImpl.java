@@ -22,6 +22,7 @@ import cn.com.pingan.cdn.model.mysql.*;
 import cn.com.pingan.cdn.model.pgsql.Domain;
 import cn.com.pingan.cdn.model.pgsql.OldContentHistory;
 import cn.com.pingan.cdn.rabbitmq.config.RabbitListenerConfig;
+import cn.com.pingan.cdn.rabbitmq.constants.Constants;
 import cn.com.pingan.cdn.rabbitmq.message.FanoutMsg;
 import cn.com.pingan.cdn.rabbitmq.message.TaskMsg;
 import cn.com.pingan.cdn.rabbitmq.producer.Producer;
@@ -51,8 +52,6 @@ import javax.persistence.criteria.Root;
 import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
@@ -220,6 +219,7 @@ public class ContentServiceImpl implements ContentService {
             contentHistory.setStatus(HisStatus.WAIT);
             contentHistory.setContentNumber(data.size());
             contentHistory.setIsAdmin(dto.getIsAdmin());
+            contentHistory.setIsSplit(String.valueOf(true));
             contentHistory.setFlowStatus(FlowEmun.init);
 
             dateBaseService.getContentHistoryRepository().save(contentHistory);
@@ -242,11 +242,25 @@ public class ContentServiceImpl implements ContentService {
                 splitHistory.setIsAdmin(dto.getIsAdmin());
                 toSaveSplit.add(splitHistory);
 
+                ContentItem contentItem = new ContentItem();
+                contentItem.setItemId(recordId);
+                contentItem.setRequestId(taskId);
+                contentItem.setUrl(dm);
+                contentItem.setDomainName(urlDomainSpMap.get(dm).getHost());
+                contentItem.setUserId(urlDomainSpMap.get(dm).getUserCode());
+                contentItem.setCreateTime(now);
+                contentItem.setStatus(HisStatus.WAIT);
+                contentItem.setType(type);
+                contentItem.setUserId(dto.getUid());
+                contentItem.setIsAdmin(dto.getIsAdmin());
+                toSaveItem.add(contentItem);
             }
 
             dateBaseService.getSplitHistoryRepository().saveAll(toSaveSplit);
             log.info("splitHistory数据入库完成[{}]", toSaveSplit);
 
+            dateBaseService.getContentItemRepository().saveAll(toSaveItem);
+            log.info("ContentItem数据入库完成[{}]", toSaveItem);
 
 
             if(requestMerge){
@@ -257,7 +271,7 @@ public class ContentServiceImpl implements ContentService {
                 log.info("请求待合并:[{}]", taskId);
             }else {
                 TaskMsg historyTaskMsg = new TaskMsg();
-                //historyTaskMsg.setId(contentHistory.getId());
+                historyTaskMsg.setId(Constants.CURMSG);
                 historyTaskMsg.setTaskId(taskId);
                 historyTaskMsg.setHisVersion(contentHistory.getVersion());
                 historyTaskMsg.setSize(data.size());
@@ -479,6 +493,487 @@ public class ContentServiceImpl implements ContentService {
         }
     }
 
+
+    public void saveVendorTaskNew(TaskMsg taskMsg) throws ContentException {
+        String requestId = taskMsg.getTaskId();
+        boolean force = taskMsg.getForce();
+        boolean isMerge = taskMsg.getIsMerge();
+        log.info("saveVendorTask start [{}]", requestId);
+        try {
+
+            if(!isMerge) {
+                ContentHistory contentHistory = dateBaseService.getContentHistoryRepository().findByRequestId(requestId);
+                if (contentHistory == null) {
+                    log.error("用户任务不存在,丢弃消息");
+                    return;
+                }
+                boolean isSplit = false;
+                List<ContentItem> contentItemList = null;
+                if(StringUtils.isNotBlank(contentHistory.getIsSplit()) && contentHistory.getIsSplit().equals(String.valueOf(true))){
+                    isSplit = true;
+
+                    contentItemList = dateBaseService.getContentItemRepository().findByRequestId(requestId);
+                    if(contentItemList.size() == 0){
+                        log.error("ContentItem任务不存在,丢弃消息");
+                        return;
+                    }
+
+                }
+
+                if (taskMsg.getRetryNum() > limitRetry) {
+                    contentHistory.setStatus(HisStatus.FAIL);
+                    contentHistory.setUpdateTime(new Date());
+                    contentHistory.setMessage("拆分任务及其子任务失败超限");
+                    contentHistory.setFlowStatus(FlowEmun.split_vendor_err);
+                    dateBaseService.getContentHistoryRepository().save(contentHistory);
+
+                    if(isSplit && contentItemList.size() >0){
+                        for(ContentItem ci:contentItemList){
+                            ci.setStatus(HisStatus.FAIL);
+                            ci.setUpdateTime(new Date());
+                            ci.setMessage("拆分任务及其子任务失败超限");
+                        }
+                        dateBaseService.getContentItemRepository().saveAll(contentItemList);
+                    }
+                    log.error("超出重试次数,设置任务失败并丢弃消息");
+                    return;
+                }
+
+                List<String> urls = JSONArray.parseArray(contentHistory.getContent(), String.class);
+                if(!isSplit) {
+                    Map<String, List<String>> lostUrlsMap = new HashMap<>();
+                    Map<String, List<String>> vendorUrlMap;
+                    vendorUrlMap = getVendorUrlsMap(urls);
+                    if (vendorUrlMap == null) {
+                        log.error("获取厂商失败");
+                        taskMsg.setDelay(limitRetryRate);
+                        taskMsg.setRetryNum(taskMsg.getRetryNum() + 1);
+                        producer.sendTaskMsg(taskMsg);
+                        return;
+                    }
+                    log.debug("获取厂商成功");
+
+                    Map<String, VendorContentTask> toSaveVendorTaskMap = new HashMap<>();
+                    Map<String, String> vendorTaskId = new HashMap<>();
+
+                    contentHistory.setVersion(contentHistory.getVersion() + 1);
+                    if (taskMsg.getVersion() == 0) {//区别新请求与重试
+                        log.debug("saveVendorTask当前为首次请求，存入全部数据");
+                        lostUrlsMap.putAll(vendorUrlMap);
+                        for (String v : lostUrlsMap.keySet()) {
+                            if (!vendorTaskId.containsKey(v) || StringUtils.isBlank(vendorTaskId.get(v))) {
+                                String mergeId = UUID.randomUUID().toString().replaceAll("-", "");
+                                vendorTaskId.put(v, mergeId);
+                            }
+                            if (!toSaveVendorTaskMap.containsKey(v) || toSaveVendorTaskMap.get(v) == null) {
+                                String taskId = UUID.randomUUID().toString().replaceAll("-", "");
+                                VendorContentTask vendorTask = new VendorContentTask();
+                                vendorTask.setTaskId(taskId);
+                                vendorTask.setRequestId(requestId);
+                                vendorTask.setVendor(v);
+                                vendorTask.setMergeId(vendorTaskId.get(v));
+                                vendorTask.setVersion(contentHistory.getVersion());
+                                vendorTask.setType(contentHistory.getType());
+                                vendorTask.setContent(JSON.toJSONString(vendorUrlMap.get(v)));
+                                vendorTask.setContentNumber(vendorUrlMap.get(v).size());
+                                vendorTask.setHistoryCreateTime(contentHistory.getCreateTime());
+                                vendorTask.setCreateTime(new Date());
+                                vendorTask.setStatus(TaskStatus.WAIT);
+                                toSaveVendorTaskMap.put(v, vendorTask);
+                            }
+                        }
+                        taskMsg.setVersion(1);
+                    } else {
+                        log.debug("saveVendorTask当前非首次请求，对比数据");
+                        int totalTaskSize = 0;
+                        int existTaskSize = 0;
+
+                        List<VendorContentTask> existVendorTaskAll = dateBaseService.getVendorTaskRepository().findByRequestId(requestId);
+                        for (String s : vendorUrlMap.keySet()) {
+                            totalTaskSize += vendorUrlMap.get(s).size();
+                        }
+                        log.debug("需要生成厂商任务数量:[{}]", totalTaskSize);
+                        for (VendorContentTask vc : existVendorTaskAll) {
+                            List<String> us = JSONArray.parseArray(vc.getContent(), String.class);
+                            existTaskSize += us.size();
+                        }
+                        if (existTaskSize == 0) {
+                            log.debug("缺失全部子任务");
+                            lostUrlsMap.putAll(vendorUrlMap);
+                            for (String v : lostUrlsMap.keySet()) {
+                                if (!vendorTaskId.containsKey(v) || StringUtils.isBlank(vendorTaskId.get(v))) {
+                                    String mergeId = UUID.randomUUID().toString().replaceAll("-", "");
+                                    vendorTaskId.put(v, mergeId);
+                                }
+                                if (!toSaveVendorTaskMap.containsKey(v) || toSaveVendorTaskMap.get(v) == null) {
+                                    String taskId = UUID.randomUUID().toString().replaceAll("-", "");
+                                    VendorContentTask vendorTask = new VendorContentTask();
+                                    vendorTask.setTaskId(taskId);
+                                    vendorTask.setRequestId(requestId);
+                                    vendorTask.setVendor(v);
+                                    vendorTask.setMergeId(vendorTaskId.get(v));
+                                    vendorTask.setVersion(contentHistory.getVersion());
+                                    vendorTask.setType(contentHistory.getType());
+                                    vendorTask.setContent(JSON.toJSONString(vendorUrlMap.get(v)));
+                                    vendorTask.setContentNumber(vendorUrlMap.get(v).size());
+                                    vendorTask.setHistoryCreateTime(contentHistory.getCreateTime());
+                                    vendorTask.setCreateTime(new Date());
+                                    vendorTask.setStatus(TaskStatus.WAIT);
+                                    toSaveVendorTaskMap.put(v, vendorTask);
+                                }
+                            }
+
+                        } else if (existTaskSize == totalTaskSize) {
+                            log.debug("子任务不缺失，只重试失败的任务");
+                            boolean allSuccess = true;
+                            for (VendorContentTask vct : existVendorTaskAll) {
+                                if (!vct.getStatus().equals(TaskStatus.SUCCESS)) {
+                                    allSuccess = false;
+                                    if (!vendorTaskId.containsKey(vct.getVendor()) || StringUtils.isBlank(vendorTaskId.get(vct.getVendor()))) {
+                                        String mergeId = UUID.randomUUID().toString().replaceAll("-", "");
+                                        vendorTaskId.put(vct.getVendor(), mergeId);
+                                    }
+                                    if (!toSaveVendorTaskMap.containsKey(vct.getVendor()) || toSaveVendorTaskMap.get(vct.getVendor()) == null) {
+                                        vct.setStatus(TaskStatus.WAIT);
+                                        vct.setVersion(contentHistory.getVersion());
+                                        vct.setUpdateTime(new Date());
+                                        vct.setMergeId(vendorTaskId.get(vct.getVendor()));
+                                        toSaveVendorTaskMap.put(vct.getVendor(), vct);
+                                    }
+                                }
+                            }
+                            if (allSuccess) {
+                                contentHistory.setUpdateTime(new Date());
+                                contentHistory.setFlowStatus(FlowEmun.split_vendor_done);
+                                contentHistory.setAllTaskNum(existVendorTaskAll.size());
+                                contentHistory.setSuccessTaskNum(existVendorTaskAll.size());
+                                contentHistory.setStatus(HisStatus.SUCCESS);
+                                dateBaseService.getContentHistoryRepository().save(contentHistory);
+                                log.info("saveVendorTask设置请求任务[{}]状态为:[split_vendor_done],[SUCCESS]", requestId);
+                                return;
+                            }
+                        } else {
+                            log.debug("子任务数量异常，清理后重新入库");
+                            clearVendorTask(requestId);
+                            lostUrlsMap.putAll(vendorUrlMap);
+                            for (String v : lostUrlsMap.keySet()) {
+                                if (!vendorTaskId.containsKey(v) || StringUtils.isBlank(vendorTaskId.get(v))) {
+                                    String mergeId = UUID.randomUUID().toString().replaceAll("-", "");
+                                    vendorTaskId.put(v, mergeId);
+                                }
+                                if (!toSaveVendorTaskMap.containsKey(v) || toSaveVendorTaskMap.get(v) == null) {
+                                    String taskId = UUID.randomUUID().toString().replaceAll("-", "");
+                                    VendorContentTask vendorTask = new VendorContentTask();
+                                    vendorTask.setTaskId(taskId);
+                                    vendorTask.setRequestId(requestId);
+                                    vendorTask.setVendor(v);
+                                    vendorTask.setMergeId(vendorTaskId.get(v));
+                                    vendorTask.setVersion(contentHistory.getVersion());
+                                    vendorTask.setType(contentHistory.getType());
+                                    vendorTask.setContent(JSON.toJSONString(vendorUrlMap.get(v)));
+                                    vendorTask.setContentNumber(vendorUrlMap.get(v).size());
+                                    vendorTask.setHistoryCreateTime(contentHistory.getCreateTime());
+                                    vendorTask.setCreateTime(new Date());
+                                    vendorTask.setStatus(TaskStatus.WAIT);
+                                    toSaveVendorTaskMap.put(v, vendorTask);
+                                }
+                            }
+                        }
+                    }
+
+                    int allNum = toSaveVendorTaskMap.values().size();
+
+                    if (allNum > 0) {
+                        dateBaseService.getVendorTaskRepository().saveAll(new ArrayList<>(toSaveVendorTaskMap.values()));
+                        log.info("saveVendorTask存入厂商任务完成:[{}]", allNum);
+                    }
+
+                    contentHistory.setUpdateTime(new Date());
+                    contentHistory.setFlowStatus(FlowEmun.split_vendor_done);
+                    contentHistory.setAllTaskNum(allNum);
+                    contentHistory.setSuccessTaskNum(0);
+
+                    dateBaseService.getContentHistoryRepository().save(contentHistory);
+                    log.info("saveVendorTask设置请求任务[{}]状态为:[split_vendor_done]", requestId);
+
+                    List<MergeRecord> records = new ArrayList<>();
+                    for (String v : vendorTaskId.keySet()) {
+                        if (!vendorRequestMerge || (toSaveVendorTaskMap.get(v).getContentNumber() >= 20 && toSaveVendorTaskMap.get(v).getContentNumber() <= 50)) {
+                            TaskMsg vendorTaskMsg = new TaskMsg();
+                            vendorTaskMsg.setTaskId(vendorTaskId.get(v));
+                            vendorTaskMsg.setOperation(TaskOperationEnum.getVendorOperation(v, contentHistory.getType()));
+                            vendorTaskMsg.setVendor(v);
+                            vendorTaskMsg.setVersion(0);
+                            vendorTaskMsg.setHisVersion(contentHistory.getVersion());
+                            //vendorTaskMsg.setIsMerge(true);
+                            vendorTaskMsg.setType(contentHistory.getType());
+                            vendorTaskMsg.setRetryNum(0);
+                            vendorTaskMsg.setSize(toSaveVendorTaskMap.get(v).getContentNumber());
+                            producer.sendTaskMsg(vendorTaskMsg);
+                            log.info("saveContentVendor发送Mq[{}]", v);
+                        } else {//TODO
+                            MergeRecord record = new MergeRecord();
+                            record.setRecordId(UUID.randomUUID().toString().replaceAll("-", ""));
+                            record.setMergeId(vendorTaskId.get(v));
+                            records.add(record);
+                            log.info("saveContentVendor记录合并record:[{}]", vendorTaskId.get(v));
+                        }
+                    }
+                    if (records.size() > 0) {
+                        dateBaseService.getMergeRecordRepository().saveAll(records);
+                        log.debug("记录合并[{}]", records.size());
+                    }
+
+                }else{
+                    Map<String, List<String>> domainVendorsMap;
+                    domainVendorsMap = getDomainVendorsMap(urls);
+                    if (domainVendorsMap == null) {
+                        log.error("获取厂商失败");
+                        taskMsg.setDelay(limitRetryRate);
+                        taskMsg.setRetryNum(taskMsg.getRetryNum() + 1);
+                        producer.sendTaskMsg(taskMsg);
+                        return;
+                    }
+                    log.debug("获取厂商成功");
+
+                    Map<String, VendorContentTask> vendorContentTaskMap = new HashMap<>();
+                    List<VendorContentTask> vendorContentTaskList = dateBaseService.getVendorTaskRepository().findByRequestId(requestId);
+                    for(VendorContentTask vct: vendorContentTaskList){
+                        vendorContentTaskMap.put(vct.getItemId()+vct.getVendor(),vct);
+                    }
+
+                    List<VendorContentTask> toSaveTask = new ArrayList<>();
+                    List<TaskMsg> toSendMsg = new ArrayList<>();
+                    int succHis = 0;
+                    int allHis = 0;
+                    for(ContentItem ci: contentItemList){
+                        int succ = 0;
+                        int all = 0;
+                        List<String> vendors = domainVendorsMap.get(ci.getDomainName());
+                        if(vendors != null){
+                            all = vendors.size();
+                            for(String v:vendors ){
+                                String getK = ci.getItemId()+v;
+                                if(vendorContentTaskMap.containsKey(getK)){
+                                    if(vendorContentTaskMap.get(getK).getStatus().equals(HisStatus.SUCCESS)){
+                                        succ++;
+                                    }else {
+                                        String taskId = UUID.randomUUID().toString().replaceAll("-", "");
+                                        vendorContentTaskMap.get(getK).setVersion(ci.getVersion());
+                                        vendorContentTaskMap.get(getK).setUpdateTime(new Date());
+                                        vendorContentTaskMap.get(getK).setMergeId(taskId);
+                                        vendorContentTaskMap.get(getK).setStatus(TaskStatus.WAIT);
+                                        toSaveTask.add(vendorContentTaskMap.get(getK));
+
+                                        TaskMsg vendorTaskMsg = new TaskMsg();
+                                        vendorTaskMsg.setTaskId(taskId);
+                                        vendorTaskMsg.setOperation(TaskOperationEnum.getVendorOperation(v, ci.getType()));
+                                        vendorTaskMsg.setVendor(v);
+                                        vendorTaskMsg.setVersion(0);
+                                        vendorTaskMsg.setHisVersion(ci.getVersion());
+                                        vendorTaskMsg.setType(ci.getType());
+                                        vendorTaskMsg.setRetryNum(0);
+                                        vendorTaskMsg.setSize(1);
+                                        toSendMsg.add(vendorTaskMsg);
+                                    }
+                                }else{
+                                    VendorContentTask vendorTask = new VendorContentTask();
+                                    String taskId = UUID.randomUUID().toString().replaceAll("-", "");
+                                    vendorTask.setTaskId(taskId);
+                                    vendorTask.setItemId(ci.getItemId());
+                                    vendorTask.setRequestId(requestId);
+                                    vendorTask.setVendor(v);
+                                    vendorTask.setMergeId(taskId);
+                                    vendorTask.setVersion(contentHistory.getVersion());
+                                    vendorTask.setType(contentHistory.getType());
+                                    vendorTask.setContent(ci.getUrl());
+                                    vendorTask.setContentNumber(1);
+                                    vendorTask.setHistoryCreateTime(contentHistory.getCreateTime());
+                                    vendorTask.setCreateTime(new Date());
+                                    vendorTask.setStatus(TaskStatus.WAIT);
+                                    toSaveTask.add(vendorTask);
+
+                                    TaskMsg vendorTaskMsg = new TaskMsg();
+                                    vendorTaskMsg.setTaskId(taskId);
+                                    vendorTaskMsg.setOperation(TaskOperationEnum.getVendorOperation(v, ci.getType()));
+                                    vendorTaskMsg.setVendor(v);
+                                    vendorTaskMsg.setVersion(0);
+                                    vendorTaskMsg.setHisVersion(ci.getVersion());
+                                    vendorTaskMsg.setType(ci.getType());
+                                    vendorTaskMsg.setRetryNum(0);
+                                    vendorTaskMsg.setSize(1);
+                                    toSendMsg.add(vendorTaskMsg);
+                                }
+                            }
+                        }
+
+                        if(succ < all){
+                            ci.setUpdateTime(new Date());
+                            ci.setSuccessTaskNum(succ);
+                            ci.setAllTaskNum(all);
+                        }
+
+                        succHis += succ;
+                        allHis  += all;
+                    }
+
+                    contentHistory.setUpdateTime(new Date());
+                    contentHistory.setFlowStatus(FlowEmun.split_vendor_done);
+                    contentHistory.setAllTaskNum(allHis);
+                    contentHistory.setSuccessTaskNum(succHis);
+
+                    dateBaseService.getContentItemRepository().saveAll(contentItemList);
+                    dateBaseService.getContentHistoryRepository().save(contentHistory);
+
+                    if(toSaveTask.size()>0){
+                        dateBaseService.getVendorTaskRepository().saveAll(toSaveTask);
+                    }
+
+                    if(toSendMsg.size() >0){
+                        for(TaskMsg tsm: toSendMsg){
+                            producer.sendTaskMsg(tsm);
+                            log.info("saveContentVendor发送Mq[{}]", tsm);
+                        }
+                    }
+                }
+
+                HistoryRecord historyRecord = new HistoryRecord();
+                historyRecord.setRecordId(UUID.randomUUID().toString().replaceAll("-", ""));
+                historyRecord.setRequestId(requestId);
+                historyRecord.setVersion(contentHistory.getVersion());
+                dateBaseService.getHistoryRecordRepository().save(historyRecord);
+
+                log.info("saveVendorTask结束[{}]", requestId);
+            }else{
+
+                List<ContentHistory> contentHistories =  dateBaseService.getContentHistoryRepository().findByRequestIdIn(taskMsg.getRequestRecordList());
+                Map<String, List<VendorContentTask>> rsMap =  new ConcurrentHashMap<>();
+                Map<String, ContentHistory> reMap = new HashMap<>();
+                Map<String, ContentHistory> allMap = new HashMap<>();
+                if(contentHistories.size()>0) {
+                    log.debug("saveVendorTask获取信息");
+                    JxGaga gg = JxGaga.of(Executors.newCachedThreadPool(), contentHistories.size());
+                    for (ContentHistory c : contentHistories) {
+                        gg.work(() -> {
+                            return splitVendorTask(c, taskMsg.getVersion());
+                        }, j -> rsMap.put(j.getRequestId(), j.getVendorContentTaskList()), q -> {
+                            log.info(q.getMessage());
+                        });
+                    }
+                    gg.merge((i) -> {
+                        log.info("生成成功的用户任务数[{}]， 总数[{}]", i.size(), contentHistories.size());
+                    }, rsMap.keySet()).exit();
+                    log.debug("saveVendorTask获取信息完成[{}]", contentHistories.size());
+
+                    List<VendorContentTask> toSaveVendorContentTask = new ArrayList<>();
+                    List<ContentHistory> toSaveContentHistory = new ArrayList<>();
+                    List<HistoryRecord> historyRecords = new ArrayList<>();
+                    for (ContentHistory ch : contentHistories) {
+                        allMap.put(ch.getRequestId(), ch);
+                        if (rsMap.containsKey(ch.getRequestId())) {
+                            ch.setAllTaskNum(rsMap.get(ch.getRequestId()).size());
+                            ch.setUpdateTime(new Date());
+                            ch.setFlowStatus(FlowEmun.split_vendor_done);
+                            ch.setSuccessTaskNum(0);
+                            toSaveContentHistory.add(ch);
+                            toSaveVendorContentTask.addAll(rsMap.get(ch.getRequestId()));
+
+                            HistoryRecord historyRecord = new HistoryRecord();
+                            historyRecord.setRecordId(UUID.randomUUID().toString().replaceAll("-", ""));
+                            historyRecord.setRequestId(ch.getRequestId());
+                            historyRecord.setVersion(ch.getVersion());
+                            historyRecords.add(historyRecord);
+                        } else {
+                            reMap.put(ch.getRequestId(), ch);
+                        }
+                    }
+
+                    if(toSaveVendorContentTask.size()>0){
+                        dateBaseService.getVendorTaskRepository().saveAll(toSaveVendorContentTask);
+                        log.info("saveVendorTask存入厂商任务完成:[{}]", toSaveVendorContentTask.size());
+                    }
+
+                    if (toSaveContentHistory.size() > 0) {
+                        dateBaseService.getContentHistoryRepository().saveAll(toSaveContentHistory);
+                        log.info("saveVendorTask设置请求任务[{}]状态为:[split_vendor_done]", toSaveContentHistory.size());
+                    }
+
+                    List<TaskMsg> toSendTaskList = new ArrayList<>();
+                    List<MergeRecord> records = new ArrayList<>();
+                    if (toSaveVendorContentTask.size() > 0) {
+                        for (VendorContentTask vct : toSaveVendorContentTask) {
+                            if (!vendorRequestMerge || (vct.getContentNumber() >= 20 && vct.getContentNumber() <= 50)) {
+                                TaskMsg vendorTaskMsg = new TaskMsg();
+                                vendorTaskMsg.setTaskId(vct.getMergeId());
+                                vendorTaskMsg.setOperation(TaskOperationEnum.getVendorOperation(vct.getVendor(), vct.getType()));
+                                vendorTaskMsg.setVendor(vct.getVendor());
+                                vendorTaskMsg.setVersion(0);
+                                vendorTaskMsg.setHisVersion(allMap.get(vct.getRequestId()).getVersion());
+                                //vendorTaskMsg.setIsMerge(true);
+                                vendorTaskMsg.setType(vct.getType());
+                                vendorTaskMsg.setRetryNum(0);
+                                vendorTaskMsg.setSize(vct.getContentNumber());
+                                toSendTaskList.add(vendorTaskMsg);
+                            } else {
+                                MergeRecord record = new MergeRecord();
+                                record.setRecordId(UUID.randomUUID().toString().replaceAll("-", ""));
+                                record.setMergeId(vct.getMergeId());
+                                records.add(record);
+                                log.info("record:[{}]", vct.getMergeId());
+                            }
+                        }
+                    }
+                    if (toSendTaskList.size() > 0) {
+                        sendListMQ(toSendTaskList);
+                        log.info("发送MQ[{}]", toSendTaskList.size());
+                    }
+                    if (records.size() > 0) {
+                        dateBaseService.getMergeRecordRepository().saveAll(records);
+                        log.info("记录合并[{}]", records.size());
+                    }
+
+                    if (historyRecords.size() > 0) {
+                        dateBaseService.getHistoryRecordRepository().saveAll(historyRecords);
+                        log.info("记录用户轮询[{}]", historyRecords.size());
+                    }
+
+                    if (reMap.keySet().size() > 0) {
+                        log.error("saveVendorTask失败数[{}]", reMap.keySet().size());
+                        if (taskMsg.getRetryNum() > limitRetry) {
+                            for (ContentHistory ch : reMap.values()) {
+                                ch.setStatus(HisStatus.FAIL);
+                                ch.setUpdateTime(new Date());
+                                ch.setMessage("拆分任务及其子任务失败超限");
+                                ch.setFlowStatus(FlowEmun.split_vendor_err);
+                            }
+                            dateBaseService.getContentHistoryRepository().saveAll(new ArrayList<>(reMap.values()));
+                            log.error("超出重试次数,设置任务失败并丢弃消息");
+                        } else {
+                            taskMsg.setVersion(1);
+                            taskMsg.setRequestRecordList(new ArrayList<>(reMap.keySet()));
+                            taskMsg.setRetryNum(taskMsg.getRetryNum() + 1);
+                            producer.sendDelayMsg(taskMsg);
+                            log.error("重试任务[{}]", taskMsg.getRequestRecordList());
+                        }
+                    }
+                }
+                log.info("saveVendorTask合并模式结束[{}]", requestId);
+            }
+
+        }catch (Exception e){
+            log.error("saveVendorTask异常{}", e);
+            if (taskMsg.getRetryNum() > limitRetry) {
+                return;
+            }
+            taskMsg.setDelay(limitRetryRate);
+            taskMsg.setRetryNum(taskMsg.getRetryNum() + 1);
+            producer.sendDelayMsg(taskMsg);
+            return;
+        }
+    }
+
+
+
     @Override
     public void saveVendorTask(TaskMsg taskMsg) throws ContentException {
         String requestId = taskMsg.getTaskId();
@@ -507,7 +1002,7 @@ public class ContentServiceImpl implements ContentService {
                 List<String> urls = JSONArray.parseArray(contentHistory.getContent(), String.class);
                 Map<String, List<String>> lostUrlsMap = new HashMap<>();
                 Map<String, List<String>> vendorUrlMap;
-                vendorUrlMap = getDomainVendorsMapNew(urls);
+                vendorUrlMap = getVendorUrlsMap(urls);
                 if (vendorUrlMap == null) {
                     log.error("获取厂商失败");
                     taskMsg.setDelay(limitRetryRate);
@@ -763,7 +1258,7 @@ public class ContentServiceImpl implements ContentService {
                                 //vendorTaskMsg.setIsMerge(true);
                                 vendorTaskMsg.setType(vct.getType());
                                 vendorTaskMsg.setRetryNum(0);
-                                vendorTaskMsg.setSize(vct.getContentNumber());
+                                vendorTaskMsg.setSize(1);
                                 toSendTaskList.add(vendorTaskMsg);
                             } else {
                                 MergeRecord record = new MergeRecord();
@@ -952,18 +1447,63 @@ public class ContentServiceImpl implements ContentService {
                     return;
                 }
 
-                if (taskMsg.getRetryNum() > limitRetry || taskMsg.getRoundRobinNum() > robinNum || taskMsg.getHisVersion() == -1) {
 
-                    List<VendorContentTask> vcts = dateBaseService.getVendorTaskRepository().findByRequestId(requestId);
-                    if(vcts.size()>0){
-                        boolean flag = true;
-                        for(VendorContentTask vct :vcts){
-                            if(!vct.getStatus().equals(TaskStatus.SUCCESS)){
-                                flag = false;
-                                break;
+                List<VendorContentTask> vcts = dateBaseService.getVendorTaskRepository().findByRequestId(requestId);
+                List<VendorContentTask> succVctList = new ArrayList<>();
+                List<VendorContentTask> failVctList = new ArrayList<>();
+                List<VendorContentTask> waitVctList = new ArrayList<>();
+                if(vcts.size()>0) {
+                    for (VendorContentTask vct : vcts) {
+                        if (vct.getStatus().equals(TaskStatus.SUCCESS)) {
+                            succVctList.add(vct);
+                        } else if (vct.getStatus().equals(TaskStatus.FAIL)) {
+                            failVctList.add(vct);
+                        } else {
+                            waitVctList.add(vct);
+                        }
+                    }
+
+                    if(contentHistory.getIsSplit().equals(String.valueOf(true))){
+                        List<ContentItem> coits = dateBaseService.getContentItemRepository().findByRequestIdAndStatus(requestId, HisStatus.WAIT.name());
+                        Map<String, ContentItem> waitContentItemMap = new HashMap<>();
+
+                        for(ContentItem ci: coits){
+                            waitContentItemMap.put(ci.getItemId(), ci);
+                        }
+                        for(VendorContentTask vct : succVctList){
+                            if(waitContentItemMap.containsKey(vct.getItemId())){
+                                waitContentItemMap.get(vct.getItemId()).setMessage("任务执行成功");
+                                waitContentItemMap.get(vct.getItemId()).setUpdateTime(new Date());
+                                waitContentItemMap.get(vct.getItemId()).setStatus(HisStatus.SUCCESS);
                             }
                         }
-                        if(flag){
+
+                        for(VendorContentTask vct : failVctList){
+                            if(waitContentItemMap.containsKey(vct.getItemId())){
+                                waitContentItemMap.get(vct.getItemId()).setMessage("任务执行失败");
+                                waitContentItemMap.get(vct.getItemId()).setUpdateTime(new Date());
+                                waitContentItemMap.get(vct.getItemId()).setStatus(HisStatus.FAIL);
+                            }
+                        }
+                        List<ContentItem> toSaveContentItemList = new ArrayList<>();
+
+                        toSaveContentItemList.addAll(waitContentItemMap.values());
+                        if (taskMsg.getRetryNum() > limitRetry || taskMsg.getRoundRobinNum() > robinNum || taskMsg.getHisVersion() == -1) {
+                            for(ContentItem saveCI: toSaveContentItemList){
+                                if(saveCI.getStatus().equals(HisStatus.WAIT)){
+                                    saveCI.setMessage("任务执行失败");
+                                    saveCI.setUpdateTime(new Date());
+                                    saveCI.setStatus(HisStatus.FAIL);
+                                }
+                            }
+                        }
+                        dateBaseService.getContentItemRepository().saveAll(toSaveContentItemList);
+                    }
+
+
+                    if(waitVctList.size() == 0){
+
+                        if(succVctList.size() == vcts.size()){
                             contentHistory.setMessage("任务执行成功");
                             contentHistory.setUpdateTime(new Date());
                             contentHistory.setStatus(HisStatus.SUCCESS);
@@ -977,16 +1517,54 @@ public class ContentServiceImpl implements ContentService {
                                 dateBaseService.getSplitHistoryRepository().saveAll(splitHistorys);
                                 log.info("变更拆分任务数[{}]",splitHistorys.size());
                             }
+                        }else{
+                            contentHistory.setMessage("任务执行失败");
+                            contentHistory.setUpdateTime(new Date());
+                            contentHistory.setStatus(HisStatus.FAIL);
+                            dateBaseService.getContentHistoryRepository().save(contentHistory);
 
+                            List<SplitHistory> splitHistorys = dateBaseService.getSplitHistoryRepository().findByRequestId(contentHistory.getRequestId());
+                            if(splitHistorys.size()>0) {
+                                for (SplitHistory sh : splitHistorys) {
+                                    sh.setStatus(HisStatus.FAIL);
+                                }
+                                dateBaseService.getSplitHistoryRepository().saveAll(splitHistorys);
+                                log.info("变更拆分任务数[{}]",splitHistorys.size());
+                            }
+                        }
+                        return;
+                    }else{
+                        if (taskMsg.getRetryNum() > limitRetry || taskMsg.getRoundRobinNum() > robinNum || taskMsg.getHisVersion() == -1) {
+                            contentHistory.setMessage("任务执行失败");
+                            contentHistory.setUpdateTime(new Date());
+                            contentHistory.setStatus(HisStatus.FAIL);
+                            dateBaseService.getContentHistoryRepository().save(contentHistory);
+
+                            List<SplitHistory> splitHistorys = dateBaseService.getSplitHistoryRepository().findByRequestId(contentHistory.getRequestId());
+                            if(splitHistorys.size()>0) {
+                                for (SplitHistory sh : splitHistorys) {
+                                    sh.setStatus(HisStatus.FAIL);
+                                }
+                                dateBaseService.getSplitHistoryRepository().saveAll(splitHistorys);
+                                log.info("变更拆分任务数[{}]",splitHistorys.size());
+                            }
                             return;
                         }
                     }
-
-                    contentHistory.setStatus(HisStatus.FAIL);
+                }else{//不存在
+                    if(contentHistory.getIsSplit().equals(String.valueOf(true))) {
+                        List<ContentItem> coits = dateBaseService.getContentItemRepository().findByRequestIdAndStatus(requestId, HisStatus.WAIT.name());
+                        for (ContentItem saveCI : coits) {
+                            saveCI.setMessage("任务执行失败");
+                            saveCI.setUpdateTime(new Date());
+                            saveCI.setStatus(HisStatus.FAIL);
+                        }
+                        dateBaseService.getContentItemRepository().saveAll(coits);
+                    }
+                    contentHistory.setMessage("任务执行失败");
                     contentHistory.setUpdateTime(new Date());
-                    contentHistory.setMessage("任务超时失败");
+                    contentHistory.setStatus(HisStatus.FAIL);
                     dateBaseService.getContentHistoryRepository().save(contentHistory);
-                    log.error("[{}]contentVendorRobin超出重试次数,设置任务失败并丢弃消息", requestId);
 
                     List<SplitHistory> splitHistorys = dateBaseService.getSplitHistoryRepository().findByRequestId(contentHistory.getRequestId());
                     if(splitHistorys.size()>0) {
@@ -996,45 +1574,12 @@ public class ContentServiceImpl implements ContentService {
                         dateBaseService.getSplitHistoryRepository().saveAll(splitHistorys);
                         log.info("变更拆分任务数[{}]",splitHistorys.size());
                     }
-
-                    if(notifyFail) {
-                        anubisNotifyService.emailNotifyApiException(new AnubisNotifyExceptionRequest("anubis-content", contentHistory.getType().name(), contentHistory.getUserId(), contentHistory.getRequestId(), "刷新预热任务失败"));
-                    }
                     return;
                 }
-
-                if(contentHistory.getSuccessTaskNum() >= contentHistory.getAllTaskNum()){
-                    List<VendorContentTask> vcts = dateBaseService.getVendorTaskRepository().findByRequestId(requestId);
-                    if(vcts.size()>0){
-                        boolean flag = true;
-                        for(VendorContentTask vct :vcts){
-                            if(!vct.getStatus().equals(TaskStatus.SUCCESS)){
-                                flag = false;
-                                break;
-                            }
-                        }
-                        if(flag){
-                            contentHistory.setMessage("任务执行成功");
-                            contentHistory.setUpdateTime(new Date());
-                            contentHistory.setStatus(HisStatus.SUCCESS);
-                            dateBaseService.getContentHistoryRepository().save(contentHistory);
-                            List<SplitHistory> splitHistorys = dateBaseService.getSplitHistoryRepository().findByRequestId(contentHistory.getRequestId());
-                            if(splitHistorys.size()>0) {
-                                for (SplitHistory sh : splitHistorys) {
-                                    sh.setStatus(HisStatus.SUCCESS);
-                                }
-                                dateBaseService.getSplitHistoryRepository().saveAll(splitHistorys);
-                                log.info("变更拆分任务数[{}]",splitHistorys.size());
-                            }
-                            return;
-                        }
-                    }
-                }
-
-
                 taskMsg.setDelay(robinRate);//TODO
                 taskMsg.setRoundRobinNum(taskMsg.getRoundRobinNum() + 1);
                 producer.sendDelayMsg(taskMsg);
+
             }else{
                 log.info("merge contentHistoryRobin task");
                 if(taskMsg.getRobinCallBackList() == null && taskMsg.getRobinCallBackList().size() == 0){
@@ -1045,10 +1590,71 @@ public class ContentServiceImpl implements ContentService {
                 for(RobinCallBack rcb: taskMsg.getRobinCallBackList()){
                     idsVersionMap.put(rcb.getRequestId(), rcb);
                 }
-                List<ContentHistory> contentHistorys = dateBaseService.getContentHistoryRepository().findByRequestIdIn(new ArrayList<>(idsVersionMap.keySet()));
+                List<String> requestIds = new ArrayList<>(idsVersionMap.keySet());
+                List<ContentHistory> contentHistorys = dateBaseService.getContentHistoryRepository().findByRequestIdIn(new ArrayList<>(requestIds));
 
                 List<ContentHistory> toSaveList = new ArrayList<>();
+                List<SplitHistory> toSaveSplitList = new ArrayList<>();
                 List<RobinCallBack> toSendList = new ArrayList<>();
+
+                List<VendorContentTask> vcts = dateBaseService.getVendorTaskRepository().findByRequestIdIn(requestIds);
+                Map<String, List<VendorContentTask>> allVendorContentTaskMap = new HashMap<>();
+
+                List<VendorContentTask> succVctList = new ArrayList<>();
+                List<VendorContentTask> failVctList = new ArrayList<>();
+                List<VendorContentTask> waitVctList = new ArrayList<>();
+                for (VendorContentTask vct : vcts) {
+                    if(!allVendorContentTaskMap.containsKey(vct.getRequestId())){
+                        allVendorContentTaskMap.put(vct.getRequestId(), new ArrayList<VendorContentTask>());
+                    }
+                    allVendorContentTaskMap.get(vct.getRequestId()).add(vct);
+
+                    if (vct.getStatus().equals(TaskStatus.SUCCESS)) {
+                        succVctList.add(vct);
+                    } else if (vct.getStatus().equals(TaskStatus.FAIL)) {
+                        failVctList.add(vct);
+                    } else {
+                        waitVctList.add(vct);
+                    }
+                }
+
+                List<ContentItem> coits = dateBaseService.getContentItemRepository().findByRequestIdInAndStatus(requestIds, HisStatus.WAIT.name());
+                if(coits.size() >0) {
+                    Map<String, ContentItem> waitContentItemMap = new HashMap<>();
+
+                    for (ContentItem ci : coits) {
+                        waitContentItemMap.put(ci.getItemId(), ci);
+                    }
+                    for (VendorContentTask vct : succVctList) {
+                        if (waitContentItemMap.containsKey(vct.getItemId())) {
+                            waitContentItemMap.get(vct.getItemId()).setMessage("任务执行成功");
+                            waitContentItemMap.get(vct.getItemId()).setUpdateTime(new Date());
+                            waitContentItemMap.get(vct.getItemId()).setStatus(HisStatus.SUCCESS);
+                        }
+                    }
+
+                    for (VendorContentTask vct : failVctList) {
+                        if (waitContentItemMap.containsKey(vct.getItemId())) {
+                            waitContentItemMap.get(vct.getItemId()).setMessage("任务执行失败");
+                            waitContentItemMap.get(vct.getItemId()).setUpdateTime(new Date());
+                            waitContentItemMap.get(vct.getItemId()).setStatus(HisStatus.FAIL);
+                        }
+                    }
+                    List<ContentItem> toSaveContentItemList = new ArrayList<>();
+
+                    toSaveContentItemList.addAll(waitContentItemMap.values());
+                    if (taskMsg.getRetryNum() > limitRetry || taskMsg.getRoundRobinNum() > robinNum || taskMsg.getHisVersion() == -1) {
+                        for (ContentItem saveCI : toSaveContentItemList) {
+                            if (saveCI.getStatus().equals(HisStatus.WAIT)) {
+                                saveCI.setMessage("任务执行失败");
+                                saveCI.setUpdateTime(new Date());
+                                saveCI.setStatus(HisStatus.FAIL);
+                            }
+                        }
+                    }
+                    dateBaseService.getContentItemRepository().saveAll(toSaveContentItemList);
+                }
+
                 for(ContentHistory ch: contentHistorys){
                     if(ch.getStatus().equals(HisStatus.SUCCESS)|| ch.getStatus().equals(HisStatus.FAIL)){
                         continue;
@@ -1057,54 +1663,53 @@ public class ContentServiceImpl implements ContentService {
                         continue;
                     }
 
-                    log.debug("SuccessTaskNum:[{}], AllTaskNum:[{}]",ch.getSuccessTaskNum(), ch.getAllTaskNum());
-                    if(ch.getSuccessTaskNum() >= ch.getAllTaskNum()){
-                        List<VendorContentTask> vcts = dateBaseService.getVendorTaskRepository().findByRequestId(ch.getRequestId());
-                        log.info("vcts:[{}]",vcts.size());
-                        if(vcts.size()>0){
-                            boolean flag = true;
-                            for(VendorContentTask vct :vcts){
-                                if(!vct.getStatus().equals(TaskStatus.SUCCESS)){
-                                    flag = false;
-                                    break;
-                                }
-                            }
+                    List<VendorContentTask> oneVendorContentTasks = allVendorContentTaskMap.get(ch.getRequestId());
+                    succVctList.clear();
+                    failVctList.clear();
+                    waitVctList.clear();
 
-                            if(flag){
+                    if(oneVendorContentTasks.size() >0) {
+                        for (VendorContentTask vct : oneVendorContentTasks) {
+                            if (vct.getStatus().equals(TaskStatus.SUCCESS)) {
+                                succVctList.add(vct);
+                            } else if (vct.getStatus().equals(TaskStatus.FAIL)) {
+                                failVctList.add(vct);
+                            } else {
+                                waitVctList.add(vct);
+                            }
+                        }
+
+                        if (waitVctList.size() == 0) {
+
+                            if (succVctList.size() == oneVendorContentTasks.size()) {
                                 ch.setMessage("任务执行成功");
                                 ch.setUpdateTime(new Date());
                                 ch.setStatus(HisStatus.SUCCESS);
                                 toSaveList.add(ch);
-                                continue;
-                            }
-                        }
-                    }
-
-                    if(taskMsg.getRetryNum() > limitRetry || taskMsg.getRoundRobinNum() > robinNum  ){//最后一次遍历所有厂商任务，确保的确失败了
-                        List<VendorContentTask> vcts = dateBaseService.getVendorTaskRepository().findByRequestId(ch.getRequestId());
-                        if(vcts.size()>0){
-                            boolean flag = true;
-                            for(VendorContentTask vct :vcts){
-                                if(!vct.getStatus().equals(TaskStatus.SUCCESS)){
-                                    flag = false;
-                                    break;
-                                }
-                            }
-                            if(flag){
-                                ch.setMessage("任务执行成功");
+                            } else {
+                                ch.setMessage("任务执行失败");
                                 ch.setUpdateTime(new Date());
-                                ch.setStatus(HisStatus.SUCCESS);
+                                ch.setStatus(HisStatus.FAIL);
                                 toSaveList.add(ch);
-                                continue;
+                            }
+                            continue;
+                        } else {
+                            if (taskMsg.getRetryNum() > limitRetry || taskMsg.getRoundRobinNum() > robinNum || taskMsg.getHisVersion() == -1) {
+                                ch.setMessage("任务执行失败");
+                                ch.setUpdateTime(new Date());
+                                ch.setStatus(HisStatus.FAIL);
+                                toSaveList.add(ch);
+                            } else {
+                                toSendList.add(idsVersionMap.get(ch.getRequestId()));
                             }
                         }
+                    }else{
                         ch.setMessage("任务执行失败");
                         ch.setUpdateTime(new Date());
                         ch.setStatus(HisStatus.FAIL);
                         toSaveList.add(ch);
-                    }else {
-                        toSendList.add(idsVersionMap.get(ch.getRequestId()));
                     }
+
 
                 }
 
@@ -1409,7 +2014,7 @@ public class ContentServiceImpl implements ContentService {
     }
 
 
-    public Map<String, List<String>> getDomainVendorsMapNew(List<String> contents) throws Exception{
+    public Map<String, List<String>> getVendorUrlsMap(List<String> contents) throws Exception{
         Map<String, List<String>> domainUrlsMap = new HashMap<String, List<String>>();
         URL domainUrl = null;
         Boolean flag = true;
@@ -1556,6 +2161,141 @@ public class ContentServiceImpl implements ContentService {
     }
 
 
+    public Map<String, List<String>> getDomainVendorsMap(List<String> contents) throws Exception{
+        Map<String, List<String>> domainUrlsMap = new HashMap<String, List<String>>();
+        URL domainUrl = null;
+        Boolean flag = true;
+        try {
+            for (String url : contents) {
+                domainUrl = new URL(url);
+                String host = domainUrl.getHost();
+                List<String> domainUrls = domainUrlsMap.get(host);
+                if (domainUrls == null) {
+                    domainUrls = new ArrayList<String>();
+                }
+                domainUrls.add(url);
+                domainUrlsMap.put(host, domainUrls);
+            }
+        }catch (Exception e) {
+            log.error("parse url failed, err:{}", e.getMessage());
+            throw RestfulException.builder().code(ErrEnum.ErrInternal.getCode()).message(e.getMessage()).build();
+        }
+
+        List<String> allDomains = new ArrayList<String>(domainUrlsMap.keySet());
+        Map<String, List<String>> existDomainsMap = new HashMap<>();
+        List<String> lostDomains = new ArrayList<String>();
+
+        for(String s:allDomains){
+            if(!urlVendorMap.containsKey(s) || urlVendorMap.get(s) == null){
+                lostDomains.add(s);
+            }else{
+                existDomainsMap.put(s, urlVendorMap.get(s));
+            }
+        }
+
+        if(lostDomains.size()>0) {
+            // 获取域名信息
+            log.debug("domains:{}", Utils.objectToString(lostDomains));
+            List<Domain> domainInfos = dateBaseService.getDomainRepository().findAllByDomainInAndStatusNot(lostDomains, "DELETE");
+            if (domainInfos.size() != lostDomains.size()) {
+                log.error("cannot find all domains info from db");
+                flag = false;
+            }
+            // 获取域名所在的厂商
+            Set<String> lineIds = new HashSet<String>();
+            domainInfos.forEach(d -> {
+                if (!StringUtils.isEmpty(d.getLineId())) {
+                    lineIds.add(d.getLineId());
+                } else {
+                    //List<String> expectedVendor = getExpectedBaseLine(d.getExpectedVendor());
+                    //lineIds.addAll(expectedVendor);
+                    lineIds.addAll(d.getExpectedBaseLine());
+                }
+            });
+            if(lineIds.size() == 0){
+                log.error("无法获取线路");
+                return null;
+            }
+            List<LineVendor> vendors = dateBaseService.getLineToVendorRepository().findByLineIdList(new ArrayList<String>(lineIds));
+            Map<String, LineVendor> lineIdLineVendorMap = vendors.stream().collect(Collectors.toMap(i -> i.getLineId(), i -> i));
+            Map<String, List<String>> lineIdVendorMap = new HashMap<String, List<String>>();
+            for (LineVendor lv : vendors) {
+                lineIdVendorMap.put(lv.getLineId(), JSONArray.parseArray(lv.getVendors(), String.class));
+            }
+            if (vendors.size() != lineIds.size()) {
+                List<String> lostLineVendor = new ArrayList<>();
+                for (String s : lineIds) {
+                    if (!lineIdLineVendorMap.containsKey(s)) {
+                        lostLineVendor.add(s);
+                    }
+                }
+                if (lostLineVendor.size() > 0) {
+                    List<LineResponse.LineDetail> lineInfos = this.lineService.getLineByIds(new ArrayList<String>(lostLineVendor), true);
+                    if (lineInfos.size() != lostLineVendor.size()) {
+                        log.error("获取Line数量不全");
+                        flag = false;
+                    }
+                    for (LineResponse.LineDetail l : lineInfos) {
+                        List<String> lineVendors = new ArrayList<String>();
+
+                        if (l.getType().equals(LineResponse.LineType.base.name())) {
+                            lineVendors.add(l.getVendor());
+                        } else {
+                            if (l.getBaseLines() != null) {
+                                for (String baselineId : l.getBaseLines().keySet()) {
+                                    lineVendors.add(l.getBaseLines().get(baselineId).getVendor());
+                                }
+                            }
+                        }
+                        if (lineVendors.size() > 0) {//不为空时才入库
+                            lineIdVendorMap.put(l.getId(), lineVendors);
+                            LineVendor LineVendorAdd = new LineVendor();
+                            LineVendorAdd.setLineId(l.getId());
+                            LineVendorAdd.setVendors(JSONObject.toJSONString(lineVendors));
+                            dateBaseService.getLineToVendorRepository().save(LineVendorAdd);
+                        } else {
+                            log.error("厂商数量为空");
+                            flag = false;
+                        }
+                    }
+                }
+            }
+
+            if (!flag) {
+                log.error("获取厂商不全");
+                return null;
+            }
+
+            // domain: [vendor]
+            Map<String, Set<String>> domainVendorsMap = new HashMap<String, Set<String>>();
+            domainInfos.forEach(d -> {
+                Set<String> domainVendors = domainVendorsMap.get(d);
+                if (domainVendors == null) {
+                    domainVendors = new HashSet<String>();
+                }
+                if (!StringUtils.isEmpty(d.getLineId())) {
+                    domainVendors.addAll(lineIdVendorMap.get(d.getLineId()));
+                } else {
+                    for (String l : d.getExpectedBaseLine()) {
+                        domainVendors.addAll(lineIdVendorMap.get(l));
+                    }
+                }
+                domainVendorsMap.put(d.getDomain(), domainVendors);
+                urlVendorMap.putIfAbsent(d.getDomain(), new ArrayList<>(domainVendors));
+                existDomainsMap.put(d.getDomain(), new ArrayList<>(domainVendors));
+            });
+            log.info("domain-vendors:{}", Utils.objectToString(domainVendorsMap));
+        }
+
+
+        if(existDomainsMap.size()>0){
+            return existDomainsMap;
+        }else{
+            return null;
+        }
+    }
+
+
 
 
     public List<String> getExpectedBaseLine(String expectedVendor) {
@@ -1673,62 +2413,35 @@ public class ContentServiceImpl implements ContentService {
 
         String requestId = contentHistory.getRequestId();
         List<String> urls = JSONArray.parseArray(contentHistory.getContent(), String.class);
-        Map<String, List<String>> lostUrlsMap = new HashMap<>();
-        Map<String, List<String>> vendorUrlMap;
         RefreshType type = contentHistory.getType();
-        vendorUrlMap = getDomainVendorsMapNew(urls);
-        if (vendorUrlMap == null) {
-            log.error("获取厂商失败");
-            throw new Exception("获取厂商失败");
+        boolean isSplit = false;
+        List<ContentItem> contentItemList = null;
+        if(StringUtils.isNotBlank(contentHistory.getIsSplit()) && contentHistory.getIsSplit().equals(String.valueOf(true))){
+            isSplit = true;
+            contentItemList = dateBaseService.getContentItemRepository().findByRequestId(requestId);
+            if(contentItemList.size() == 0){
+                log.error("ContentItem任务不存在,丢弃消息");
+                throw new Exception("ContentItem任务不存在");
+            }
         }
-        log.debug("获取厂商成功");
 
-
-        Map<String, String> vendorTaskId = new HashMap<>();
-        Map<String, VendorContentTask> toSaveVendorTaskMap = new HashMap<>();
-
-        contentHistory.setVersion(contentHistory.getVersion() + 1);
-        if (version == 0) {//区别新请求与重试
-            log.debug("saveVendorTask当前为首次请求，存入全部数据");
-            lostUrlsMap.putAll(vendorUrlMap);
-            for (String v : lostUrlsMap.keySet()) {
-                if (!vendorTaskId.containsKey(v) || StringUtils.isBlank(vendorTaskId.get(v))) {
-                    String mergeId = UUID.randomUUID().toString().replaceAll("-", "");
-                    vendorTaskId.put(v, mergeId);
-                }
-                if (!toSaveVendorTaskMap.containsKey(v) || toSaveVendorTaskMap.get(v) == null) {
-                    String taskId = UUID.randomUUID().toString().replaceAll("-", "");
-                    VendorContentTask vendorTask = new VendorContentTask();
-                    vendorTask.setTaskId(taskId);
-                    vendorTask.setRequestId(requestId);
-                    vendorTask.setVendor(v);
-                    vendorTask.setMergeId(vendorTaskId.get(v));
-                    vendorTask.setVersion(contentHistory.getVersion());
-                    vendorTask.setType(contentHistory.getType());
-                    vendorTask.setContent(JSON.toJSONString(vendorUrlMap.get(v)));
-                    vendorTask.setContentNumber(vendorUrlMap.get(v).size());
-                    vendorTask.setHistoryCreateTime(contentHistory.getCreateTime());
-                    vendorTask.setCreateTime(new Date());
-                    vendorTask.setStatus(TaskStatus.WAIT);
-                    toSaveVendorTaskMap.put(v, vendorTask);
-                }
+        List<VendorContentTask> resultVendorContentTaskList = new ArrayList<>();
+        if(!isSplit) {
+            Map<String, List<String>> vendorUrlMap;
+            Map<String, List<String>> lostUrlsMap = new HashMap<>();
+            vendorUrlMap = getVendorUrlsMap(urls);
+            if (vendorUrlMap == null) {
+                log.error("获取厂商失败");
+                throw new Exception("获取厂商失败");
             }
-        } else {
-            log.debug("saveVendorTask当前非首次请求，对比数据");
-            int totalTaskSize = 0;
-            int existTaskSize = 0;
+            log.debug("获取厂商成功");
 
-            List<VendorContentTask> existVendorTaskAll = dateBaseService.getVendorTaskRepository().findByRequestId(requestId);
-            for (String s : vendorUrlMap.keySet()) {
-                totalTaskSize += vendorUrlMap.get(s).size();
-            }
-            log.debug("需要生成厂商任务数量:[{}]", totalTaskSize);
-            for (VendorContentTask vc : existVendorTaskAll) {
-                List<String> us = JSONArray.parseArray(vc.getContent(), String.class);
-                existTaskSize += us.size();
-            }
-            if (existTaskSize == 0) {
-                log.debug("缺失全部子任务");
+
+            Map<String, String> vendorTaskId = new HashMap<>();
+            Map<String, VendorContentTask> toSaveVendorTaskMap = new HashMap<>();
+            contentHistory.setVersion(contentHistory.getVersion() + 1);
+            if (version == 0) {//区别新请求与重试
+                log.debug("saveVendorTask当前为首次请求，存入全部数据");
                 lostUrlsMap.putAll(vendorUrlMap);
                 for (String v : lostUrlsMap.keySet()) {
                     if (!vendorTaskId.containsKey(v) || StringUtils.isBlank(vendorTaskId.get(v))) {
@@ -1750,60 +2463,168 @@ public class ContentServiceImpl implements ContentService {
                         vendorTask.setCreateTime(new Date());
                         vendorTask.setStatus(TaskStatus.WAIT);
                         toSaveVendorTaskMap.put(v, vendorTask);
-                    }
-                }
-
-            } else if (existTaskSize == totalTaskSize) {
-                log.debug("子任务不缺失，只重试失败的任务");
-                for (VendorContentTask vct : existVendorTaskAll) {
-                    if (!vct.getStatus().equals(TaskStatus.SUCCESS)) {
-                        if (!vendorTaskId.containsKey(vct.getVendor()) || StringUtils.isBlank(vendorTaskId.get(vct.getVendor()))) {
-                            String mergeId = UUID.randomUUID().toString().replaceAll("-", "");
-                            vendorTaskId.put(vct.getVendor(), mergeId);
-                        }
-                        if (!toSaveVendorTaskMap.containsKey(vct.getVendor()) || toSaveVendorTaskMap.get(vct.getVendor()) == null) {
-                            vct.setStatus(TaskStatus.WAIT);
-                            vct.setVersion(contentHistory.getVersion());
-                            vct.setUpdateTime(new Date());
-                            vct.setMergeId(vendorTaskId.get(vct.getVendor()));
-                            toSaveVendorTaskMap.put(vct.getVendor(), vct);
-                        }
                     }
                 }
             } else {
-                log.debug("子任务数量异常，清理后重新入库");
-                clearVendorTask(requestId);
-                lostUrlsMap.putAll(vendorUrlMap);
-                for (String v : lostUrlsMap.keySet()) {
-                    if (!vendorTaskId.containsKey(v) || StringUtils.isBlank(vendorTaskId.get(v))) {
-                        String mergeId = UUID.randomUUID().toString().replaceAll("-", "");
-                        vendorTaskId.put(v, mergeId);
+                log.debug("saveVendorTask当前非首次请求，对比数据");
+                int totalTaskSize = 0;
+                int existTaskSize = 0;
+
+                List<VendorContentTask> existVendorTaskAll = dateBaseService.getVendorTaskRepository().findByRequestId(requestId);
+                for (String s : vendorUrlMap.keySet()) {
+                    totalTaskSize += vendorUrlMap.get(s).size();
+                }
+                log.debug("需要生成厂商任务数量:[{}]", totalTaskSize);
+                for (VendorContentTask vc : existVendorTaskAll) {
+                    List<String> us = JSONArray.parseArray(vc.getContent(), String.class);
+                    existTaskSize += us.size();
+                }
+                if (existTaskSize == 0) {
+                    log.debug("缺失全部子任务");
+                    lostUrlsMap.putAll(vendorUrlMap);
+                    for (String v : lostUrlsMap.keySet()) {
+                        if (!vendorTaskId.containsKey(v) || StringUtils.isBlank(vendorTaskId.get(v))) {
+                            String mergeId = UUID.randomUUID().toString().replaceAll("-", "");
+                            vendorTaskId.put(v, mergeId);
+                        }
+                        if (!toSaveVendorTaskMap.containsKey(v) || toSaveVendorTaskMap.get(v) == null) {
+                            String taskId = UUID.randomUUID().toString().replaceAll("-", "");
+                            VendorContentTask vendorTask = new VendorContentTask();
+                            vendorTask.setTaskId(taskId);
+                            vendorTask.setRequestId(requestId);
+                            vendorTask.setVendor(v);
+                            vendorTask.setMergeId(vendorTaskId.get(v));
+                            vendorTask.setVersion(contentHistory.getVersion());
+                            vendorTask.setType(contentHistory.getType());
+                            vendorTask.setContent(JSON.toJSONString(vendorUrlMap.get(v)));
+                            vendorTask.setContentNumber(vendorUrlMap.get(v).size());
+                            vendorTask.setHistoryCreateTime(contentHistory.getCreateTime());
+                            vendorTask.setCreateTime(new Date());
+                            vendorTask.setStatus(TaskStatus.WAIT);
+                            toSaveVendorTaskMap.put(v, vendorTask);
+                        }
                     }
-                    if (!toSaveVendorTaskMap.containsKey(v) || toSaveVendorTaskMap.get(v) == null) {
-                        String taskId = UUID.randomUUID().toString().replaceAll("-", "");
-                        VendorContentTask vendorTask = new VendorContentTask();
-                        vendorTask.setTaskId(taskId);
-                        vendorTask.setRequestId(requestId);
-                        vendorTask.setVendor(v);
-                        vendorTask.setMergeId(vendorTaskId.get(v));
-                        vendorTask.setVersion(contentHistory.getVersion());
-                        vendorTask.setType(contentHistory.getType());
-                        vendorTask.setContent(JSON.toJSONString(vendorUrlMap.get(v)));
-                        vendorTask.setContentNumber(vendorUrlMap.get(v).size());
-                        vendorTask.setHistoryCreateTime(contentHistory.getCreateTime());
-                        vendorTask.setCreateTime(new Date());
-                        vendorTask.setStatus(TaskStatus.WAIT);
-                        toSaveVendorTaskMap.put(v, vendorTask);
+
+                } else if (existTaskSize == totalTaskSize) {
+                    log.debug("子任务不缺失，只重试失败的任务");
+                    for (VendorContentTask vct : existVendorTaskAll) {
+                        if (!vct.getStatus().equals(TaskStatus.SUCCESS)) {
+                            if (!vendorTaskId.containsKey(vct.getVendor()) || StringUtils.isBlank(vendorTaskId.get(vct.getVendor()))) {
+                                String mergeId = UUID.randomUUID().toString().replaceAll("-", "");
+                                vendorTaskId.put(vct.getVendor(), mergeId);
+                            }
+                            if (!toSaveVendorTaskMap.containsKey(vct.getVendor()) || toSaveVendorTaskMap.get(vct.getVendor()) == null) {
+                                vct.setStatus(TaskStatus.WAIT);
+                                vct.setVersion(contentHistory.getVersion());
+                                vct.setUpdateTime(new Date());
+                                vct.setMergeId(vendorTaskId.get(vct.getVendor()));
+                                toSaveVendorTaskMap.put(vct.getVendor(), vct);
+                            }
+                        }
+                    }
+                } else {
+                    log.debug("子任务数量异常，清理后重新入库");
+                    clearVendorTask(requestId);
+                    lostUrlsMap.putAll(vendorUrlMap);
+                    for (String v : lostUrlsMap.keySet()) {
+                        if (!vendorTaskId.containsKey(v) || StringUtils.isBlank(vendorTaskId.get(v))) {
+                            String mergeId = UUID.randomUUID().toString().replaceAll("-", "");
+                            vendorTaskId.put(v, mergeId);
+                        }
+                        if (!toSaveVendorTaskMap.containsKey(v) || toSaveVendorTaskMap.get(v) == null) {
+                            String taskId = UUID.randomUUID().toString().replaceAll("-", "");
+                            VendorContentTask vendorTask = new VendorContentTask();
+                            vendorTask.setTaskId(taskId);
+                            vendorTask.setRequestId(requestId);
+                            vendorTask.setVendor(v);
+                            vendorTask.setMergeId(vendorTaskId.get(v));
+                            vendorTask.setVersion(contentHistory.getVersion());
+                            vendorTask.setType(contentHistory.getType());
+                            vendorTask.setContent(JSON.toJSONString(vendorUrlMap.get(v)));
+                            vendorTask.setContentNumber(vendorUrlMap.get(v).size());
+                            vendorTask.setHistoryCreateTime(contentHistory.getCreateTime());
+                            vendorTask.setCreateTime(new Date());
+                            vendorTask.setStatus(TaskStatus.WAIT);
+                            toSaveVendorTaskMap.put(v, vendorTask);
+                        }
                     }
                 }
+            }
+            if(toSaveVendorTaskMap != null ) {
+                resultVendorContentTaskList.addAll(new ArrayList<>(toSaveVendorTaskMap.values()));
+            }
+
+        }else{
+            Map<String, List<String>> domainVendorsMap;
+            domainVendorsMap = getDomainVendorsMap(urls);
+            if (domainVendorsMap == null) {
+                log.error("获取厂商失败");
+                throw new Exception("获取厂商失败");
+            }
+
+            Map<String, VendorContentTask> vendorContentTaskMap = new HashMap<>();
+            List<VendorContentTask> vendorContentTaskList = dateBaseService.getVendorTaskRepository().findByRequestId(requestId);
+            for(VendorContentTask vct: vendorContentTaskList){
+                vendorContentTaskMap.put(vct.getItemId()+vct.getVendor(),vct);
+            }
+
+            List<VendorContentTask> toSaveTask = new ArrayList<>();
+            List<TaskMsg> toSendMsg = new ArrayList<>();
+            for(ContentItem ci: contentItemList){
+                int succ = 0;
+                int all = 0;
+                List<String> vendors = domainVendorsMap.get(ci.getDomainName());
+                if(vendors != null){
+                    all = vendors.size();
+                    for(String v:vendors ){
+                        String getK = ci.getItemId()+v;
+                        if(vendorContentTaskMap.containsKey(getK)){
+                            if(vendorContentTaskMap.get(getK).getStatus().equals(HisStatus.SUCCESS)){
+                                succ++;
+                            }else {
+                                String taskId = UUID.randomUUID().toString().replaceAll("-", "");
+                                vendorContentTaskMap.get(getK).setVersion(ci.getVersion());
+                                vendorContentTaskMap.get(getK).setUpdateTime(new Date());
+                                vendorContentTaskMap.get(getK).setMergeId(taskId);
+                                vendorContentTaskMap.get(getK).setStatus(TaskStatus.WAIT);
+                                toSaveTask.add(vendorContentTaskMap.get(getK));
+                            }
+                        }else{
+                            VendorContentTask vendorTask = new VendorContentTask();
+                            String taskId = UUID.randomUUID().toString().replaceAll("-", "");
+                            vendorTask.setTaskId(taskId);
+                            vendorTask.setItemId(ci.getItemId());
+                            vendorTask.setRequestId(requestId);
+                            vendorTask.setVendor(v);
+                            vendorTask.setMergeId(taskId);
+                            vendorTask.setVersion(contentHistory.getVersion());
+                            vendorTask.setType(contentHistory.getType());
+                            vendorTask.setContent(ci.getUrl());
+                            vendorTask.setContentNumber(1);
+                            vendorTask.setHistoryCreateTime(contentHistory.getCreateTime());
+                            vendorTask.setCreateTime(new Date());
+                            vendorTask.setStatus(TaskStatus.WAIT);
+                            toSaveTask.add(vendorTask);
+                        }
+                    }
+                }
+                ci.setAllTaskNum(all);
+                ci.setSuccessTaskNum(succ);
+                ci.setUpdateTime(new Date());
+            }
+            if(contentItemList.size() > 0) {
+                dateBaseService.getContentItemRepository().saveAll(contentItemList);
+            }
+            if(toSaveTask.size() > 0) {
+                resultVendorContentTaskList.addAll(toSaveTask);
             }
         }
 
         RequestMergeItem requestMergeItem = new RequestMergeItem();
 
-        if(toSaveVendorTaskMap != null ) {
+        if(resultVendorContentTaskList.size() > 0 ) {
             requestMergeItem.setRequestId(requestId);
-            requestMergeItem.setVendorContentTaskList(new ArrayList<>(toSaveVendorTaskMap.values()));
+            requestMergeItem.setVendorContentTaskList(resultVendorContentTaskList);
             return requestMergeItem;
         }else{
             throw new Exception("数据异常");

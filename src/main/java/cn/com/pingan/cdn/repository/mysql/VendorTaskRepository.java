@@ -34,8 +34,9 @@ public interface VendorTaskRepository extends MyJpaRepository<VendorContentTask,
     @Query(value = "update vendor_task t set t.status = ?2, t.update_time=current_timestamp where t.task_id =?1", nativeQuery = true)
     int updateStatus(String id, TaskStatus status);
 
-
     List<VendorContentTask> findByRequestId(String requestId);
+
+    List<VendorContentTask> findByRequestIdIn(List<String> requestIds);
 
     List<VendorContentTask> findByRequestIdAndVersion(String requestId, int version);
 

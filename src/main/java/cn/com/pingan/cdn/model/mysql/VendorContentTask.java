@@ -90,6 +90,9 @@ public class VendorContentTask {
     @Column(length=128, name="request_id", nullable = false)
     private String requestId;
 
+    @Column(length=128, name="item_id", nullable = false)
+    private String itemId;
+
     @Column(length=128, name="merge_id")
     private String mergeId;
 }

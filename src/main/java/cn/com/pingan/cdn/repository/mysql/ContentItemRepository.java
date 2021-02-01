@@ -49,6 +49,12 @@ public interface ContentItemRepository extends JpaRepository<ContentItem, Long>,
 
     List<ContentItem> findByRequestId(String requestId);
 
+    List<ContentItem> findByRequestIdAndStatus(String requestId, String status);
+
+    List<ContentItem> findByRequestIdInAndStatus(List<String> requestIds, String status);
+
+    List<ContentItem> findByRequestIdAndStatusNot(String requestId, String status);
+
     List<ContentItem> findByRequestIdIn(List<String> requestIds);
 
 

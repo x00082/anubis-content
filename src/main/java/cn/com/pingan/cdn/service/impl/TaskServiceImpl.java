@@ -259,41 +259,15 @@ public class TaskServiceImpl implements TaskService {
             log.error("handlerNewRequestUrl Exception:{}",e);
             msg.setRetryNum(msg.getRetryNum() + 1);
             if(msg.getRetryNum() > timeOutLimit){
-                Map<String, Integer> failMap = new HashMap<>();
-                Map<String, Integer> versionMap = new HashMap<>();
                 log.error("[{}]handlerNewRequestUrl超过最大重试限制[{}]", taskId, timeOutLimit);
                 List<VendorContentTask> vendorContentTaskList = dateBaseService.getVendorTaskRepository().findByMergeId(taskId);
                 for(VendorContentTask v :vendorContentTaskList){
-                    if(!failMap.containsKey(v.getRequestId())){
-                        failMap.put(v.getRequestId(), 1);
-                    }
-                    if(!versionMap.containsKey(v.getRequestId())){
-                        versionMap.put(v.getRequestId(), v.getVersion());
-                    }
                     v.setMessage("请求厂商失败");
                     v.setStatus(TaskStatus.FAIL);
                     v.setUpdateTime(new Date());
                 }
                 dateBaseService.getVendorTaskRepository().saveAll(vendorContentTaskList);
 
-                if(failMap.keySet().size()>0) {
-                    log.info("请求厂商失败[{}]", failMap);
-                    List<RobinCallBack> failList = new ArrayList<>();
-                    for (String id : failMap.keySet()) {
-                        log.debug("fail -> request id[{}], version[{}]", id, versionMap.get(id));
-                        //dateBaseService.getContentHistoryRepository().updateStatusAndMessageByRequestIdAndVersion(id, HisStatus.FAIL.name(), "任务执行失败", versionMap.get(id));
-                        RobinCallBack rcb = new RobinCallBack();
-                        rcb.setRequestId(id);
-                        rcb.setNum(1);
-                        rcb.setVersion(versionMap.get(id));
-                        failList.add(rcb);
-                    }
-                    TaskMsg failMsg = new TaskMsg();
-                    failMsg.setOperation(TaskOperationEnum.content_vendor_fail);
-                    failMsg.setRobinCallBackList(failList);
-                    producer.sendTaskMsg(failMsg);
-                    log.debug("send fail msg done");
-                }
                 return false;
             }else{
                 msg.setDelay(timeOutMs);
@@ -316,41 +290,15 @@ public class TaskServiceImpl implements TaskService {
             log.error("handlerNewRequestDir Exception:{}",e);
             msg.setRetryNum(msg.getRetryNum() + 1);
             if(msg.getRetryNum() > timeOutLimit){
-                Map<String, Integer> failMap = new HashMap<>();
-                Map<String, Integer> versionMap = new HashMap<>();
                 log.error("[{}]handlerNewRequestDir超过最大重试限制[{}]", taskId, timeOutLimit);
                 List<VendorContentTask> vendorContentTaskList = dateBaseService.getVendorTaskRepository().findByMergeId(taskId);
                 for(VendorContentTask v :vendorContentTaskList){
-                    if(!failMap.containsKey(v.getRequestId())){
-                        failMap.put(v.getRequestId(), 1);
-                    }
-                    if(!versionMap.containsKey(v.getRequestId())){
-                        versionMap.put(v.getRequestId(), v.getVersion());
-                    }
+
                     v.setMessage("请求厂商失败");
                     v.setStatus(TaskStatus.FAIL);
                     v.setUpdateTime(new Date());
                 }
                 dateBaseService.getVendorTaskRepository().saveAll(vendorContentTaskList);
-
-                if(failMap.keySet().size()>0) {
-                    log.info("请求厂商失败[{}]", failMap);
-                    List<RobinCallBack> failList = new ArrayList<>();
-                    for (String id : failMap.keySet()) {
-                        log.debug("fail -> request id[{}], version[{}]", id, versionMap.get(id));
-                        //dateBaseService.getContentHistoryRepository().updateStatusAndMessageByRequestIdAndVersion(id, HisStatus.FAIL.name(), "任务执行失败", versionMap.get(id));
-                        RobinCallBack rcb = new RobinCallBack();
-                        rcb.setRequestId(id);
-                        rcb.setNum(1);
-                        rcb.setVersion(versionMap.get(id));
-                        failList.add(rcb);
-                    }
-                    TaskMsg failMsg = new TaskMsg();
-                    failMsg.setOperation(TaskOperationEnum.content_vendor_fail);
-                    failMsg.setRobinCallBackList(failList);
-                    producer.sendTaskMsg(failMsg);
-                    log.debug("send fail msg done");
-                }
                 return false;
             }else{
                 msg.setDelay(timeOutMs);
@@ -373,42 +321,14 @@ public class TaskServiceImpl implements TaskService {
             log.error("handlerNewRequestPreload Exception:{}",e);
             msg.setRetryNum(msg.getRetryNum() + 1);
             if(msg.getRetryNum() > timeOutLimit){
-                Map<String, Integer> failMap = new HashMap<>();
-                Map<String, Integer> versionMap = new HashMap<>();
                 log.error("[{}]handlerNewRequestPreload超过最大重试限制[{}]", taskId, timeOutLimit);
                 List<VendorContentTask> vendorContentTaskList = dateBaseService.getVendorTaskRepository().findByMergeId(taskId);
                 for(VendorContentTask v :vendorContentTaskList){
-                    if(!failMap.containsKey(v.getRequestId())){
-                        failMap.put(v.getRequestId(), 1);
-                    }
-                    if(!versionMap.containsKey(v.getRequestId())){
-                        versionMap.put(v.getRequestId(), v.getVersion());
-                    }
                     v.setMessage("请求厂商失败");
                     v.setStatus(TaskStatus.FAIL);
                     v.setUpdateTime(new Date());
                 }
                 dateBaseService.getVendorTaskRepository().saveAll(vendorContentTaskList);
-
-                if(failMap.keySet().size()>0) {
-                    log.info("请求厂商失败[{}]", failMap);
-                    List<RobinCallBack> failList = new ArrayList<>();
-                    for (String id : failMap.keySet()) {
-                        log.debug("fail -> request id[{}], version[{}]", id, versionMap.get(id));
-                        //dateBaseService.getContentHistoryRepository().updateStatusAndMessageByRequestIdAndVersion(id, HisStatus.FAIL.name(), "任务执行失败", versionMap.get(id));
-                        RobinCallBack rcb = new RobinCallBack();
-                        rcb.setRequestId(id);
-                        rcb.setNum(1);
-                        rcb.setVersion(versionMap.get(id));
-                        failList.add(rcb);
-                    }
-                    TaskMsg failMsg = new TaskMsg();
-                    failMsg.setOperation(TaskOperationEnum.content_vendor_fail);
-                    failMsg.setRobinCallBackList(failList);
-                    producer.sendTaskMsg(failMsg);
-                    log.debug("send fail msg done");
-                }
-
                 return false;
             }else{
                 msg.setDelay(timeOutMs);
@@ -563,43 +483,6 @@ public class TaskServiceImpl implements TaskService {
                     }
                 }
 
-                if(successMap.keySet().size() >0){
-                    log.info("成功任务[{}]", successMap);
-                    List<RobinCallBack> succList = new ArrayList<>();
-                    for(String id: successMap.keySet()){
-                        log.debug("success -> request id[{}], succ[{}], version[{}]", id, successMap.get(id), versionMap.get(id));
-                        RobinCallBack rcb = new RobinCallBack();
-                        rcb.setRequestId(id);
-                        rcb.setNum(successMap.get(id));
-                        rcb.setVersion(versionMap.get(id));
-                        succList.add(rcb);
-                    }
-                    TaskMsg succMsg = new TaskMsg();
-                    succMsg.setOperation(TaskOperationEnum.content_vendor_success);
-                    succMsg.setRobinCallBackList(succList);
-                    producer.sendTaskMsg(succMsg);
-                    log.debug("send success msg done");
-                }
-
-                if(failMap.keySet().size()>0) {
-                    log.info("失败任务[{}]", failMap);
-                    List<RobinCallBack> failList = new ArrayList<>();
-                    for (String id : failMap.keySet()) {
-                        log.debug("fail -> request id[{}], version[{}]", id, versionMap.get(id));
-                        //dateBaseService.getContentHistoryRepository().updateStatusAndMessageByRequestIdAndVersion(id, HisStatus.FAIL.name(), "任务执行失败", versionMap.get(id));
-                        RobinCallBack rcb = new RobinCallBack();
-                        rcb.setRequestId(id);
-                        rcb.setNum(1);
-                        rcb.setVersion(versionMap.get(id));
-                        failList.add(rcb);
-                    }
-                    TaskMsg failMsg = new TaskMsg();
-                    failMsg.setOperation(TaskOperationEnum.content_vendor_fail);
-                    failMsg.setRobinCallBackList(failList);
-                    producer.sendTaskMsg(failMsg);
-                    log.debug("send fail msg done");
-                }
-
                 for(RefreshPreloadItem it: dto.getTaskList()){
                     log.debug("jobId[{}], ", it.getJobId());
                     if(responseMap !=null && responseMap.containsKey(it.getJobId()) && ( responseMap.get(it.getJobId()).equals(TaskStatus.SUCCESS) || responseMap.get(it.getJobId()).equals(TaskStatus.FAIL))){
@@ -632,40 +515,14 @@ public class TaskServiceImpl implements TaskService {
                 for(RefreshPreloadItem it:msg.getRobinTaskDto().getTaskList()){
                     ids.add(it.getJobId());
                 }
-                Map<String, Integer> failMap = new HashMap<>();
-                Map<String, Integer> versionMap = new HashMap<>();
                 List<VendorContentTask> vendorContentTaskList = dateBaseService.getVendorTaskRepository().findByJobIdIn(ids);
                 for(VendorContentTask v :vendorContentTaskList){
-                    if(!failMap.containsKey(v.getRequestId())){
-                        failMap.put(v.getRequestId(), 1);
-                    }
-                    if(!versionMap.containsKey(v.getRequestId())){
-                        failMap.put(v.getRequestId(), v.getVersion());
-                    }
                     v.setMessage("轮询失败");
                     v.setStatus(TaskStatus.FAIL);
                     v.setUpdateTime(new Date());
                 }
                 dateBaseService.getVendorTaskRepository().saveAll(vendorContentTaskList);
 
-                if(failMap.keySet().size()>0) {
-                    log.info("轮询失败[{}]", failMap);
-                    List<RobinCallBack> failList = new ArrayList<>();
-                    for (String id : failMap.keySet()) {
-                        log.debug("fail -> request id[{}], version[{}]", id, versionMap.get(id));
-                        //dateBaseService.getContentHistoryRepository().updateStatusAndMessageByRequestIdAndVersion(id, HisStatus.FAIL.name(), "任务执行失败", versionMap.get(id));
-                        RobinCallBack rcb = new RobinCallBack();
-                        rcb.setRequestId(id);
-                        rcb.setNum(1);
-                        rcb.setVersion(versionMap.get(id));
-                        failList.add(rcb);
-                    }
-                    TaskMsg failMsg = new TaskMsg();
-                    failMsg.setOperation(TaskOperationEnum.content_vendor_fail);
-                    failMsg.setRobinCallBackList(failList);
-                    producer.sendTaskMsg(failMsg);
-                    log.debug("send fail msg done");
-                }
                 return false;
             }else{
                 msg.setDelay(timeOutMs);
@@ -876,7 +733,11 @@ public class TaskServiceImpl implements TaskService {
         }
         for(VendorContentTask vct:vendorContentTaskList){
             if(vct.getContent() !=null && vct.getContentNumber()>0){
-                urls.addAll(JSONArray.parseArray(vct.getContent(), String.class));
+                if( -1 != vct.getContent().indexOf('[') && -1 != vct.getContent().indexOf(']')) {
+                    urls.addAll(JSONArray.parseArray(vct.getContent(), String.class));
+                }else{
+                    urls.add(vct.getContent());
+                }
             }
         }
         if(urls.size() == 0 ){
@@ -920,32 +781,24 @@ public class TaskServiceImpl implements TaskService {
                 }else{
                     jobId = response.getJSONObject("data") == null ? null : response.getJSONObject("data").getString("taskId");
                     if(StringUtils.isNoneBlank(jobId)) {
-                        if(responseAsync){
-                            msg.setJobId(jobId);
-                            msg.setTaskStatus(TaskStatus.PROCESSING);
-                            msg.setRetryNum(0);//状态改变，清空计数
-                            msg.setCallBack(CallBackEnum.request);
-                            msg.setOperation(TaskOperationEnum.getVendorOperationCommon(msg.getVendor()));
-                        }else{
-                            for (VendorContentTask vct : vendorContentTaskList) {
-                                vct.setJobId(jobId);
-                                vct.setStatus(TaskStatus.PROCESSING);
-                                vct.setMessage("请求厂商成功");
-                                vct.setUpdateTime(new Date());
-                            }
-                            log.debug("handlerCommon request update");
-                            dateBaseService.getVendorTaskRepository().saveAll(vendorContentTaskList);
-                            log.debug("handlerCommon request update done");
-
-                            RobinRecord robinRecord = new RobinRecord();
-                            robinRecord.setRecordId(UUID.randomUUID().toString().replaceAll("-", ""));
-                            robinRecord.setRobinId(jobId);
-                            robinRecord.setType(type);
-                            robinRecord.setVendor(msg.getVendor());
-                            dateBaseService.getRobinRecordRepository().save(robinRecord);
-                            log.info("记录待轮询[{}]", robinRecord);
-                            return false;
+                        for (VendorContentTask vct : vendorContentTaskList) {
+                            vct.setJobId(jobId);
+                            vct.setStatus(TaskStatus.PROCESSING);
+                            vct.setMessage("请求厂商成功");
+                            vct.setUpdateTime(new Date());
                         }
+                        log.debug("handlerCommon request update");
+                        dateBaseService.getVendorTaskRepository().saveAll(vendorContentTaskList);
+                        log.debug("handlerCommon request update done");
+
+                        RobinRecord robinRecord = new RobinRecord();
+                        robinRecord.setRecordId(UUID.randomUUID().toString().replaceAll("-", ""));
+                        robinRecord.setRobinId(jobId);
+                        robinRecord.setType(type);
+                        robinRecord.setVendor(msg.getVendor());
+                        dateBaseService.getRobinRecordRepository().save(robinRecord);
+                        log.info("记录待轮询[{}]", robinRecord);
+                        return false;
 
                     }else{
                         log.error("[{}]无效的jobId", msg.getVendor());
@@ -960,35 +813,11 @@ public class TaskServiceImpl implements TaskService {
                     Map<String, Integer> versionMap = new HashMap<>();
                     log.error("[{}]handlerNewRequestUrl超过最大重试限制[{}]", taskId, timeOutLimit);
                     for(VendorContentTask v :vendorContentTaskList){
-                        if(!failMap.containsKey(v.getRequestId())){
-                            failMap.put(v.getRequestId(), 1);
-                        }
-                        if(!versionMap.containsKey(v.getRequestId())){
-                            versionMap.put(v.getRequestId(), v.getVersion());
-                        }
                         v.setMessage(StringUtils.isNotBlank(message)?message:"请求厂商失败");
                         v.setStatus(TaskStatus.FAIL);
                         v.setUpdateTime(new Date());
                     }
                     dateBaseService.getVendorTaskRepository().saveAll(vendorContentTaskList);
-
-                    if(failMap.keySet().size()>0) {
-                        log.info("请求厂商失败[{}]", failMap);
-                        List<RobinCallBack> failList = new ArrayList<>();
-                        for (String id : failMap.keySet()) {
-                            log.debug("fail -> request id[{}], version[{}]", id, versionMap.get(id));
-                            RobinCallBack rcb = new RobinCallBack();
-                            rcb.setRequestId(id);
-                            rcb.setNum(1);
-                            rcb.setVersion(versionMap.get(id));
-                            failList.add(rcb);
-                        }
-                        TaskMsg failMsg = new TaskMsg();
-                        failMsg.setOperation(TaskOperationEnum.content_vendor_fail);
-                        failMsg.setRobinCallBackList(failList);
-                        producer.sendTaskMsg(failMsg);
-                        log.debug("send fail msg done");
-                    }
                     return false;
                 }else{
                     msg.setDelay(timeOutMs);

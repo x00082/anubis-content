@@ -5,6 +5,7 @@ import cn.com.pingan.cdn.common.*;
 import cn.com.pingan.cdn.config.RedisLuaScriptService;
 import cn.com.pingan.cdn.current.JxGaga;
 import cn.com.pingan.cdn.model.mysql.*;
+import cn.com.pingan.cdn.rabbitmq.constants.Constants;
 import cn.com.pingan.cdn.rabbitmq.message.FanoutMsg;
 import cn.com.pingan.cdn.rabbitmq.message.TaskMsg;
 import cn.com.pingan.cdn.rabbitmq.producer.Producer;

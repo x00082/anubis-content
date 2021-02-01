@@ -30,7 +30,10 @@ public class Constants {
     public static final String STATUS_FAIL = "FAIL";
 
     public static final String QPS_LIMIT = "QPSLIMITED";
-    
+
+    public static final long LASTMSG = 0L;
+    public static final long CURMSG = 100L;
+
     //
 
     public static final String CONTENT_FANOUT_EXCHANGE = "anubisContentFanoutExchange";

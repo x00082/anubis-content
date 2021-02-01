@@ -101,4 +101,6 @@ public class ContentHistory {
     @Column(name="is_admin", length=16, nullable = false)
     private String isAdmin;
 
+    @Column(columnDefinition="varchar(16) default 'false'", name="is_split")
+    private String isSplit;
 }
