@@ -2,8 +2,7 @@ package cn.com.pingan.cdn.rabbitmq.consumer;
 
 import cn.com.pingan.cdn.client.AnubisNotifyService;
 import cn.com.pingan.cdn.common.TaskOperationEnum;
-import cn.com.pingan.cdn.config.RedisLuaScriptService;
-import cn.com.pingan.cdn.model.mysql.VendorInfo;
+
 import cn.com.pingan.cdn.rabbitmq.config.RabbitListenerConfig;
 import cn.com.pingan.cdn.rabbitmq.constants.Constants;
 import cn.com.pingan.cdn.rabbitmq.message.TaskMsg;
@@ -38,9 +37,6 @@ public class VendorConsumer {
     public String[] vendorQueues() {
         return vendorQueues;
     }*/
-
-    @Autowired
-    RedisLuaScriptService luaScriptService;
 
     @Autowired
     TaskService taskService;

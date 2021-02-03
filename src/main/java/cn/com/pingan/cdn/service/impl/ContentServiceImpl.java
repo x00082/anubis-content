@@ -247,7 +247,7 @@ public class ContentServiceImpl implements ContentService {
                 contentItem.setRequestId(taskId);
                 contentItem.setUrl(dm);
                 contentItem.setDomainName(urlDomainSpMap.get(dm).getHost());
-                contentItem.setUserId(urlDomainSpMap.get(dm).getUserCode());
+                contentItem.setSpCode(urlDomainSpMap.get(dm).getUserCode());
                 contentItem.setCreateTime(now);
                 contentItem.setStatus(HisStatus.WAIT);
                 contentItem.setType(type);
@@ -493,8 +493,8 @@ public class ContentServiceImpl implements ContentService {
         }
     }
 
-
-    public void saveVendorTaskNew(TaskMsg taskMsg) throws ContentException {
+    @Override
+    public void saveVendorTask(TaskMsg taskMsg) throws ContentException {
         String requestId = taskMsg.getTaskId();
         boolean force = taskMsg.getForce();
         boolean isMerge = taskMsg.getIsMerge();
@@ -540,7 +540,7 @@ public class ContentServiceImpl implements ContentService {
                 }
 
                 List<String> urls = JSONArray.parseArray(contentHistory.getContent(), String.class);
-                if(!isSplit) {
+                if(!isSplit || !vendorRequestMerge) {
                     Map<String, List<String>> lostUrlsMap = new HashMap<>();
                     Map<String, List<String>> vendorUrlMap;
                     vendorUrlMap = getVendorUrlsMap(urls);
@@ -696,32 +696,19 @@ public class ContentServiceImpl implements ContentService {
                     dateBaseService.getContentHistoryRepository().save(contentHistory);
                     log.info("saveVendorTask设置请求任务[{}]状态为:[split_vendor_done]", requestId);
 
-                    List<MergeRecord> records = new ArrayList<>();
                     for (String v : vendorTaskId.keySet()) {
-                        if (!vendorRequestMerge || (toSaveVendorTaskMap.get(v).getContentNumber() >= 20 && toSaveVendorTaskMap.get(v).getContentNumber() <= 50)) {
-                            TaskMsg vendorTaskMsg = new TaskMsg();
-                            vendorTaskMsg.setTaskId(vendorTaskId.get(v));
-                            vendorTaskMsg.setOperation(TaskOperationEnum.getVendorOperation(v, contentHistory.getType()));
-                            vendorTaskMsg.setVendor(v);
-                            vendorTaskMsg.setVersion(0);
-                            vendorTaskMsg.setHisVersion(contentHistory.getVersion());
-                            //vendorTaskMsg.setIsMerge(true);
-                            vendorTaskMsg.setType(contentHistory.getType());
-                            vendorTaskMsg.setRetryNum(0);
-                            vendorTaskMsg.setSize(toSaveVendorTaskMap.get(v).getContentNumber());
-                            producer.sendTaskMsg(vendorTaskMsg);
-                            log.info("saveContentVendor发送Mq[{}]", v);
-                        } else {//TODO
-                            MergeRecord record = new MergeRecord();
-                            record.setRecordId(UUID.randomUUID().toString().replaceAll("-", ""));
-                            record.setMergeId(vendorTaskId.get(v));
-                            records.add(record);
-                            log.info("saveContentVendor记录合并record:[{}]", vendorTaskId.get(v));
-                        }
-                    }
-                    if (records.size() > 0) {
-                        dateBaseService.getMergeRecordRepository().saveAll(records);
-                        log.debug("记录合并[{}]", records.size());
+                        TaskMsg vendorTaskMsg = new TaskMsg();
+                        vendorTaskMsg.setTaskId(vendorTaskId.get(v));
+                        vendorTaskMsg.setOperation(TaskOperationEnum.getVendorOperation(v, contentHistory.getType()));
+                        vendorTaskMsg.setVendor(v);
+                        vendorTaskMsg.setVersion(0);
+                        vendorTaskMsg.setHisVersion(contentHistory.getVersion());
+                        //vendorTaskMsg.setIsMerge(true);
+                        vendorTaskMsg.setType(contentHistory.getType());
+                        vendorTaskMsg.setRetryNum(0);
+                        vendorTaskMsg.setSize(toSaveVendorTaskMap.get(v).getContentNumber());
+                        producer.sendTaskMsg(vendorTaskMsg);
+                        log.info("saveContentVendor发送Mq[{}]", v);
                     }
 
                 }else{
@@ -786,7 +773,8 @@ public class ContentServiceImpl implements ContentService {
                                     vendorTask.setMergeId(taskId);
                                     vendorTask.setVersion(contentHistory.getVersion());
                                     vendorTask.setType(contentHistory.getType());
-                                    vendorTask.setContent(ci.getUrl());
+                                    vendorTask.setContent("[\"" + ci.getUrl() + "\"]");
+                                    vendorTask.setUrl(ci.getUrl());
                                     vendorTask.setContentNumber(1);
                                     vendorTask.setHistoryCreateTime(contentHistory.getCreateTime());
                                     vendorTask.setCreateTime(new Date());
@@ -899,38 +887,26 @@ public class ContentServiceImpl implements ContentService {
                     }
 
                     List<TaskMsg> toSendTaskList = new ArrayList<>();
-                    List<MergeRecord> records = new ArrayList<>();
                     if (toSaveVendorContentTask.size() > 0) {
                         for (VendorContentTask vct : toSaveVendorContentTask) {
-                            if (!vendorRequestMerge || (vct.getContentNumber() >= 20 && vct.getContentNumber() <= 50)) {
-                                TaskMsg vendorTaskMsg = new TaskMsg();
-                                vendorTaskMsg.setTaskId(vct.getMergeId());
-                                vendorTaskMsg.setOperation(TaskOperationEnum.getVendorOperation(vct.getVendor(), vct.getType()));
-                                vendorTaskMsg.setVendor(vct.getVendor());
-                                vendorTaskMsg.setVersion(0);
-                                vendorTaskMsg.setHisVersion(allMap.get(vct.getRequestId()).getVersion());
-                                //vendorTaskMsg.setIsMerge(true);
-                                vendorTaskMsg.setType(vct.getType());
-                                vendorTaskMsg.setRetryNum(0);
-                                vendorTaskMsg.setSize(vct.getContentNumber());
-                                toSendTaskList.add(vendorTaskMsg);
-                            } else {
-                                MergeRecord record = new MergeRecord();
-                                record.setRecordId(UUID.randomUUID().toString().replaceAll("-", ""));
-                                record.setMergeId(vct.getMergeId());
-                                records.add(record);
-                                log.info("record:[{}]", vct.getMergeId());
-                            }
+                            TaskMsg vendorTaskMsg = new TaskMsg();
+                            vendorTaskMsg.setTaskId(vct.getMergeId());
+                            vendorTaskMsg.setOperation(TaskOperationEnum.getVendorOperation(vct.getVendor(), vct.getType()));
+                            vendorTaskMsg.setVendor(vct.getVendor());
+                            vendorTaskMsg.setVersion(0);
+                            vendorTaskMsg.setHisVersion(allMap.get(vct.getRequestId()).getVersion());
+                            //vendorTaskMsg.setIsMerge(true);
+                            vendorTaskMsg.setType(vct.getType());
+                            vendorTaskMsg.setRetryNum(0);
+                            vendorTaskMsg.setSize(vct.getContentNumber());
+                            toSendTaskList.add(vendorTaskMsg);
                         }
                     }
                     if (toSendTaskList.size() > 0) {
                         sendListMQ(toSendTaskList);
                         log.info("发送MQ[{}]", toSendTaskList.size());
                     }
-                    if (records.size() > 0) {
-                        dateBaseService.getMergeRecordRepository().saveAll(records);
-                        log.info("记录合并[{}]", records.size());
-                    }
+
 
                     if (historyRecords.size() > 0) {
                         dateBaseService.getHistoryRecordRepository().saveAll(historyRecords);
@@ -974,8 +950,8 @@ public class ContentServiceImpl implements ContentService {
 
 
 
-    @Override
-    public void saveVendorTask(TaskMsg taskMsg) throws ContentException {
+
+    public void saveVendorTaskOld(TaskMsg taskMsg) throws ContentException {
         String requestId = taskMsg.getTaskId();
         boolean force = taskMsg.getForce();
         boolean isMerge = taskMsg.getIsMerge();
@@ -1452,6 +1428,7 @@ public class ContentServiceImpl implements ContentService {
                 List<VendorContentTask> succVctList = new ArrayList<>();
                 List<VendorContentTask> failVctList = new ArrayList<>();
                 List<VendorContentTask> waitVctList = new ArrayList<>();
+                Map<String, HisStatus> requestStatusMap = new HashMap<>();
                 if(vcts.size()>0) {
                     for (VendorContentTask vct : vcts) {
                         if (vct.getStatus().equals(TaskStatus.SUCCESS)) {
@@ -1464,30 +1441,63 @@ public class ContentServiceImpl implements ContentService {
                     }
 
                     if(contentHistory.getIsSplit().equals(String.valueOf(true))){
-                        List<ContentItem> coits = dateBaseService.getContentItemRepository().findByRequestIdAndStatus(requestId, HisStatus.WAIT.name());
+
+                        List<ContentItem> coits = dateBaseService.getContentItemRepository().findByRequestIdAndStatus(requestId, HisStatus.WAIT);
                         Map<String, ContentItem> waitContentItemMap = new HashMap<>();
+                        List<ContentItem> toSaveContentItemList = new ArrayList<>();
 
                         for(ContentItem ci: coits){
                             waitContentItemMap.put(ci.getItemId(), ci);
                         }
                         for(VendorContentTask vct : succVctList){
-                            if(waitContentItemMap.containsKey(vct.getItemId())){
-                                waitContentItemMap.get(vct.getItemId()).setMessage("任务执行成功");
-                                waitContentItemMap.get(vct.getItemId()).setUpdateTime(new Date());
-                                waitContentItemMap.get(vct.getItemId()).setStatus(HisStatus.SUCCESS);
+                            if(StringUtils.isNotBlank(vct.getItemId())) {
+                                if (waitContentItemMap.containsKey(vct.getItemId())) {
+                                    waitContentItemMap.get(vct.getItemId()).setMessage("任务执行成功");
+                                    waitContentItemMap.get(vct.getItemId()).setUpdateTime(new Date());
+                                    waitContentItemMap.get(vct.getItemId()).setStatus(HisStatus.SUCCESS);
+                                }
+                            }else{
+                                requestStatusMap.put(vct.getRequestId(),HisStatus.SUCCESS);
+                            }
+                        }
+
+                        for(VendorContentTask vct : waitVctList){
+                            if(!StringUtils.isNotBlank(vct.getItemId()) && requestStatusMap.containsKey(vct.getRequestId())){
+                                requestStatusMap.put(vct.getRequestId(),HisStatus.WAIT);
                             }
                         }
 
                         for(VendorContentTask vct : failVctList){
-                            if(waitContentItemMap.containsKey(vct.getItemId())){
-                                waitContentItemMap.get(vct.getItemId()).setMessage("任务执行失败");
-                                waitContentItemMap.get(vct.getItemId()).setUpdateTime(new Date());
-                                waitContentItemMap.get(vct.getItemId()).setStatus(HisStatus.FAIL);
+                            if(StringUtils.isNotBlank(vct.getItemId())) {
+                                if (waitContentItemMap.containsKey(vct.getItemId())) {
+                                    waitContentItemMap.get(vct.getItemId()).setMessage("任务执行失败");
+                                    waitContentItemMap.get(vct.getItemId()).setUpdateTime(new Date());
+                                    waitContentItemMap.get(vct.getItemId()).setStatus(HisStatus.FAIL);
+                                }
+                            }else{
+                                requestStatusMap.put(vct.getRequestId(),HisStatus.FAIL);
                             }
                         }
-                        List<ContentItem> toSaveContentItemList = new ArrayList<>();
+                        if(waitContentItemMap.size() >0) {
+                            toSaveContentItemList.addAll(waitContentItemMap.values());
+                        }
 
-                        toSaveContentItemList.addAll(waitContentItemMap.values());
+                        if(requestStatusMap.keySet().size() >0) {
+                            for (ContentItem saveCI : toSaveContentItemList) {
+                                if (requestStatusMap.containsKey(saveCI.getRequestId())) {
+                                    if(requestStatusMap.get(saveCI.getRequestId()).equals(HisStatus.SUCCESS)){
+                                        saveCI.setMessage("任务执行成功");
+                                        saveCI.setUpdateTime(new Date());
+                                        saveCI.setStatus(HisStatus.SUCCESS);
+                                    }else if(requestStatusMap.get(saveCI.getRequestId()).equals(HisStatus.FAIL)){
+                                        saveCI.setMessage("任务执行失败");
+                                        saveCI.setUpdateTime(new Date());
+                                        saveCI.setStatus(HisStatus.FAIL);
+                                    }
+                                }
+                            }
+                        }
+
                         if (taskMsg.getRetryNum() > limitRetry || taskMsg.getRoundRobinNum() > robinNum || taskMsg.getHisVersion() == -1) {
                             for(ContentItem saveCI: toSaveContentItemList){
                                 if(saveCI.getStatus().equals(HisStatus.WAIT)){
@@ -1553,7 +1563,7 @@ public class ContentServiceImpl implements ContentService {
                     }
                 }else{//不存在
                     if(contentHistory.getIsSplit().equals(String.valueOf(true))) {
-                        List<ContentItem> coits = dateBaseService.getContentItemRepository().findByRequestIdAndStatus(requestId, HisStatus.WAIT.name());
+                        List<ContentItem> coits = dateBaseService.getContentItemRepository().findByRequestIdAndStatus(requestId, HisStatus.WAIT);
                         for (ContentItem saveCI : coits) {
                             saveCI.setMessage("任务执行失败");
                             saveCI.setUpdateTime(new Date());
@@ -1600,6 +1610,7 @@ public class ContentServiceImpl implements ContentService {
                 List<VendorContentTask> vcts = dateBaseService.getVendorTaskRepository().findByRequestIdIn(requestIds);
                 Map<String, List<VendorContentTask>> allVendorContentTaskMap = new HashMap<>();
 
+                Map<String, HisStatus> requestStatusMap = new HashMap<>();
                 List<VendorContentTask> succVctList = new ArrayList<>();
                 List<VendorContentTask> failVctList = new ArrayList<>();
                 List<VendorContentTask> waitVctList = new ArrayList<>();
@@ -1618,34 +1629,67 @@ public class ContentServiceImpl implements ContentService {
                     }
                 }
 
-                List<ContentItem> coits = dateBaseService.getContentItemRepository().findByRequestIdInAndStatus(requestIds, HisStatus.WAIT.name());
+                List<ContentItem> coits = dateBaseService.getContentItemRepository().findByRequestIdInAndStatus(requestIds, HisStatus.WAIT);
                 if(coits.size() >0) {
                     Map<String, ContentItem> waitContentItemMap = new HashMap<>();
+                    List<ContentItem> toSaveContentItemList = new ArrayList<>();
 
                     for (ContentItem ci : coits) {
                         waitContentItemMap.put(ci.getItemId(), ci);
                     }
-                    for (VendorContentTask vct : succVctList) {
-                        if (waitContentItemMap.containsKey(vct.getItemId())) {
-                            waitContentItemMap.get(vct.getItemId()).setMessage("任务执行成功");
-                            waitContentItemMap.get(vct.getItemId()).setUpdateTime(new Date());
-                            waitContentItemMap.get(vct.getItemId()).setStatus(HisStatus.SUCCESS);
+
+                    for(VendorContentTask vct : succVctList){
+                        if(StringUtils.isNotBlank(vct.getItemId())) {
+                            if (waitContentItemMap.containsKey(vct.getItemId())) {
+                                waitContentItemMap.get(vct.getItemId()).setMessage("任务执行成功");
+                                waitContentItemMap.get(vct.getItemId()).setUpdateTime(new Date());
+                                waitContentItemMap.get(vct.getItemId()).setStatus(HisStatus.SUCCESS);
+                            }
+                        }else{
+                            requestStatusMap.put(vct.getRequestId(),HisStatus.SUCCESS);
                         }
                     }
 
-                    for (VendorContentTask vct : failVctList) {
-                        if (waitContentItemMap.containsKey(vct.getItemId())) {
-                            waitContentItemMap.get(vct.getItemId()).setMessage("任务执行失败");
-                            waitContentItemMap.get(vct.getItemId()).setUpdateTime(new Date());
-                            waitContentItemMap.get(vct.getItemId()).setStatus(HisStatus.FAIL);
+                    for(VendorContentTask vct : waitVctList){
+                        if(!StringUtils.isNotBlank(vct.getItemId()) && requestStatusMap.containsKey(vct.getRequestId())){
+                            requestStatusMap.put(vct.getRequestId(),HisStatus.WAIT);
                         }
                     }
-                    List<ContentItem> toSaveContentItemList = new ArrayList<>();
 
-                    toSaveContentItemList.addAll(waitContentItemMap.values());
-                    if (taskMsg.getRetryNum() > limitRetry || taskMsg.getRoundRobinNum() > robinNum || taskMsg.getHisVersion() == -1) {
+                    for(VendorContentTask vct : failVctList){
+                        if(StringUtils.isNotBlank(vct.getItemId())) {
+                            if (waitContentItemMap.containsKey(vct.getItemId())) {
+                                waitContentItemMap.get(vct.getItemId()).setMessage("任务执行失败");
+                                waitContentItemMap.get(vct.getItemId()).setUpdateTime(new Date());
+                                waitContentItemMap.get(vct.getItemId()).setStatus(HisStatus.FAIL);
+                            }
+                        }else{
+                            requestStatusMap.put(vct.getRequestId(),HisStatus.FAIL);
+                        }
+                    }
+                    if(waitContentItemMap.size() >0) {
+                        toSaveContentItemList.addAll(waitContentItemMap.values());
+                    }
+
+                    if(requestStatusMap.keySet().size() >0) {
                         for (ContentItem saveCI : toSaveContentItemList) {
-                            if (saveCI.getStatus().equals(HisStatus.WAIT)) {
+                            if (requestStatusMap.containsKey(saveCI.getRequestId())) {
+                                if(requestStatusMap.get(saveCI.getRequestId()).equals(HisStatus.SUCCESS)){
+                                    saveCI.setMessage("任务执行成功");
+                                    saveCI.setUpdateTime(new Date());
+                                    saveCI.setStatus(HisStatus.SUCCESS);
+                                }else if(requestStatusMap.get(saveCI.getRequestId()).equals(HisStatus.FAIL)){
+                                    saveCI.setMessage("任务执行失败");
+                                    saveCI.setUpdateTime(new Date());
+                                    saveCI.setStatus(HisStatus.FAIL);
+                                }
+                            }
+                        }
+                    }
+
+                    if (taskMsg.getRetryNum() > limitRetry || taskMsg.getRoundRobinNum() > robinNum || taskMsg.getHisVersion() == -1) {
+                        for(ContentItem saveCI: toSaveContentItemList){
+                            if(saveCI.getStatus().equals(HisStatus.WAIT)){
                                 saveCI.setMessage("任务执行失败");
                                 saveCI.setUpdateTime(new Date());
                                 saveCI.setStatus(HisStatus.FAIL);
@@ -2426,7 +2470,7 @@ public class ContentServiceImpl implements ContentService {
         }
 
         List<VendorContentTask> resultVendorContentTaskList = new ArrayList<>();
-        if(!isSplit) {
+        if(!isSplit || !vendorRequestMerge) {
             Map<String, List<String>> vendorUrlMap;
             Map<String, List<String>> lostUrlsMap = new HashMap<>();
             vendorUrlMap = getVendorUrlsMap(urls);
@@ -2599,7 +2643,8 @@ public class ContentServiceImpl implements ContentService {
                             vendorTask.setMergeId(taskId);
                             vendorTask.setVersion(contentHistory.getVersion());
                             vendorTask.setType(contentHistory.getType());
-                            vendorTask.setContent(ci.getUrl());
+                            vendorTask.setContent("[\"" + ci.getUrl() + "\"]");
+                            vendorTask.setUrl(ci.getUrl());
                             vendorTask.setContentNumber(1);
                             vendorTask.setHistoryCreateTime(contentHistory.getCreateTime());
                             vendorTask.setCreateTime(new Date());

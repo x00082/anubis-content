@@ -732,12 +732,10 @@ public class TaskServiceImpl implements TaskService {
             return false;
         }
         for(VendorContentTask vct:vendorContentTaskList){
-            if(vct.getContent() !=null && vct.getContentNumber()>0){
-                if( -1 != vct.getContent().indexOf('[') && -1 != vct.getContent().indexOf(']')) {
-                    urls.addAll(JSONArray.parseArray(vct.getContent(), String.class));
-                }else{
-                    urls.add(vct.getContent());
-                }
+            if(StringUtils.isNotBlank(vct.getUrl()) && vct.getContentNumber() == 1){
+                urls.add(vct.getUrl());
+            }else{
+                urls.addAll(JSONArray.parseArray(vct.getContent(), String.class));
             }
         }
         if(urls.size() == 0 ){

@@ -63,6 +63,9 @@ public class VendorContentTask {
     @Column(columnDefinition="TEXT", name="content", nullable = false)
     private String content;
 
+    @Column(length=128, name="url")
+    private String url;
+
     @Column(name="content_number", nullable = false)
     private Integer contentNumber;
 
@@ -90,7 +93,7 @@ public class VendorContentTask {
     @Column(length=128, name="request_id", nullable = false)
     private String requestId;
 
-    @Column(length=128, name="item_id", nullable = false)
+    @Column(length=128, name="item_id")
     private String itemId;
 
     @Column(length=128, name="merge_id")

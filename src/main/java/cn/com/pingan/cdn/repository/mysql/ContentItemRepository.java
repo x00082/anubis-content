@@ -8,6 +8,7 @@
  */
 package cn.com.pingan.cdn.repository.mysql;
 
+import cn.com.pingan.cdn.common.HisStatus;
 import cn.com.pingan.cdn.model.mysql.ContentItem;
 import cn.com.pingan.cdn.request.QueryHisCountDTO;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -49,11 +50,11 @@ public interface ContentItemRepository extends JpaRepository<ContentItem, Long>,
 
     List<ContentItem> findByRequestId(String requestId);
 
-    List<ContentItem> findByRequestIdAndStatus(String requestId, String status);
+    List<ContentItem> findByRequestIdAndStatus(String requestId, HisStatus status);
 
-    List<ContentItem> findByRequestIdInAndStatus(List<String> requestIds, String status);
+    List<ContentItem> findByRequestIdInAndStatus(List<String> requestIds, HisStatus status);
 
-    List<ContentItem> findByRequestIdAndStatusNot(String requestId, String status);
+    List<ContentItem> findByRequestIdAndStatusNot(String requestId, HisStatus status);
 
     List<ContentItem> findByRequestIdIn(List<String> requestIds);
 
