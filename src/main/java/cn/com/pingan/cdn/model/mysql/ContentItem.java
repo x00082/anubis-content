@@ -80,12 +80,6 @@ public class ContentItem {
     @Column(name="is_admin", length=16, nullable = false)
     private String isAdmin;
 
-    @Column(name = "all_task_num")
-    private Integer allTaskNum = 0;
-
-    @Column(name = "success_task_num")
-    private Integer successTaskNum = 0;
-
     @Column(name = "version")
     private Integer version= 0;
 

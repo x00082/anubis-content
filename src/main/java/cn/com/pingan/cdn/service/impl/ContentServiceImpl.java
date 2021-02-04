@@ -508,14 +508,16 @@ public class ContentServiceImpl implements ContentService {
                     return;
                 }
                 boolean isSplit = false;
-                List<ContentItem> contentItemList = null;
+                List<ContentItem> contentItemList = new ArrayList<>();
                 if(StringUtils.isNotBlank(contentHistory.getIsSplit()) && contentHistory.getIsSplit().equals(String.valueOf(true))){
                     isSplit = true;
 
-                    contentItemList = dateBaseService.getContentItemRepository().findByRequestId(requestId);
-                    if(contentItemList.size() == 0){
+                    List<ContentItem> itemList = dateBaseService.getContentItemRepository().findByRequestId(requestId);
+                    if(itemList.size() == 0){
                         log.error("ContentItem任务不存在,丢弃消息");
                         return;
+                    }else{
+                        contentItemList.addAll(itemList);
                     }
 
                 }
@@ -724,9 +726,17 @@ public class ContentServiceImpl implements ContentService {
                     log.debug("获取厂商成功");
 
                     Map<String, VendorContentTask> vendorContentTaskMap = new HashMap<>();
+                    List<VendorContentTask> delList = new ArrayList<>();
                     List<VendorContentTask> vendorContentTaskList = dateBaseService.getVendorTaskRepository().findByRequestId(requestId);
                     for(VendorContentTask vct: vendorContentTaskList){
-                        vendorContentTaskMap.put(vct.getItemId()+vct.getVendor(),vct);
+                        if(StringUtils.isNotBlank(vct.getItemId())) {
+                            vendorContentTaskMap.put(vct.getItemId() + vct.getVendor(), vct);
+                        }else{
+                            delList.add(vct);
+                        }
+                    }
+                    if(delList.size() >0){
+                        dateBaseService.getVendorTaskRepository().deleteInBatch(delList);
                     }
 
                     List<VendorContentTask> toSaveTask = new ArrayList<>();
@@ -795,12 +805,6 @@ public class ContentServiceImpl implements ContentService {
                             }
                         }
 
-                        if(succ < all){
-                            ci.setUpdateTime(new Date());
-                            ci.setSuccessTaskNum(succ);
-                            ci.setAllTaskNum(all);
-                        }
-
                         succHis += succ;
                         allHis  += all;
                     }
@@ -810,7 +814,11 @@ public class ContentServiceImpl implements ContentService {
                     contentHistory.setAllTaskNum(allHis);
                     contentHistory.setSuccessTaskNum(succHis);
 
-                    dateBaseService.getContentItemRepository().saveAll(contentItemList);
+                    /*
+                    if(contentItemList.size() >0 ) {
+                        dateBaseService.getContentItemRepository().saveAll(contentItemList);
+                    }
+                    */
                     dateBaseService.getContentHistoryRepository().save(contentHistory);
 
                     if(toSaveTask.size()>0){
@@ -2459,13 +2467,15 @@ public class ContentServiceImpl implements ContentService {
         List<String> urls = JSONArray.parseArray(contentHistory.getContent(), String.class);
         RefreshType type = contentHistory.getType();
         boolean isSplit = false;
-        List<ContentItem> contentItemList = null;
+        List<ContentItem> contentItemList = new ArrayList<>();
         if(StringUtils.isNotBlank(contentHistory.getIsSplit()) && contentHistory.getIsSplit().equals(String.valueOf(true))){
             isSplit = true;
-            contentItemList = dateBaseService.getContentItemRepository().findByRequestId(requestId);
-            if(contentItemList.size() == 0){
+            List<ContentItem> itemList = dateBaseService.getContentItemRepository().findByRequestId(requestId);
+            if(itemList.size() == 0){
                 log.error("ContentItem任务不存在,丢弃消息");
                 throw new Exception("ContentItem任务不存在");
+            }else{
+                contentItemList.addAll(itemList);
             }
         }
 
@@ -2607,9 +2617,17 @@ public class ContentServiceImpl implements ContentService {
             }
 
             Map<String, VendorContentTask> vendorContentTaskMap = new HashMap<>();
+            List<VendorContentTask> delList = new ArrayList<>();
             List<VendorContentTask> vendorContentTaskList = dateBaseService.getVendorTaskRepository().findByRequestId(requestId);
             for(VendorContentTask vct: vendorContentTaskList){
-                vendorContentTaskMap.put(vct.getItemId()+vct.getVendor(),vct);
+                if(StringUtils.isNotBlank(vct.getItemId())) {
+                    vendorContentTaskMap.put(vct.getItemId() + vct.getVendor(), vct);
+                }else{
+                    delList.add(vct);
+                }
+            }
+            if(delList.size() >0) {
+                dateBaseService.getVendorTaskRepository().deleteInBatch(delList);
             }
 
             List<VendorContentTask> toSaveTask = new ArrayList<>();
@@ -2653,13 +2671,12 @@ public class ContentServiceImpl implements ContentService {
                         }
                     }
                 }
-                ci.setAllTaskNum(all);
-                ci.setSuccessTaskNum(succ);
-                ci.setUpdateTime(new Date());
             }
+            /*
             if(contentItemList.size() > 0) {
                 dateBaseService.getContentItemRepository().saveAll(contentItemList);
             }
+            */
             if(toSaveTask.size() > 0) {
                 resultVendorContentTaskList.addAll(toSaveTask);
             }
