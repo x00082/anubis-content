@@ -14,6 +14,7 @@ public class QueryHisCommandDTO implements Command {
     private String startTime;
     private String endTime;
     private String type;
+    private String url;
     private int pageIndex;
     private int pageSize;
     private String taskId;

@@ -27,7 +27,7 @@ import java.util.List;
  *  
  */
 @Repository
-public interface ContentHistoryRepository extends JpaRepository<ContentHistory, Long>, JpaSpecificationExecutor<ContentHistory> {
+public interface ContentHistoryRepository extends JpaRepository<ContentHistory, String>, JpaSpecificationExecutor<ContentHistory> {
 
     ContentHistory findByRequestId(String requestId);
 

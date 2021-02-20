@@ -8,24 +8,14 @@
  */
 package cn.com.pingan.cdn.repository.mysql;
 
-import cn.com.pingan.cdn.model.mysql.SplitHistory;
-import cn.com.pingan.cdn.request.QueryHisCountDTO;
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
-import org.springframework.data.jpa.repository.Query;
-import org.springframework.stereotype.Repository;
-
-import java.util.Date;
-import java.util.List;
-
 /**
  * @author lujun
  * @ClassName: ContentHistoryRepository
  * @Description: TODO()
  * @date 2021年01月19日 上午10:21:18
  */
-@Repository
-public interface SplitHistoryRepository extends JpaRepository<SplitHistory, Long>, JpaSpecificationExecutor<SplitHistory> {
+/*@Repository
+public interface SplitHistoryRepository extends JpaRepository<SplitHistory, String>, JpaSpecificationExecutor<SplitHistory> {
 
     List<SplitHistory> findByRequestId(String requestId);
 
@@ -44,3 +34,4 @@ public interface SplitHistoryRepository extends JpaRepository<SplitHistory, Long
     List<QueryHisCountDTO.HisCountResult> findByCreateTimeBetweenAndUserIdInOrDomainNameIn(Date startTime, Date endTime, List<String> uuids, List<String> domains);
 
 }
+*/

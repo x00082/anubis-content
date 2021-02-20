@@ -45,10 +45,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 
-import javax.persistence.criteria.CriteriaBuilder;
-import javax.persistence.criteria.CriteriaQuery;
-import javax.persistence.criteria.Predicate;
-import javax.persistence.criteria.Root;
+import javax.persistence.criteria.*;
 import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
@@ -225,23 +222,11 @@ public class ContentServiceImpl implements ContentService {
             dateBaseService.getContentHistoryRepository().save(contentHistory);
             log.info("用户请求入库完成 request id:{}", contentHistory.getRequestId());
 
-            List<SplitHistory> toSaveSplit = new ArrayList<>();
+            //List<SplitHistory> toSaveSplit = new ArrayList<>();
             List<ContentItem> toSaveItem = new ArrayList<>();
             log.info("urlDomainMap:[{}]", urlDomainSpMap);
             for(String dm: urlDomainSpMap.keySet()){
                 String recordId = UUID.randomUUID().toString().replaceAll("-", "");
-                SplitHistory splitHistory = new SplitHistory();
-                splitHistory.setTaskId(recordId);
-                splitHistory.setRequestId(taskId);
-                splitHistory.setContent(dm);
-                splitHistory.setDomainName(urlDomainSpMap.get(dm).getHost());
-                splitHistory.setCreateTime(now);
-                splitHistory.setStatus(HisStatus.WAIT);
-                splitHistory.setType(type);
-                splitHistory.setUserId(dto.getUid());
-                splitHistory.setIsAdmin(dto.getIsAdmin());
-                toSaveSplit.add(splitHistory);
-
                 ContentItem contentItem = new ContentItem();
                 contentItem.setItemId(recordId);
                 contentItem.setRequestId(taskId);
@@ -255,9 +240,6 @@ public class ContentServiceImpl implements ContentService {
                 contentItem.setIsAdmin(dto.getIsAdmin());
                 toSaveItem.add(contentItem);
             }
-
-            dateBaseService.getSplitHistoryRepository().saveAll(toSaveSplit);
-            log.info("splitHistory数据入库完成[{}]", toSaveSplit);
 
             dateBaseService.getContentItemRepository().saveAll(toSaveItem);
             log.info("ContentItem数据入库完成[{}]", toSaveItem);
@@ -305,36 +287,61 @@ public class ContentServiceImpl implements ContentService {
                 log.error("用户任务[{}]不存在", requestId);
                 return ApiReceipt.error("0x004008", String.format("[%s]原始任务记录不存在，禁止操作", requestId));
             }
-            if (contentHistory.getStatus().equals(HisStatus.FAIL)) {//任务已失败或未开始
+
+            //检查域名状态
+            Map<String, HostSpCodeData> urlDomainSpMap = checkDomainStatus(JSONArray.parseArray(contentHistory.getContent(), String.class), true, null);
+            log.info("检查域名状态完成");
+
+            if(!contentHistory.getStatus().equals(HisStatus.SUCCESS)) {
                 contentHistory.setStatus(HisStatus.WAIT);
                 contentHistory.setFlowStatus(FlowEmun.redo);
                 contentHistory.setVersion(contentHistory.getVersion() + 1);
                 contentHistory.setAllTaskNum(-1);
                 contentHistory.setSuccessTaskNum(-100);
-                dateBaseService.getContentHistoryRepository().save(contentHistory);
-                log.info("[{}]请求任务已失败，设置为wait", requestId);
 
-            } else if (contentHistory.getStatus().equals(HisStatus.WAIT)) {
-                if(flag){
-                    log.info("[{}]请求任务为wait,强制重试", requestId);
-                    contentHistory.setFlowStatus(FlowEmun.redo);
-                    contentHistory.setVersion(contentHistory.getVersion() + 1);
-                    contentHistory.setAllTaskNum(-1);
-                    contentHistory.setSuccessTaskNum(-100);
-                    dateBaseService.getContentHistoryRepository().save(contentHistory);
-                }else{
-                    log.info("[{}]请求任务为wait,不需要重试", requestId);
-                    if(contentHistory.getSuccessTaskNum().equals(contentHistory.getAllTaskNum())){
-                        contentHistory.setStatus(HisStatus.SUCCESS);
-                        dateBaseService.getContentHistoryRepository().save(contentHistory);
-                    }
-                    return ApiReceipt.ok();
+                if (contentHistory.getIsSplit().equals(String.valueOf(false))) {
+                    contentHistory.setIsSplit(String.valueOf(true));
                 }
-            } else {
-                log.info("[{}]请求任务已成功，不再重试", requestId);
-                return ApiReceipt.ok();
+                Date now = new Date();
 
+                List<ContentItem> toSaveItem = new ArrayList<>();
+                List<ContentItem> itemList = dateBaseService.getContentItemRepository().findByRequestId(requestId);
+                if(itemList.size() != contentHistory.getContentNumber()){
+                    if(itemList.size()>0){
+                        dateBaseService.getContentItemRepository().deleteInBatch(itemList);
+                    }
+
+                    log.info("urlDomainMap:[{}]", urlDomainSpMap);
+                    for(String dm: urlDomainSpMap.keySet()){
+                        String recordId = UUID.randomUUID().toString().replaceAll("-", "");
+                        ContentItem contentItem = new ContentItem();
+                        contentItem.setItemId(recordId);
+                        contentItem.setRequestId(contentHistory.getRequestId());
+                        contentItem.setUrl(dm);
+                        contentItem.setDomainName(urlDomainSpMap.get(dm).getHost());
+                        contentItem.setSpCode(urlDomainSpMap.get(dm).getUserCode());
+                        contentItem.setCreateTime(contentHistory.getCreateTime());
+                        contentItem.setUpdateTime(now);
+                        contentItem.setStatus(HisStatus.WAIT);
+                        contentItem.setType(contentHistory.getType());
+                        contentItem.setUserId(contentHistory.getUserId());
+                        contentItem.setIsAdmin(contentHistory.getIsAdmin());
+                        toSaveItem.add(contentItem);
+                    }
+                }else{
+                    for(ContentItem ci:itemList){
+                        ci.setUpdateTime(now);
+                        ci.setStatus(HisStatus.WAIT);
+                        toSaveItem.add(ci);
+                    }
+                }
+                if(toSaveItem.size()>0){
+                    dateBaseService.getContentItemRepository().saveAll(toSaveItem);
+                }
+
+                dateBaseService.getContentHistoryRepository().save(contentHistory);
             }
+
             TaskMsg historyTaskMsg = new TaskMsg();
             historyTaskMsg.setForce(flag);
             historyTaskMsg.setTaskId(requestId);
@@ -386,49 +393,77 @@ public class ContentServiceImpl implements ContentService {
 
 
             List<ContentHistory> toSave = new ArrayList<>();
+            List<ContentItem> toSaveItem = new ArrayList<>();
+            Date now = new Date();
             for(ContentHistory ch: contentHistorys){
-                if (ch.getStatus().equals(HisStatus.FAIL)) {//任务已失败或未开始
+
+                Map<String, HostSpCodeData> urlDomainSpMap = checkDomainStatus(JSONArray.parseArray(ch.getContent(), String.class), true, null);
+                log.info("检查域名状态完成");
+
+                if (!ch.getStatus().equals(HisStatus.SUCCESS)) {//任务已失败或未开始
                     ch.setStatus(HisStatus.WAIT);
                     ch.setFlowStatus(FlowEmun.redo);
                     ch.setVersion(ch.getVersion() + 1);
                     ch.setAllTaskNum(-1);
                     ch.setSuccessTaskNum(-100);
+                    if (ch.getIsSplit().equals(String.valueOf(false))) {
+                        ch.setIsSplit(String.valueOf(true));
+                    }
                     log.info("[{}]请求任务已失败，设置为wait", ch.getRequestId());
                     toSave.add(ch);
-                } else if (ch.getStatus().equals(HisStatus.WAIT)) {
-                    if(flag){
-                        log.info("[{}]请求任务为wait,强制重试", ch.getRequestId());
-                        ch.setFlowStatus(FlowEmun.redo);
-                        ch.setVersion(ch.getVersion() + 1);
-                        ch.setAllTaskNum(-1);
-                        ch.setSuccessTaskNum(-100);
-                        toSave.add(ch);
-                    }else{
-                        log.info("[{}]请求任务为wait,不需要重试", ch.getRequestId());
-                        if(ch.getSuccessTaskNum().equals(ch.getAllTaskNum())){
-                            ch.setStatus(HisStatus.SUCCESS);
-                            toSave.add(ch);
-                        }
-                        continue;
-                    }
-                } else {
-                    log.info("[{}]请求任务已成功，不再重试", ch.getRequestId());
-                    continue;
 
+
+                    List<ContentItem> itemList = dateBaseService.getContentItemRepository().findByRequestId(ch.getRequestId());
+                    if(itemList.size() != ch.getContentNumber()){
+                        if(itemList.size()>0){
+                            dateBaseService.getContentItemRepository().deleteInBatch(itemList);
+                        }
+
+                        log.info("urlDomainMap:[{}]", urlDomainSpMap);
+                        for(String dm: urlDomainSpMap.keySet()){
+                            String recordId = UUID.randomUUID().toString().replaceAll("-", "");
+                            ContentItem contentItem = new ContentItem();
+                            contentItem.setItemId(recordId);
+                            contentItem.setRequestId(ch.getRequestId());
+                            contentItem.setUrl(dm);
+                            contentItem.setDomainName(urlDomainSpMap.get(dm).getHost());
+                            contentItem.setSpCode(urlDomainSpMap.get(dm).getUserCode());
+                            contentItem.setCreateTime(ch.getCreateTime());
+                            contentItem.setUpdateTime(now);
+                            contentItem.setStatus(HisStatus.WAIT);
+                            contentItem.setType(ch.getType());
+                            contentItem.setUserId(ch.getUserId());
+                            contentItem.setIsAdmin(ch.getIsAdmin());
+                            toSaveItem.add(contentItem);
+                        }
+                    }else{
+                        for(ContentItem ci:itemList){
+                            ci.setUpdateTime(now);
+                            ci.setStatus(HisStatus.WAIT);
+                            toSaveItem.add(ci);
+                        }
+                    }
+
+                    TaskMsg historyTaskMsg = new TaskMsg();
+                    historyTaskMsg.setForce(flag);
+                    //historyTaskMsg.setId(ch.getId());
+                    historyTaskMsg.setTaskId(ch.getRequestId());
+                    historyTaskMsg.setVersion(1);
+                    historyTaskMsg.setHisVersion(ch.getVersion());
+                    historyTaskMsg.setType(ch.getType());
+                    historyTaskMsg.setSize(ch.getContentNumber());
+                    historyTaskMsg.setOperation(TaskOperationEnum.content_item);
+                    msgList.add(historyTaskMsg);
                 }
-                TaskMsg historyTaskMsg = new TaskMsg();
-                historyTaskMsg.setForce(flag);
-                //historyTaskMsg.setId(ch.getId());
-                historyTaskMsg.setTaskId(ch.getRequestId());
-                historyTaskMsg.setVersion(1);
-                historyTaskMsg.setHisVersion(ch.getVersion());
-                historyTaskMsg.setType(ch.getType());
-                historyTaskMsg.setSize(ch.getContentNumber());
-                historyTaskMsg.setOperation(TaskOperationEnum.content_item);
-                msgList.add(historyTaskMsg);
             }
             if(toSave.size()>0) {
                 dateBaseService.getContentHistoryRepository().saveAll(toSave);
+
+            }
+            if(toSaveItem.size()>0){
+                dateBaseService.getContentItemRepository().saveAll(toSaveItem);
+            }
+            if(msgList.size()>0){
                 sendListMQ(msgList);
             }
 
@@ -956,9 +991,6 @@ public class ContentServiceImpl implements ContentService {
         }
     }
 
-
-
-
     public void saveVendorTaskOld(TaskMsg taskMsg) throws ContentException {
         String requestId = taskMsg.getTaskId();
         boolean force = taskMsg.getForce();
@@ -1310,17 +1342,148 @@ public class ContentServiceImpl implements ContentService {
         return 0;
     }
 
+
     @Override
     public void exportAndImport(TaskMsg taskMsg) {
         log.info("exportAndImport start[{}]", taskMsg);
+        ExportRecord exportRecord = exportRecordRepository.findByExportId(taskMsg.getTaskId());
+        if (exportRecord == null || exportRecord.getType() == null) {
+            return;
+        }
+        if(taskMsg.getRetryNum() > 3){
+            log.error("重试次数超过限制，导入任务失败");
+            exportRecord.setUpdateTime(new Date());
+            exportRecord.setStatus(HisStatus.FAIL);
+            exportRecordRepository.save(exportRecord);
+            return;
+        }
+
+        String type = exportRecord.getType();
+        if(type.equals("splitItem")){
+            exportAndImportSplitItem(taskMsg, exportRecord);
+        }else if(type.equals("oldHis")){
+            exportAndImportOldHistory(taskMsg, exportRecord);
+        }else{
+            return;
+        }
+
+
+    }
+
+
+    public void exportAndImportSplitItem(TaskMsg taskMsg, ExportRecord exportRecord) {
+        log.info("exportAndImportSplitItem start[{}]", taskMsg);
+        int pageIndex = 0;
+        int pageSize = exportRecord.getPageSize();
+        String taskId = taskMsg.getTaskId();
+        try {
+
+            Date startTime = taskMsg.getExportInfo().getStartTime();
+            Date endTime = taskMsg.getExportInfo().getEndTime();
+
+            Sort sort = new Sort(Sort.Direction.ASC, "createTime");
+            long count = 0L;
+            long allCount = 0L;
+            long num = 0L;
+            Map<String,String> hostSpMap = new HashMap<>();
+            do {
+
+                PageRequest pageRequest = PageRequest.of(0, pageSize, sort);
+
+                Page<ContentHistory> pager = dateBaseService.getContentHistoryRepository().findAll(new Specification<ContentHistory>() {
+                    private static final long serialVersionUID = 1L;
+
+                    public Predicate toPredicate(Root<ContentHistory> root, CriteriaQuery<?> query,
+                                                 CriteriaBuilder criteriaBuilder) {
+                        List<Predicate> cond = new ArrayList<>();
+
+                        //大于等于
+                        cond.add(criteriaBuilder.greaterThanOrEqualTo(root.get("createTime").as(Date.class), startTime));
+                        //小于等于
+                        cond.add(criteriaBuilder.lessThanOrEqualTo(root.get("createTime").as(Date.class), endTime));
+
+                        cond.add(criteriaBuilder.equal(root.get("isSplit"), String.valueOf(false)));
+
+                        Path<Object> path = root.get("status");//定义查询的字段
+
+                        /*
+                        CriteriaBuilder.In<Object> in = criteriaBuilder.in(path);
+                        in.value(HisStatus.SUCCESS);//存入值
+                        in.value(HisStatus.FAIL);
+                        cond.add(criteriaBuilder.and(criteriaBuilder.and(in)));//存入结果集
+                        */
+
+                        return query.where(cond.toArray(new Predicate[0])).getRestriction();
+                    }
+
+                }, pageRequest);
+                if (allCount == 0) {
+                    allCount = pager.getTotalElements();
+                }
+                List<ContentHistory> toSaveContentHis = new ArrayList<>();
+                List<ContentItem> toSaveItem = new ArrayList<>();
+                if(pager.getNumberOfElements() == 0){
+                    break;
+                }
+                for (ContentHistory ch : pager) {
+                    ch.setIsSplit(String.valueOf(true));
+
+                    Map<String, HostSpCodeData> urlDomainSpMap = getUrlHostSp(JSONArray.parseArray(ch.getContent(), String.class),hostSpMap);
+                    for(String url: urlDomainSpMap.keySet()){
+                        String recordId = UUID.randomUUID().toString().replaceAll("-", "");
+                        ContentItem contentItem = new ContentItem();
+                        contentItem.setItemId(recordId);
+                        contentItem.setRequestId(ch.getRequestId());
+                        contentItem.setUrl(url);
+                        contentItem.setDomainName(urlDomainSpMap.get(url).getHost());
+                        contentItem.setSpCode(urlDomainSpMap.get(url).getUserCode());
+                        contentItem.setCreateTime(ch.getCreateTime());
+                        contentItem.setUpdateTime(ch.getCreateTime());
+                        contentItem.setStatus(ch.getStatus());
+                        contentItem.setType(ch.getType());
+                        contentItem.setUserId(ch.getUserId());
+                        contentItem.setIsAdmin(ch.getIsAdmin());
+                        toSaveItem.add(contentItem);
+                    }
+                    toSaveContentHis.add(ch);
+                    num++;
+                }
+                if(toSaveItem.size()>0) {
+                    dateBaseService.getContentItemRepository().saveAll(toSaveItem);
+                }
+                dateBaseService.getContentHistoryRepository().saveAll(toSaveContentHis);
+
+                count += pager.getNumberOfElements();
+                pageIndex++;
+
+                log.info("导入进度---->已导出[{}], 已导入有效[{}], 当前次数[{}], 总数[{}]", count, num, pageIndex, allCount);
+                exportRecord.setCount(num);
+                exportRecord.setUpdateTime(new Date());
+                exportRecordRepository.save(exportRecord);
+
+            } while (count < allCount);
+
+            exportRecord.setUpdateTime(new Date());
+            exportRecord.setStatus(HisStatus.SUCCESS);
+            exportRecordRepository.save(exportRecord);
+            log.info("exportAndImportSplitItem done[{}]", taskMsg);
+        }catch (Exception e){
+            log.error("导入数据异常", e);
+            taskMsg.setDelay(5000L);
+            taskMsg.setRetryNum(taskMsg.getRetryNum()+1);
+            producer.sendDelayMsg(taskMsg);
+        }
+
+    }
+
+
+
+    public void exportAndImportOldHistory(TaskMsg taskMsg, ExportRecord exportRecord) {
+        log.info("exportAndImportOldHistory start[{}]", taskMsg);
         int pageIndex = 0;
         int pageSize = exportLimit;
         String taskId = taskMsg.getTaskId();
         try {
-            ExportRecord exportRecord = exportRecordRepository.findByExportId(taskId);
-            if (exportRecord == null) {
-                return;
-            }
 
             if(taskMsg.getRetryNum() > 3){
                 log.error("重试次数超过限制，导入任务失败");
@@ -1527,6 +1690,7 @@ public class ContentServiceImpl implements ContentService {
                             contentHistory.setStatus(HisStatus.SUCCESS);
                             dateBaseService.getContentHistoryRepository().save(contentHistory);
 
+                            /*
                             List<SplitHistory> splitHistorys = dateBaseService.getSplitHistoryRepository().findByRequestId(contentHistory.getRequestId());
                             if(splitHistorys.size()>0) {
                                 for (SplitHistory sh : splitHistorys) {
@@ -1535,12 +1699,14 @@ public class ContentServiceImpl implements ContentService {
                                 dateBaseService.getSplitHistoryRepository().saveAll(splitHistorys);
                                 log.info("变更拆分任务数[{}]",splitHistorys.size());
                             }
+                            */
                         }else{
                             contentHistory.setMessage("任务执行失败");
                             contentHistory.setUpdateTime(new Date());
                             contentHistory.setStatus(HisStatus.FAIL);
                             dateBaseService.getContentHistoryRepository().save(contentHistory);
 
+                            /*
                             List<SplitHistory> splitHistorys = dateBaseService.getSplitHistoryRepository().findByRequestId(contentHistory.getRequestId());
                             if(splitHistorys.size()>0) {
                                 for (SplitHistory sh : splitHistorys) {
@@ -1549,6 +1715,7 @@ public class ContentServiceImpl implements ContentService {
                                 dateBaseService.getSplitHistoryRepository().saveAll(splitHistorys);
                                 log.info("变更拆分任务数[{}]",splitHistorys.size());
                             }
+                            */
                         }
                         return;
                     }else{
@@ -1558,6 +1725,7 @@ public class ContentServiceImpl implements ContentService {
                             contentHistory.setStatus(HisStatus.FAIL);
                             dateBaseService.getContentHistoryRepository().save(contentHistory);
 
+                            /*
                             List<SplitHistory> splitHistorys = dateBaseService.getSplitHistoryRepository().findByRequestId(contentHistory.getRequestId());
                             if(splitHistorys.size()>0) {
                                 for (SplitHistory sh : splitHistorys) {
@@ -1566,6 +1734,7 @@ public class ContentServiceImpl implements ContentService {
                                 dateBaseService.getSplitHistoryRepository().saveAll(splitHistorys);
                                 log.info("变更拆分任务数[{}]",splitHistorys.size());
                             }
+                            */
                             return;
                         }
                     }
@@ -1584,6 +1753,7 @@ public class ContentServiceImpl implements ContentService {
                     contentHistory.setStatus(HisStatus.FAIL);
                     dateBaseService.getContentHistoryRepository().save(contentHistory);
 
+                    /*
                     List<SplitHistory> splitHistorys = dateBaseService.getSplitHistoryRepository().findByRequestId(contentHistory.getRequestId());
                     if(splitHistorys.size()>0) {
                         for (SplitHistory sh : splitHistorys) {
@@ -1592,6 +1762,7 @@ public class ContentServiceImpl implements ContentService {
                         dateBaseService.getSplitHistoryRepository().saveAll(splitHistorys);
                         log.info("变更拆分任务数[{}]",splitHistorys.size());
                     }
+                    */
                     return;
                 }
                 taskMsg.setDelay(robinRate);//TODO
@@ -1612,7 +1783,7 @@ public class ContentServiceImpl implements ContentService {
                 List<ContentHistory> contentHistorys = dateBaseService.getContentHistoryRepository().findByRequestIdIn(new ArrayList<>(requestIds));
 
                 List<ContentHistory> toSaveList = new ArrayList<>();
-                List<SplitHistory> toSaveSplitList = new ArrayList<>();
+                //List<SplitHistory> toSaveSplitList = new ArrayList<>();
                 List<RobinCallBack> toSendList = new ArrayList<>();
 
                 List<VendorContentTask> vcts = dateBaseService.getVendorTaskRepository().findByRequestIdIn(requestIds);
@@ -1775,6 +1946,7 @@ public class ContentServiceImpl implements ContentService {
                     for(ContentHistory ch: toSaveList){
                         reIdMap.put(ch.getRequestId(), ch.getStatus());
                     }
+                    /*
                     List<SplitHistory> splitHistories = dateBaseService.getSplitHistoryRepository().findByRequestIdIn(new ArrayList<>(reIdMap.keySet()));
                     for(SplitHistory sh:splitHistories){
                         if(reIdMap.containsKey(sh.getRequestId())){
@@ -1783,6 +1955,7 @@ public class ContentServiceImpl implements ContentService {
                     }
                     dateBaseService.getSplitHistoryRepository().saveAll(splitHistories);
                     log.info("变更拆分任务数[{}]",splitHistories.size());
+                    */
                 }
 
                 if(toSendList.size()>0){
@@ -2003,6 +2176,56 @@ public class ContentServiceImpl implements ContentService {
         }
         return urlDomainSpMap;
     }
+
+    private Map<String, HostSpCodeData> getUrlHostSp(List<String> data, Map<String, String> domainSpMap) throws ContentException {
+        //判断当前域名状态，查当前用户的所有域名
+        List<Domain> domains = new ArrayList<>();
+        //根据domain来过滤
+        List<String> domainParam = new ArrayList<>();
+
+        Map<String, String> urlDomainMap = new HashMap<>();
+
+        for (String url : data) {
+            String host = null;
+            try {
+                host = (new URL(url)).getHost();
+            } catch (MalformedURLException e) {
+                log.error("无效的URL [{}]",url);
+                throw new ContentException("0x004008", String.format("无效的URL:[%s]，禁止操作", url));
+            }
+            if(!domainSpMap.containsKey(host)){
+                domainParam.add(host);
+            }
+            urlDomainMap.put(url, host);
+        }
+
+        if(domainParam.size() >0) {
+            domains = dateBaseService.getDomainRepository().findByDomainIn(domainParam);
+            log.info("domains:{}",domains);
+            //判断域名状态
+            for (Domain d : domains) {
+                domainSpMap.put(d.getDomain(), d.getUserCode());
+
+            }
+        }
+
+
+        for (String host : domainParam) {
+            if (!domainSpMap.containsKey(host)) {
+                throw new ContentException("0x004008", String.format("域名:[%s]不可用，禁止操作", host));
+            }
+        }
+
+        Map<String, HostSpCodeData> urlDomainSpMap = new HashMap<>();
+
+        for(String url:urlDomainMap.keySet()){
+            String h = urlDomainMap.get(url);
+            String sp = domainSpMap.get(h);
+            urlDomainSpMap.put(url, new HostSpCodeData(h, sp));
+        }
+        return urlDomainSpMap;
+    }
+
     
     private void checkUserLimit(boolean adminFlag,RefreshType type,String spCode, String userName, int size) throws ContentException {
         if(adminFlag) return;

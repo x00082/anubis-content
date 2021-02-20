@@ -8,20 +8,15 @@
  */
 package cn.com.pingan.cdn.model.mysql;
 
-import cn.com.pingan.cdn.common.HisStatus;
-import cn.com.pingan.cdn.common.RefreshType;
-import lombok.Data;
-
-import javax.persistence.*;
-import java.util.Date;
-
-/** 
+/**
  * @ClassName: ContentHistory 
  * @Description: TODO() 
  * @author lujun
  * @date 2020年10月9日 上午10:12:01 
  *  
  */
+
+/*
 @Data
 @Entity
 
@@ -37,6 +32,7 @@ import java.util.Date;
                 @Index(columnList = "domain_name"),
 
 })
+
 public class SplitHistory {
 
     @Id
@@ -70,3 +66,4 @@ public class SplitHistory {
     private String isAdmin;
 
 }
+*/

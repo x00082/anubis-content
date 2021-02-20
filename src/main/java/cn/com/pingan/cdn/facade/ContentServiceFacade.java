@@ -12,6 +12,7 @@ import cn.com.pingan.cdn.common.ApiReceipt;
 import cn.com.pingan.cdn.common.ContentLimitDTO;
 import cn.com.pingan.cdn.exception.ContentException;
 import cn.com.pingan.cdn.gateWay.GateWayHeaderDTO;
+import cn.com.pingan.cdn.request.ExportAndImportCommand;
 import cn.com.pingan.cdn.request.QueryHisCountDTO;
 import cn.com.pingan.cdn.request.QueryHisDTO;
 import cn.com.pingan.cdn.request.VendorInfoDTO;
@@ -46,6 +47,8 @@ public interface ContentServiceFacade {
 
     public QueryHisDTO queryHis(GateWayHeaderDTO dto, QueryHisCommand command);
 
+    public QueryHisDTO queryItemHis(GateWayHeaderDTO dto, QueryHisCommand command);
+
     public QueryHisCountDTO queryHisCount(QueryHisCountCommandDTO command);
 
     public ApiReceipt queryImportTask(String exportId);
@@ -74,7 +77,7 @@ public interface ContentServiceFacade {
 
     public ApiReceipt setVendorStatus(VendorInfoDTO command);
 
-    ApiReceipt exportAndImport(GateWayHeaderDTO dto, QueryHisCommand command);
+    ApiReceipt exportAndImport(GateWayHeaderDTO dto, ExportAndImportCommand command);
 
     
     ApiReceipt test(GateWayHeaderDTO dto, FreshCommand command) throws ContentException;

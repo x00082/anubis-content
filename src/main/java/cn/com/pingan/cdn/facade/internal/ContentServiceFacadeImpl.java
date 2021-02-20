@@ -14,16 +14,19 @@ import cn.com.pingan.cdn.exception.ContentException;
 import cn.com.pingan.cdn.facade.ContentServiceFacade;
 import cn.com.pingan.cdn.gateWay.GateWayHeaderDTO;
 import cn.com.pingan.cdn.model.mysql.ContentHistory;
+import cn.com.pingan.cdn.model.mysql.ContentItem;
 import cn.com.pingan.cdn.model.mysql.ExportRecord;
 import cn.com.pingan.cdn.rabbitmq.message.TaskMsg;
 import cn.com.pingan.cdn.rabbitmq.producer.Producer;
 import cn.com.pingan.cdn.repository.mysql.ContentHistoryRepository;
 import cn.com.pingan.cdn.repository.mysql.ExportRecordRepository;
+import cn.com.pingan.cdn.request.ExportAndImportCommand;
 import cn.com.pingan.cdn.request.QueryHisCountDTO;
 import cn.com.pingan.cdn.request.QueryHisDTO;
 import cn.com.pingan.cdn.request.VendorInfoDTO;
 import cn.com.pingan.cdn.request.openapi.ContentDefaultNumDTO;
 import cn.com.pingan.cdn.response.ContentHisDTO;
+import cn.com.pingan.cdn.response.ContentItemHisDTO;
 import cn.com.pingan.cdn.response.openapi.OpenApiUserContentHisDTO;
 import cn.com.pingan.cdn.service.ConfigService;
 import cn.com.pingan.cdn.service.ContentService;
@@ -42,6 +45,7 @@ import org.springframework.stereotype.Service;
 
 import javax.persistence.criteria.*;
 import java.io.IOException;
+import java.math.BigInteger;
 import java.sql.Timestamp;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
@@ -173,26 +177,6 @@ public class ContentServiceFacadeImpl implements ContentServiceFacade {
                 ch = this.contentHistoryRepository.findByRequestId(command.getTaskId());
             }
             if(ch !=null) {
-
-                /*
-                if(ch.getStatus().equals(HisStatus.WAIT) && ch.getSuccessTaskNum() >= ch.getAllTaskNum()){
-                    List<VendorContentTask> vcts = dateBaseService.getVendorTaskRepository().findByRequestId(command.getTaskId());
-                    if(vcts.size()>0){
-                        boolean flag = true;
-                        for(VendorContentTask vct :vcts){
-                            if(!vct.getStatus().equals(TaskStatus.SUCCESS)){
-                                flag = false;
-                                break;
-                            }
-                        }
-                        if(flag){
-                            this.contentHistoryRepository.updateStatusAndMessageByRequestId(command.getTaskId(), HisStatus.SUCCESS.name(), "任务执行成功");
-                            ch.setStatus(HisStatus.SUCCESS);
-                        }
-                    }
-                }
-                */
-
 
                 chList.add(ch);
             }
@@ -340,6 +324,152 @@ public class ContentServiceFacadeImpl implements ContentServiceFacade {
 
 
     @Override
+    public QueryHisDTO queryItemHis(GateWayHeaderDTO dto, QueryHisCommand command) {
+        QueryHisDTO queryHisDTO = new QueryHisDTO();
+        int pageIndex = command.getPageIndex();
+        int pageSize = command.getPageSize();
+        pageIndex = pageIndex > 0 ? pageIndex - 1 : pageIndex;
+        pageSize = (pageSize > 0 && pageSize <= 100) ? pageSize : 100;
+        //Sort sort = new Sort(Sort.Direction.DESC, "id");
+        Sort sort = new Sort(Sort.Direction.DESC, "createTime");
+        //Sort sort = Sort.by(Sort.Direction.DESC, "id");
+        PageRequest pageRequest = PageRequest.of(pageIndex, pageSize, sort);
+
+        //管理员取command的账户数据中的用户UUID，commad是主账号则包含子账号
+        //用户角色 主账号取SSOAUTH主账号和子账号的uuid
+        //用户角色 子账号取SSOTUTH子账号的
+        List<BaseUser> userList = userRpcService.queryAllAccount();//查所有用户的信息
+
+        List<String> uuidList = new ArrayList<>();
+
+        //拼装用户uuid查询条件
+        queryUserUuid(dto, command, userList, uuidList);
+
+        List<String> finalUuidList = uuidList;
+
+        Page<ContentItem> pager;
+
+        pager = dateBaseService.getContentItemRepository().findAll(new Specification<ContentItem>() {
+            private static final long serialVersionUID = 1L;
+
+            public Predicate toPredicate(Root<ContentItem> root, CriteriaQuery<?> query,
+                                         CriteriaBuilder criteriaBuilder) {
+                List<Predicate> cond = new ArrayList<>();
+                SimpleDateFormat df = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+
+                Date startDate = null;
+                Date endDate = null;
+                try {
+                    if (!StringUtils.isEmpty(command.getStartTime())) {
+                        startDate = df.parse(command.getStartTime());
+                    } else {
+                        //默认查10天内的数据
+                        startDate = preNDay(1);
+                    }
+                    if (!StringUtils.isEmpty(command.getEndTime())) {
+                        endDate = df.parse(command.getEndTime());
+                    } else {
+                        endDate = new Date();
+                    }
+                } catch (ParseException e) {
+                    log.error("", e);
+                }
+
+                //                if (!StringUtils.isEmpty(dto.getUid()) && !"true".equals(dto.getIsAdmin())) {//非管理员加判断
+                //                    //非管理员角色  主账号查询包含子账号的刷新记录，子账号只能查询子账号刷新记录
+                //                    cond.add(criteriaBuilder.equal(root.get("userId"), dto.getUid()));
+                //                }
+                //                if (!StringUtils.isEmpty(command.getOperateAccount()) && "true".equals(dto.getIsAdmin()) && null != finalUuidList && finalUuidList.size() > 0) {//管理员新增用户过滤
+                //
+                //                    Path<Object> path = root.get("userId");//定义查询的字段
+                //
+                //                    CriteriaBuilder.In<Object> in = criteriaBuilder.in(path);
+                //                    for (int i = 0; i < finalUuidList.size(); i++) {
+                //                        in.value(finalUuidList.get(i));//存入值
+                //                    }
+                //                    cond.add(criteriaBuilder.and(criteriaBuilder.and(in)));//存入结果集
+                //                }
+                if (null != finalUuidList && finalUuidList.size() > 0) {
+                    Path<Object> path = root.get("userId");//定义查询的字段
+
+                    CriteriaBuilder.In<Object> in = criteriaBuilder.in(path);
+                    for (int i = 0; i < finalUuidList.size(); i++) {
+                        in.value(finalUuidList.get(i));//存入值
+                    }
+                    cond.add(criteriaBuilder.and(criteriaBuilder.and(in)));//存入结果集
+                }
+                if (command.getType() != null && !StringUtils.isEmpty(command.getType().name())) {
+                    cond.add(criteriaBuilder.equal(root.get("type"), command.getType()));
+                }
+                if (!StringUtils.isEmpty(command.getUrl())) {
+                    cond.add(criteriaBuilder.equal(root.get("url"), command.getUrl()));
+                }
+                if (!StringUtils.isEmpty(command.getTaskId())) {
+                    cond.add(criteriaBuilder.equal(root.get("requestId"), command.getTaskId()));
+                }
+                if (command.getStatus() != null && !StringUtils.isEmpty(command.getStatus().name())) {
+                    cond.add(criteriaBuilder.equal(root.get("status"), command.getStatus()));
+                }
+                if (null != startDate) {//大于等于
+                    cond.add(criteriaBuilder.greaterThanOrEqualTo(root.get("createTime").as(Date.class), startDate));
+                }
+                if (null != endDate) {//小于等于
+                    cond.add(criteriaBuilder.lessThanOrEqualTo(root.get("createTime").as(Date.class), endDate));
+                }
+                return query.where(cond.toArray(new Predicate[0])).getRestriction();
+            }
+
+        }, pageRequest);
+
+
+        List<ContentItemHisDTO> data = new ArrayList<>();
+        for (ContentItem contentItem : pager) {
+            ContentItemHisDTO tmp = new ContentItemHisDTO();
+            //tmp.setId(contentHistory.getId());
+            tmp.setOptTime(new Timestamp(contentItem.getCreateTime() != null ? contentItem.getCreateTime().getTime() : new Date().getTime()));
+            tmp.setContent(contentItem.getUrl());
+            tmp.setType(contentItem.getType() != null ? contentItem.getType().toString() : "");
+            String status = "";
+            String dataStatus = contentItem.getStatus() != null ? contentItem.getStatus().toString() : "";
+            if ("SUCCESS".equals(dataStatus)) {
+                status = "成功";
+            } else if ("FAIL".equals(dataStatus)) {
+                status = "失败";
+            } else {
+                status = "处理中";
+            }
+            tmp.setStatus(status);
+            tmp.setTaskId(contentItem.getRequestId());
+            tmp.setItemId(contentItem.getItemId());
+            tmp.setUserId(contentItem.getUserId());
+            String account = "";
+            String channel = "";
+            if (null != userList && !StringUtils.isEmpty(contentItem.getUserId())) {
+                for (BaseUser baseUser : userList) {
+
+                    if (!StringUtils.isEmpty(contentItem.getUserId()) && !StringUtils.isEmpty(baseUser.getUuid()) &&
+                            contentItem.getUserId().equals(baseUser.getUuid())) {
+                        account = baseUser.getAccount();
+                        channel = baseUser.getChannel();
+                        continue;
+                    }
+                }
+            }
+            tmp.setAccount(account);
+            tmp.setChannel(channel);
+            data.add(tmp);
+        }
+        queryHisDTO.setData(data);
+
+        queryHisDTO.setPageIndex(pager.getNumber() + 1);
+        queryHisDTO.setPageSize(pager.getNumberOfElements());
+        queryHisDTO.setTotalRecords((int) pager.getTotalElements());
+
+        return queryHisDTO;
+    }
+
+
+    @Override
     public QueryHisCountDTO queryHisCount(QueryHisCountCommandDTO command){
 
         QueryHisCountDTO queryHisCountDTO = new QueryHisCountDTO();
@@ -353,15 +483,22 @@ public class ContentServiceFacadeImpl implements ContentServiceFacade {
             domains = new ArrayList<>();
         }
 
-        List<String> uuidList = new ArrayList<>();
+        if(spCodes == null){
+            spCodes = new ArrayList<>();
+        }
+
+
 
         //拼装用户uuid查询条件
+        /*
+        List<String> uuidList = new ArrayList<>();
         if(spCodes != null && spCodes.size()>0) {
             List<BaseUser> userList = userRpcService.queryAllAccount();//查所有用户的信息
             queryUserUuidForSpcode(spCodes, userList, uuidList);
         }
 
         List<String> finalUuidList = uuidList;
+        */
 
         SimpleDateFormat df = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
 
@@ -383,16 +520,32 @@ public class ContentServiceFacadeImpl implements ContentServiceFacade {
             log.error("", e);
         }
 
-        List<QueryHisCountDTO.HisCountResult> results;
-        if(finalUuidList.size()>0 && domains.size()>0){
-            results = dateBaseService.getSplitHistoryRepository().findByCreateTimeBetweenAndUserIdInOrDomainNameIn(startDate, endDate, finalUuidList, domains);
-        }else if(finalUuidList.size()>0 && domains.size() == 0){
-            results = dateBaseService.getSplitHistoryRepository().findByCreateTimeBetweenAndUserIdIn(startDate, endDate, finalUuidList);
-        }else if(finalUuidList.size() == 0 && domains.size() > 0){
-            results = dateBaseService.getSplitHistoryRepository().findByCreateTimeBetweenAndDomainNameIn(startDate, endDate, domains);
+        List<QueryHisCountDTO.HisCountResult> results = new ArrayList<>();
+        List<Map<String,Object>> resultsObjs;
+        if(spCodes.size()>0 && domains.size()>0){
+            resultsObjs = dateBaseService.getContentItemRepository().findByCreateTimeBetweenAndSpCodeInOrDomainNameIn(startDate, endDate, spCodes, domains);
+        }else if(spCodes.size()>0 && domains.size() == 0){
+            resultsObjs = dateBaseService.getContentItemRepository().findByCreateTimeBetweenAndSpCodeIn(startDate, endDate, spCodes);
+        }else if(spCodes.size() == 0 && domains.size() > 0){
+            resultsObjs = dateBaseService.getContentItemRepository().findByCreateTimeBetweenAndDomainNameIn(startDate, endDate, domains);
         }else{
-            results = dateBaseService.getSplitHistoryRepository().findByCreateTimeBetween(startDate, endDate);
+            resultsObjs = dateBaseService.getContentItemRepository().findByCreateTimeBetween(startDate, endDate);
         }
+
+        for(Map<String,Object> map: resultsObjs) {
+            QueryHisCountDTO.HisCountResult result = new QueryHisCountDTO.HisCountResult();
+            for (Map.Entry<String, Object> entry : map.entrySet()){
+                if("count".equals(entry.getKey())){
+                    result.setCount(((BigInteger)entry.getValue()).longValue());
+                }else if("status".equals(entry.getKey())){
+                    result.setStatus(HisStatus.of((String) entry.getValue()));
+                }else if("type".equals(entry.getKey())) {
+                    result.setType(RefreshType.of((String) entry.getValue()));
+                }
+            }
+            results.add(result);
+        }
+
 
         Map<String, QueryHisCountDTO.HisCount> reMap = new HashMap<>();
         reMap.put(RefreshType.url.name(), new QueryHisCountDTO.HisCount(RefreshType.url));
@@ -421,7 +574,7 @@ public class ContentServiceFacadeImpl implements ContentServiceFacade {
 
 
     @Override
-    public ApiReceipt exportAndImport(GateWayHeaderDTO dto, QueryHisCommand command) {
+    public ApiReceipt exportAndImport(GateWayHeaderDTO dto, ExportAndImportCommand command) {
 
         Date startDate = null;
         Date endDate = null;
@@ -447,6 +600,8 @@ public class ContentServiceFacadeImpl implements ContentServiceFacade {
             exportRecord.setUpdateTime(new Date());
             exportRecord.setExportId(recordId);
             exportRecord.setCount(0L);
+            exportRecord.setType(command.getType());
+            exportRecord.setPageSize(command.getPageSize());
             exportRecord.setStatus(HisStatus.WAIT);
             exportRecordRepository.save(exportRecord);
 

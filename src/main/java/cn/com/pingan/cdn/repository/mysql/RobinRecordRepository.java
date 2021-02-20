@@ -26,7 +26,7 @@ import java.util.List;
  *  
  */
 @Repository
-public interface RobinRecordRepository extends JpaRepository<RobinRecord, Long>, JpaSpecificationExecutor<RobinRecord> {
+public interface RobinRecordRepository extends JpaRepository<RobinRecord, String>, JpaSpecificationExecutor<RobinRecord> {
 
     @Modifying
     @Transactional

@@ -21,7 +21,7 @@ import org.springframework.stereotype.Repository;
  *  
  */
 @Repository
-public interface ExportRecordRepository extends JpaRepository<ExportRecord, Long>, JpaSpecificationExecutor<ExportRecord> {
+public interface ExportRecordRepository extends JpaRepository<ExportRecord, String>, JpaSpecificationExecutor<ExportRecord> {
 
     ExportRecord findByExportId( String exportId );
 

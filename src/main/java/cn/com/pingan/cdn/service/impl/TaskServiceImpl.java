@@ -25,6 +25,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.stereotype.Service;
 
+import javax.print.DocFlavor;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
@@ -340,6 +341,7 @@ public class TaskServiceImpl implements TaskService {
     }
 
 
+    /*
     @Override
     public Boolean handlerRoundRobin(TaskMsg msg) throws RestfulException {
         log.info("enter handlerRoundRobin:{}", msg);
@@ -482,10 +484,213 @@ public class TaskServiceImpl implements TaskService {
                         dateBaseService.getVendorTaskRepository().batchUpdate(waitContentTaskList);
                     }
                 }
-
                 for(RefreshPreloadItem it: dto.getTaskList()){
                     log.debug("jobId[{}], ", it.getJobId());
                     if(responseMap !=null && responseMap.containsKey(it.getJobId()) && ( responseMap.get(it.getJobId()).equals(TaskStatus.SUCCESS) || responseMap.get(it.getJobId()).equals(TaskStatus.FAIL))){
+                        continue;
+                    }
+                    waitItemList.add(it);
+                }
+                if(waitItemList.size()>0){
+                    log.info("再次轮询[{}]", waitItemList.size());
+                    msg.getRobinTaskDto().getTaskList().clear();
+                    msg.getRobinTaskDto().getTaskList().addAll(waitItemList);
+                    msg.setRoundRobinNum(msg.getRoundRobinNum() + 1);
+                    producer.sendAllMsg(msg);
+                    return true;
+                }else{
+                    log.info("不再轮询");
+                    return false;
+                }
+            }else{
+                log.error("返回无效数据{}", response);
+                throw new Exception(" response err");
+            }
+        }catch (Exception e){
+            log.error("HandlerRoundRobin Exception:{}",e);
+            msg.setRetryNum(msg.getRetryNum() + 1);
+            if(msg.getRetryNum() > timeOutLimit){
+                List<String> ids = new ArrayList<>();
+                for(RefreshPreloadItem it:msg.getRobinTaskDto().getTaskList()){
+                    ids.add(it.getJobId());
+                }
+                List<VendorContentTask> vendorContentTaskList = dateBaseService.getVendorTaskRepository().findByJobIdIn(ids);
+                for(VendorContentTask v :vendorContentTaskList){
+                    v.setMessage("轮询失败");
+                    v.setStatus(TaskStatus.FAIL);
+                    v.setUpdateTime(new Date());
+                }
+                dateBaseService.getVendorTaskRepository().saveAll(vendorContentTaskList);
+
+                return false;
+            }else{
+                msg.setDelay(timeOutMs);
+            }
+        }
+        producer.sendAllMsg(msg);
+        return true;
+    }
+*/
+
+
+    @Override
+    public Boolean handlerRoundRobin(TaskMsg msg) throws RestfulException {
+        log.info("enter handlerRoundRobin:{}", msg);
+        //String taskId = msg.getTaskId();
+        try {
+            VendorInfo vendorInfo = null;
+            if(vendorInfoMap.containsKey(msg.getVendor())){
+                vendorInfo = vendorInfoMap.get(msg.getVendor());
+            }else{
+                vendorInfo = dateBaseService.getVendorInfoRepository().findByVendor(msg.getVendor());
+                if(vendorInfo != null){
+                    vendorInfoMap.put(msg.getVendor(), vendorInfo);
+                }
+            }
+            String vendorStatus;
+            if (vendorInfo == null) {
+                log.warn("[{}] vendorInfo db is null", msg.getVendor());
+                vendorStatus = defaultVendorStatus;
+            } else {
+                vendorStatus = vendorInfo.getStatus().name();
+            }
+
+            if ("down".equals(vendorStatus)) {
+                msg.setDelay(1 * 60 * 1000L);
+                //rabbitListenerConfig.stop(msg.getOperation().name());//关闭监听
+                producer.sendAllMsg(msg);//放回队列
+                Thread.currentThread().sleep(sleepMs);
+                return false;
+            }
+
+            if (msg.getIsLimit()) {//
+                //请求QPS限制
+                int limit = vendorInfo!=null?vendorInfo.getRobinQps():robinQps;
+                String redisKey = msg.getOperation().toString();
+                // 0-成功，-1执行异常，-100超限
+                int result = handlerTaskLimit(redisKey, limit);
+                if (-100 == result) {
+                    //stopAndSendDelayFanoutMsg(msg);
+                    log.warn("redis:{} Limit:{}", redisKey, limit);
+                    msg.setDelay(1000L);
+                    producer.sendAllMsg(msg);
+                    Thread.currentThread().sleep(sleepMs);
+                    return false;
+                } else if (-1 == result) {
+                    log.warn("redis:{} Limit:{} 执行异常", redisKey, limit);
+                    throw new Exception("redis err");
+                }
+            }
+
+            JSONObject response;
+
+            RefreshPreloadTaskStatusDTO dto = msg.getRobinTaskDto();
+
+            VendorClientService vendorClient = getVendorClientVO(VendorEnum.getByCode(msg.getVendor()));
+            response = vendorClient.queryRefreshPreloadTask(dto);
+            if(response == null || !response.containsKey("data")){
+                log.error("response is null or no data");
+                throw new Exception(": response no data");
+            }
+            log.info("response:{}", response);
+
+            Map<String, ItemStatusData> responseMap = new HashMap<>();//终态succ or fail
+            List<String> robinTask = new ArrayList<>();//仍需要轮询
+            List<RefreshPreloadItem> waitItemList = new ArrayList<>();
+
+            JSONArray jsonArray = response.getJSONArray("data");
+            if (jsonArray != null && jsonArray.size() > 0) {
+                TaskStatus ts = TaskStatus.ROUND_ROBIN;
+                String message = "";
+                for (int i = 0; i < jsonArray.size(); i++) {
+                    JSONObject json = jsonArray.getJSONObject(i);
+                    if (json != null && json.getString("jobId") != null ) {
+                        ItemStatusData itemStatusData = new ItemStatusData();
+                        if(json.getObject("item", Map.class) != null && json.getObject("item", Map.class).size() >0){
+                            itemStatusData.setItemMap(json.getObject("item", Map.class));
+                        }else{
+                            itemStatusData.setItemMap(new HashMap<>());
+                        }
+                        if (Constants.STATUS_SUCCESS.equals(json.getString("status"))) {
+                            itemStatusData.setStatus(TaskStatus.SUCCESS);
+                            responseMap.put(json.getString("jobId"), itemStatusData);
+                            msg.setRetryNum(0);
+                            log.debug("刷新预热任务完成，任务编号[{}]", json.getString("jobId"));
+                        } else if (Constants.STATUS_FAIL.equals(json.getString("status"))) {
+                            itemStatusData.setStatus(TaskStatus.FAIL);
+                            responseMap.put(json.getString("jobId"), itemStatusData);
+                            msg.setRetryNum(0);
+                            log.debug("刷新预热任务失败，任务编号[{}]", json.getString("jobId"));
+                        } else if (Constants.STATUS_WAIT.equals(json.getString("status"))) {
+                            itemStatusData.setStatus(TaskStatus.WAIT);
+                            //msg.setRoundRobinNum(msg.getRoundRobinNum() + 1);
+                            if(msg.getRoundRobinNum() > roundLimit){
+                                itemStatusData.setStatus(TaskStatus.FAIL);
+                                for(Map.Entry entry :itemStatusData.getItemMap().entrySet()){
+                                    if(entry.getValue().equals(TaskStatus.WAIT.name())){
+                                        entry.setValue(TaskStatus.FAIL.name());
+                                    }
+                                }
+                            }else{
+                                msg.setDelay(roundMs);
+                                robinTask.add(json.getString("jobId"));
+                            }
+                            responseMap.put(json.getString("jobId"), itemStatusData);
+                            log.debug("刷新预热任务未完成，任务编号[{}], 等待{}ms后查询", json.getString("jobId"), roundMs);
+                            msg.setRetryNum(0);
+                        } else {
+                            log.debug("返回值状态异常，期望的状态是SUCCESS/FAIL/WAIT,收到的状态是[{}]", json.getString("status"));
+                            msg.setRetryNum(msg.getRetryNum() + 1);
+                            if(msg.getRetryNum() > timeOutLimit){
+                            }else{
+                                msg.setDelay(timeOutMs);
+                            };
+                        }
+                    }
+                }
+
+
+                if(responseMap.keySet().size()>0) {
+                    List<VendorContentTask> vendorContentTaskList = dateBaseService.getVendorTaskRepository().findByJobIdIn(new ArrayList<>(responseMap.keySet()));
+                    if (vendorContentTaskList.size() > 0) {
+                        for (VendorContentTask v : vendorContentTaskList) {
+                            if (responseMap.get(v.getJobId()).getStatus().equals(TaskStatus.SUCCESS)) {
+                                v.setMessage("厂商执行成功");
+                                v.setStatus(TaskStatus.SUCCESS);
+                            } else if(responseMap.get(v.getJobId()).getStatus().equals(TaskStatus.FAIL)){
+                                v.setMessage("厂商执行失败或超时");
+                                v.setStatus(TaskStatus.FAIL);
+                                if(v.getUrl() != null && responseMap.get(v.getJobId()).getItemMap().containsKey(v.getUrl())){
+                                    if(responseMap.get(v.getJobId()).getItemMap().get(v.getUrl()).equals(TaskStatus.SUCCESS.name())){
+                                        v.setMessage("厂商执行成功");
+                                        v.setStatus(TaskStatus.SUCCESS);
+                                    }
+                                }
+                            }else{
+                                v.setMessage("轮询中");
+                                v.setStatus(TaskStatus.ROUND_ROBIN);
+                                if(v.getUrl() != null && responseMap.get(v.getJobId()).getItemMap().containsKey(v.getUrl())){
+                                    if(responseMap.get(v.getJobId()).getItemMap().get(v.getUrl()).equals(TaskStatus.SUCCESS.name())){
+                                        v.setMessage("厂商执行成功");
+                                        v.setStatus(TaskStatus.SUCCESS);
+                                    }else if(responseMap.get(v.getJobId()).getItemMap().get(v.getUrl()).equals(TaskStatus.FAIL.name())){
+                                        v.setMessage("厂商执行失败或超时");
+                                        v.setStatus(TaskStatus.FAIL);
+                                    }
+                                }
+                            }
+                            v.setUpdateTime(new Date());
+                        }
+                        dateBaseService.getVendorTaskRepository().batchUpdate(vendorContentTaskList);
+                    }else{
+                        log.error("任务记录不存在，丢弃该消息");
+                        return false;
+                    }
+                }
+
+                for(RefreshPreloadItem it: dto.getTaskList()){
+                    log.debug("jobId[{}], ", it.getJobId());
+                    if(responseMap !=null && responseMap.containsKey(it.getJobId()) && ( responseMap.get(it.getJobId()).getStatus().equals(TaskStatus.SUCCESS) || responseMap.get(it.getJobId()).getStatus().equals(TaskStatus.FAIL))){
                         continue;
                     }
                     waitItemList.add(it);
@@ -531,6 +736,7 @@ public class TaskServiceImpl implements TaskService {
         producer.sendAllMsg(msg);
         return true;
     }
+
 
     @Override
     public Boolean handlerSuccess(TaskMsg msg) throws RestfulException{

@@ -26,7 +26,7 @@ import java.util.List;
  *  
  */
 @Repository
-public interface RequestRecordRepository extends JpaRepository<RequestRecord, Long>, JpaSpecificationExecutor<RequestRecord> {
+public interface RequestRecordRepository extends JpaRepository<RequestRecord, String>, JpaSpecificationExecutor<RequestRecord> {
 
     @Modifying
     @Transactional

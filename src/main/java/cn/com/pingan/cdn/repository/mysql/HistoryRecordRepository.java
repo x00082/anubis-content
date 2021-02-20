@@ -26,7 +26,7 @@ import java.util.List;
  *  
  */
 @Repository
-public interface HistoryRecordRepository extends JpaRepository<HistoryRecord, Long>, JpaSpecificationExecutor<HistoryRecord> {
+public interface HistoryRecordRepository extends JpaRepository<HistoryRecord, String>, JpaSpecificationExecutor<HistoryRecord> {
 
     @Modifying
     @Transactional

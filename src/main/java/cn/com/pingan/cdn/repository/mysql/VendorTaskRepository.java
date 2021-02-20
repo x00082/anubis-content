@@ -19,7 +19,7 @@ import java.util.List;
  * @Created by Luj
  */
 @Repository
-public interface VendorTaskRepository extends MyJpaRepository<VendorContentTask, Long>, JpaSpecificationExecutor<VendorContentTask> {
+public interface VendorTaskRepository extends MyJpaRepository<VendorContentTask, String>, JpaSpecificationExecutor<VendorContentTask> {
 
     @Query(value = "select * from vendor_task v where status not in ?1 and create_time < ?2", nativeQuery = true)
     List<VendorContentTask> findByStatusNotINAndUpdateTimeLessThan(List<String> types, Date time);

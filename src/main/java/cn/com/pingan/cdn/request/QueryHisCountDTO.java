@@ -34,9 +34,9 @@ public class QueryHisCountDTO {
 
     @Data
     public static class HisCountResult{
-        private RefreshType type;
-        private HisStatus status;
         private long count;
+        private HisStatus status;
+        private RefreshType type;
     }
 
 

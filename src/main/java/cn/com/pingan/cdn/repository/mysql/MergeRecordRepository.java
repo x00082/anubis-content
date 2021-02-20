@@ -26,7 +26,7 @@ import java.util.List;
  *  
  */
 @Repository
-public interface MergeRecordRepository extends JpaRepository<MergeRecord, Long>, JpaSpecificationExecutor<MergeRecord> {
+public interface MergeRecordRepository extends JpaRepository<MergeRecord, String>, JpaSpecificationExecutor<MergeRecord> {
 
     @Modifying
     @Transactional

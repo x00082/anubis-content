@@ -33,7 +33,7 @@ public interface DateBaseService {
 
     public RequestRecordRepository getRequestRecordRepository();
 
-    public SplitHistoryRepository getSplitHistoryRepository();
+    //public SplitHistoryRepository getSplitHistoryRepository();
 
 
 }

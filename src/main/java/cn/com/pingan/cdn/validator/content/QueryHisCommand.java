@@ -23,6 +23,7 @@ public class QueryHisCommand implements Command {
     private RefreshType type;
     private int pageIndex;
     private int pageSize;
+    private String url;
     private String taskId;
     private String channel;
     private String account;
@@ -41,6 +42,7 @@ public class QueryHisCommand implements Command {
         if(StringUtils.isNotEmpty(dto.getType())) {
             this.type = RefreshType.of(dto.getType());
         }
+        this.url = dto.getUrl();
         this.pageIndex = dto.getPageIndex();
         this.pageSize = dto.getPageSize();
         this.taskId = dto.getTaskId();

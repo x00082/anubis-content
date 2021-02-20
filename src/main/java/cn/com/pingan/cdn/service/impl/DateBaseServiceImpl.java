@@ -47,8 +47,10 @@ public class DateBaseServiceImpl implements DateBaseService {
     @Autowired
     private RequestRecordRepository requestRecordRepository;
 
+    /*
     @Autowired
     private SplitHistoryRepository splitHistoryRepository;
+    */
 
     @Autowired
     private ContentItemRepository contentItemRepository;
@@ -101,6 +103,8 @@ public class DateBaseServiceImpl implements DateBaseService {
     @Override
     public RequestRecordRepository getRequestRecordRepository() { return requestRecordRepository; }
 
+    /*
     @Override
     public SplitHistoryRepository getSplitHistoryRepository() { return splitHistoryRepository; }
+    */
 }

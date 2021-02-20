@@ -33,4 +33,10 @@ public class ExportRecord {
 
     @Column(name="update_time")
     private Date updateTime;
+
+    @Column(name="type")
+    private String type;
+
+    @Column(name="page_size")
+    private int pageSize;
 }

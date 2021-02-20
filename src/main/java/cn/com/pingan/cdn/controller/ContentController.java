@@ -14,6 +14,7 @@ import cn.com.pingan.cdn.exception.DomainException;
 import cn.com.pingan.cdn.exception.ErrorCode;
 import cn.com.pingan.cdn.facade.ContentServiceFacade;
 import cn.com.pingan.cdn.gateWay.GateWayHeaderDTO;
+import cn.com.pingan.cdn.request.ExportAndImportCommand;
 import cn.com.pingan.cdn.request.VendorInfoDTO;
 import cn.com.pingan.cdn.request.openapi.ContentDefaultNumDTO;
 import cn.com.pingan.cdn.validator.content.FreshCommand;
@@ -244,6 +245,46 @@ public class ContentController {
             return result;
         }
 
+
+    /***
+     * @Description:  拆分任务查询
+     * @Param:
+     * @return:
+     */
+    //TODOs
+    @PostMapping("/queryItemHis")
+    public ApiReceipt queryItemHis(@Valid @RequestBody QueryHisCommandDTO command) throws ContentException, DomainException {
+
+        log.info("content/queryHis start command:{}", JSON.toJSONString(command));
+        // TODO
+        GateWayHeaderDTO dto = this.getGateWayInfo(request);
+        if(StringUtils.isEmpty(dto.getUsername()) || StringUtils.isEmpty(dto.getUid())) {
+            return  ApiReceipt.error(ErrorCode.NOHEADER);
+        }
+        //越权校验
+        if(!"true".equals(dto.getIsAdmin())) {
+            if (StringUtils.isEmpty(dto.getSpcode())) {
+                return  ApiReceipt.error(ErrorCode.FORBIDOPT);
+            }
+        }
+
+        if(StringUtils.isNotEmpty(command.getType()) && !RefreshType.is(command.getType())){
+            return  ApiReceipt.error(ErrorCode.PARAMILLEGAL);
+        }
+
+        if(StringUtils.isNotEmpty(command.getStatus()) && !HisStatus.is(command.getStatus())){
+            return  ApiReceipt.error(ErrorCode.PARAMILLEGAL);
+        }
+
+        QueryHisCommand hisCmd = new QueryHisCommand();
+        hisCmd.setWithQueryHisCommandDTO(command);
+
+        ApiReceipt result =ApiReceipt.ok().data(this.facade.queryItemHis(dto,hisCmd));
+        log.info("content/queryHis end result:{}", JSON.toJSONString(result));
+        return result;
+    }
+
+
         @GetMapping("/queryDetails")
         public ApiReceipt queryDetails(@RequestParam String requestId) throws ContentException, DomainException {
 
@@ -268,7 +309,7 @@ public class ContentController {
 
 
         @PostMapping("/importHis")
-        public ApiReceipt importHis(@Valid @RequestBody QueryHisCommand command) throws ContentException, DomainException {
+        public ApiReceipt importHis(@Valid @RequestBody ExportAndImportCommand command) throws ContentException, DomainException {
 
             log.info("content/importHis start command:{}", JSON.toJSONString(command));
             // TODO
