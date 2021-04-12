@@ -242,7 +242,7 @@ public class ContentServiceImpl implements ContentService {
             }
 
             dateBaseService.getContentItemRepository().saveAll(toSaveItem);
-            log.info("ContentItem数据入库完成[{}]", toSaveItem);
+            log.info("ContentItem数据入库完成[{}]", JSONObject.toJSONString(toSaveItem.toString()));
 
 
             if(requestMerge){
@@ -2019,7 +2019,7 @@ public class ContentServiceImpl implements ContentService {
         try {
             limitDTO = redisService.get(redisKey.toString(), ContentLimitDTO.class);
         } catch (IOException e) {
-            log.error("查询用户[{}]刷新预热用量异常,[{}]", spCode, e == null ? "null exception" : e.getMessage());
+            log.error("查询用户[{}]刷新预热用量异常,[{}]", JSONObject.toJSONString(spCode), e == null ? "null exception" : JSONObject.toJSONString(e.getMessage()));
             throw new IOException("查询redis用户刷新预热上限异常");
         }
         ContentLimit limit = new ContentLimit();
@@ -2244,7 +2244,7 @@ public class ContentServiceImpl implements ContentService {
 
         List<String> keys = new ArrayList<>();
         keys.add(contentPrefix + spCode);
-        log.info(contentPrefix + spCode);
+        log.info("check user limit {}", JSONObject.toJSONString(contentPrefix + spCode));
         List<String> args  = new ArrayList<>();
         args.add(String.valueOf(adminFlag));
         args.add(type.name());

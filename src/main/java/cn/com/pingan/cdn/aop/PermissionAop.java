@@ -28,6 +28,7 @@ import java.util.Map;
 
 import cn.com.pingan.cdn.exception.SslCertException;
 import com.alibaba.fastjson.JSON;
+import com.alibaba.fastjson.JSONObject;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.aspectj.lang.JoinPoint;
@@ -55,17 +56,17 @@ public class PermissionAop {
         HttpServletRequest request = attributes.getRequest();
 
         // 记录下请求内容
-        log.info("URL : " + request.getRequestURL().toString());
-        log.info("HTTP_METHOD : " + request.getMethod());
-        log.info("IP : " + request.getRemoteAddr());
-        log.info("CLASS_METHOD : " + joinPoint.getSignature().getDeclaringTypeName() + "." + joinPoint.getSignature().getName());
-        log.info("ARGS : " + Arrays.toString(joinPoint.getArgs()));
+        log.info("URL : {}", JSONObject.toJSONString(request.getRequestURL().toString()));
+        log.info("HTTP_METHOD : {}", JSONObject.toJSONString(request.getMethod()));
+        log.info("IP : {}", JSONObject.toJSONString(request.getRemoteAddr()));
+        log.info("CLASS_METHOD : {}", JSONObject.toJSONString(joinPoint.getSignature().getDeclaringTypeName() + "." + joinPoint.getSignature().getName()));
+        log.info("ARGS : {}", JSONObject.toJSONString(Arrays.toString(joinPoint.getArgs())));
 
 
         Enumeration<String> names=request.getHeaderNames();
         while (names.hasMoreElements()){
             String name=(String)names.nextElement();
-            log.info(name+":"+request.getHeader(name));
+            log.info("HeaderName:{}", JSONObject.toJSONString(name+":"+request.getHeader(name)));
         }
 //        GateWayHeaderDTO dto = new GateWayHeaderDTO();
         //校验账户信息
